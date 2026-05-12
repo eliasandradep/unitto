@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — OSBeauty</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+</head>
+<body class="admin-body admin-body--auth">
+
+  <div class="auth-card">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <svg viewBox="0 0 48 48" width="48" height="48" fill="none" style="margin-bottom:.5rem">
+        <circle cx="24" cy="24" r="22" fill="var(--primary,#c9a27e)" opacity=".15"/>
+        <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle"
+              font-family="Jost,sans-serif" font-size="20" font-weight="600"
+              fill="var(--primary,#c9a27e)">OS</text>
+      </svg>
+      <div style="font-size:1.1rem;font-weight:600;color:var(--text)">OSBeauty</div>
+      <div style="font-size:.8rem;color:var(--text-muted)">Painel Administrativo</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert--{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('admin.login') }}">
+      <div class="form-group">
+        <label>Usuário ou e-mail</label>
+        <input type="text" name="username" autofocus required />
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" name="password" required />
+      </div>
+      <button type="submit" class="btn-primary btn-full">Entrar</button>
+    </form>
+  </div>
+
+</body>
+</html>

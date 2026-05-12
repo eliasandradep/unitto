@@ -1,0 +1,946 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ c.nome if c else 'Novo Cliente' }}{% endblock %}
+{% block page_title %}{{ c.nome if c else 'Novo Cliente' }}{% endblock %}
+
+{% block content %}
+{% set action_url = url_for('admin.cliente_detalhe', cliente_id=c.id) if c else url_for('admin.cliente_novo') %}
+{% set ana = anamnese %}
+{% set anc = anamnese_corporal if anamnese_corporal is defined else none %}
+
+<!-- ── Abas ────────────────────────────────────────────────── -->
+<div class="cli-tabs">
+  <button class="cli-tab cli-tab--active" id="tabInfo" onclick="switchTab('tab-info')" type="button">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Informações do Cliente
+  </button>
+  {% if c %}
+  <button class="cli-tab" id="tabAnamnese" onclick="switchTab('tab-anamnese')" type="button">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Anamnese Capilar{% if ana %} <span class="cli-tab-ok">✓</span>{% endif %}
+  </button>
+  <button class="cli-tab" id="tabAnamneseCorporal" onclick="switchTab('tab-anamnese-corporal')" type="button">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Anamnese Corporal{% if anc %} <span class="cli-tab-ok">✓</span>{% endif %}
+  </button>
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAINEL 1 — Informações do Cliente
+     ══════════════════════════════════════════════════════════ -->
+<div id="tab-info" class="cli-panel">
+<div class="cli-layout">
+
+  <!-- Coluna principal -->
+  <div class="cli-main">
+    <form method="POST" action="{{ action_url }}" id="cliForm">
+
+      <!-- Dados Cadastrais -->
+      <div class="cli-section">
+        <div class="cli-section__hdr" onclick="toggleSec(this)">
+          <span>Dados Cadastrais</span>
+          <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cli-section__body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nome <span class="required">*</span></label>
+              <input type="text" name="nome" required value="{{ c.nome if c else '' }}" placeholder="Nome completo" />
+            </div>
+            <div class="form-group">
+              <label>Telefone / WhatsApp <span class="required">*</span></label>
+              <input type="tel" name="telefone" required value="{{ c.telefone if c else '' }}" placeholder="(00) 00000-0000" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>E-mail</label>
+              <input type="email" name="email" value="{{ c.email or '' if c else '' }}" placeholder="cliente@email.com" />
+            </div>
+            <div class="form-group">
+              <label>CPF</label>
+              <input type="text" name="cpf" id="cpfInput" value="{{ c.cpf or '' if c else '' }}" placeholder="000.000.000-00" maxlength="14" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Aniversário</label>
+              <input type="date" name="aniversario" value="{{ c.aniversario.strftime('%Y-%m-%d') if c and c.aniversario else '' }}" />
+            </div>
+            <div class="form-group">
+              <label>Sexo</label>
+              <select name="sexo">
+                <option value="">— Selecionar —</option>
+                {% for v, lbl in [('F','Feminino'),('M','Masculino'),('Outro','Outro')] %}
+                <option value="{{ v }}" {% if c and c.sexo == v %}selected{% endif %}>{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="cli-toggle-row">
+              <label class="cli-toggle-label">Bloquear cliente?</label>
+              <label class="cli-toggle">
+                <input type="checkbox" name="bloqueado" value="1" {% if c and c.bloqueado %}checked{% endif %} id="bloqueadoChk" />
+                <span class="cli-toggle__slider"></span>
+              </label>
+              <span class="cli-toggle-status" id="bloqueadoStatus">{{ 'SIM' if c and c.bloqueado else 'NÃO' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Endereço -->
+      <div class="cli-section">
+        <div class="cli-section__hdr" onclick="toggleSec(this)">
+          <span>Endereço</span>
+          <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cli-section__body">
+          <div class="form-row form-row--cep">
+            <div class="form-group">
+              <label>CEP</label>
+              <input type="text" name="cep" id="cepInput" value="{{ c.cep or '' if c else '' }}" placeholder="00000-000" maxlength="9" />
+            </div>
+            <div class="form-group" style="grid-column:span 2">
+              <label>Endereço</label>
+              <input type="text" name="endereco" id="enderecoInput" value="{{ c.endereco or '' if c else '' }}" placeholder="Rua, Avenida..." />
+            </div>
+          </div>
+          <div class="form-row form-row--4">
+            <div class="form-group">
+              <label>Número</label>
+              <input type="text" name="numero" value="{{ c.numero or '' if c else '' }}" placeholder="123" />
+            </div>
+            <div class="form-group">
+              <label>Complemento</label>
+              <input type="text" name="complemento" value="{{ c.complemento or '' if c else '' }}" placeholder="Apto, bloco..." />
+            </div>
+            <div class="form-group">
+              <label>Bairro</label>
+              <input type="text" name="bairro" id="bairroInput" value="{{ c.bairro or '' if c else '' }}" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cidade</label>
+              <input type="text" name="cidade" id="cidadeInput" value="{{ c.cidade or '' if c else '' }}" />
+            </div>
+            <div class="form-group">
+              <label>Estado</label>
+              <select name="estado" id="estadoInput">
+                <option value="">— Selecionar —</option>
+                {% for uf in ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] %}
+                <option value="{{ uf }}" {% if c and c.estado == uf %}selected{% endif %}>{{ uf }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dados Adicionais -->
+      <div class="cli-section">
+        <div class="cli-section__hdr" onclick="toggleSec(this)">
+          <span>Dados Adicionais</span>
+          <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cli-section__body">
+          <div class="form-group">
+            <label>Descrição / Observações</label>
+            <textarea name="descricao" rows="3" placeholder="Observações gerais sobre o cliente...">{{ c.descricao or '' if c else '' }}</textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Telefone Fixo</label>
+              <input type="tel" name="telefone_fixo" value="{{ c.telefone_fixo or '' if c else '' }}" placeholder="(00) 0000-0000" />
+            </div>
+            <div class="form-group">
+              <label>Telefone Celular</label>
+              <input type="tel" name="telefone_celular" value="{{ c.telefone_celular or '' if c else '' }}" placeholder="(00) 00000-0000" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Como nos conheceu?</label>
+            <input type="text" name="como_conheceu" value="{{ c.como_conheceu or '' if c else '' }}" placeholder="Instagram, indicação, Google..." />
+          </div>
+        </div>
+      </div>
+
+      <!-- Ações -->
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Salvar
+        </button>
+        <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">Cancelar</a>
+        {% if c %}
+        <button type="submit" name="action" value="excluir" class="btn-danger"
+          onclick="return confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')">
+          Excluir cliente
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Coluna lateral -->
+  <div class="cli-side">
+    {% if c %}
+
+    <div class="cli-info-block">
+      <div class="cli-info-hdr cli-info-hdr--open" onclick="toggleInfo(this)">
+        <span>Comportamento</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body">
+        <div class="cli-info-row cli-info-row--total">
+          <span>Saldo do Cliente</span><strong>R$ 0,00</strong>
+        </div>
+        <div class="cli-info-row">
+          <span>Total Gasto</span><strong class="cli-val--gold">R$ 0,00</strong>
+        </div>
+        <div class="cli-info-divider"></div>
+        <p class="cli-info-label">Operação</p>
+        <div class="cli-info-row">
+          <span>Leads cadastrados</span><strong>{{ leads_rel | length }}</strong>
+        </div>
+        <div class="cli-info-row">
+          <span>Cadastrado em</span><strong>{{ c.created_at.strftime('%d/%m/%Y') }}</strong>
+        </div>
+        <div class="cli-info-row">
+          <span>Última atualização</span><strong>{{ c.updated_at.strftime('%d/%m/%Y') }}</strong>
+        </div>
+        <div class="cli-info-divider"></div>
+        {% set fone = c.telefone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
+        <a href="https://wa.me/55{{ fone }}" target="_blank" rel="noopener" class="btn-sm btn-wa btn-sm-block">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:.3rem"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Enviar WhatsApp
+        </a>
+      </div>
+    </div>
+
+    <div class="cli-info-block">
+      <div class="cli-info-hdr" onclick="toggleInfo(this)">
+        <span>Leads ({{ leads_rel | length }})</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body" hidden>
+        {% if leads_rel %}
+          {% for lead in leads_rel %}
+          <div class="cli-lead-row">
+            <div>
+              <span class="badge badge--{{ lead.status }}">{{ lead.status_label() }}</span>
+              <span style="font-size:.78rem;margin-left:.4rem">{{ lead.service or '—' }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span style="font-size:.75rem;color:var(--text-muted)">{{ lead.created_at.strftime('%d/%m/%Y') }}</span>
+              <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}" class="btn-sm" style="padding:.2rem .5rem;font-size:.72rem">Ver</a>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Nenhum lead encontrado para este telefone.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cli-info-block">
+      <div class="cli-info-hdr" onclick="toggleInfo(this)">
+        <span>Agendamentos</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body" hidden>
+        <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Integração com Gendo em breve.</p>
+      </div>
+    </div>
+
+    {% if vendas_pacote is defined and vendas_pacote %}
+    <div class="cli-info-block">
+      <div class="cli-info-hdr cli-info-hdr--open" onclick="toggleInfo(this)">
+        <span>🎁 Pacotes Ativos ({{ vendas_pacote | length }})</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body">
+        {% for venda in vendas_pacote %}
+        <div style="margin-bottom:.8rem;padding-bottom:.8rem;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <strong style="font-size:.83rem">{{ venda.nome_pacote }}</strong>
+            <a href="{{ url_for('admin.venda_pacote_detalhe', venda_id=venda.id) }}"
+               style="font-size:.72rem;color:var(--primary)">Ver detalhes →</a>
+          </div>
+          {% for item in venda.itens %}
+          <div style="font-size:.78rem;color:var(--text-muted);display:flex;justify-content:space-between">
+            <span>{{ item.descricao }}</span>
+            <span>
+              {% if item.quantidade_restante > 0 %}
+                <strong style="color:var(--primary)">{{ item.quantidade_restante }}</strong> / {{ item.quantidade_total }} restantes
+              {% else %}
+                <span style="color:#aaa">esgotado</span>
+              {% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card" style="text-align:center;padding:2rem 1.4rem">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--border)" stroke-width="1.5" style="margin-bottom:.8rem"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <p style="font-size:.85rem;color:var(--text-muted)">Preencha os dados ao lado e salve para visualizar as informações do cliente.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- /cli-layout -->
+</div><!-- /tab-info -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     PAINEL 2 — Anamnese Capilar
+     ══════════════════════════════════════════════════════════ -->
+{% if c %}
+<div id="tab-anamnese" class="cli-panel" hidden>
+
+{% set condicoes  = (ana.condicao               or '' if ana else '').split(',') %}
+{% set patologias = (ana.patologia              or '' if ana else '').split(',') %}
+{% set alergicos  = (ana.antecedentes_alergicos or '' if ana else '').split(',') %}
+{% set tratamentos= (ana.tratamentos_atuais     or '' if ana else '').split(',') %}
+
+<form method="POST" action="{{ url_for('admin.cliente_anamnese', cliente_id=c.id) }}">
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card__header">
+      <h3>Anamnese Capilar</h3>
+      {% if ana %}<span style="font-size:.78rem;color:var(--text-muted)">Atualizado em {{ ana.updated_at.strftime('%d/%m/%Y') }}</span>{% endif %}
+    </div>
+
+    <!-- Tipo + Característica -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select name="tipo">
+          <option value="">Selecione</option>
+          {% for opt in ['Liso','Ondulado','Crespo','Afro'] %}
+          <option value="{{ opt }}" {% if ana and ana.tipo == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Característica</label>
+        <select name="caracteristica">
+          <option value="">Selecione</option>
+          {% for opt in ['Normal','Oleoso','Seco','Seborreico','Misto'] %}
+          <option value="{{ opt }}" {% if ana and ana.caracteristica == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Pigmentação + Tipo de Cabelo -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Pigmentação Predominante</label>
+        <select name="pigmentacao">
+          <option value="">Selecione</option>
+          {% for opt in ['Eumenalina','Feomenalina','Tricosiderina'] %}
+          <option value="{{ opt }}" {% if ana and ana.pigmentacao == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de Cabelo</label>
+        <select name="tipo_cabelo">
+          <option value="">Selecione</option>
+          {% for opt in ['Liso','Crespo','Alisado','Cacheado','Encaracolado'] %}
+          <option value="{{ opt }}" {% if ana and ana.tipo_cabelo == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Comprimento + Elasticidade -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Comprimento</label>
+        <input type="text" name="comprimento" value="{{ ana.comprimento or '' if ana else '' }}" placeholder="ex: Curto, Médio, Longo" />
+      </div>
+      <div class="form-group">
+        <label>Elasticidade</label>
+        <input type="text" name="elasticidade" value="{{ ana.elasticidade or '' if ana else '' }}" placeholder="ex: Boa, Baixa, Alta" />
+      </div>
+    </div>
+
+    <!-- Porosidade + Volume -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Porosidade</label>
+        <input type="text" name="porosidade" value="{{ ana.porosidade or '' if ana else '' }}" placeholder="ex: Alta, Média, Baixa" />
+      </div>
+      <div class="form-group">
+        <label>Volume</label>
+        <input type="text" name="volume" value="{{ ana.volume or '' if ana else '' }}" placeholder="ex: Alto, Médio, Baixo" />
+      </div>
+    </div>
+
+    <!-- Espessura + Resistência -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Espessura do Fio</label>
+        <select name="espessura_fio">
+          <option value="">Selecione</option>
+          {% for opt in ['Fino','Médio','Grosso'] %}
+          <option value="{{ opt }}" {% if ana and ana.espessura_fio == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Resistência</label>
+        <input type="text" name="resistencia" value="{{ ana.resistencia or '' if ana else '' }}" placeholder="ex: Boa, Fraca, Alta" />
+      </div>
+    </div>
+
+    <!-- Condição + Observações -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Condição</label>
+        <div class="check-group">
+          {% for opt in ['Tingimento','Permanente','Reflexos','Luzes','Amaciamento','Permanente Afro','Alisamento','Relaxamento','Escova Progressiva','Henna','Henê'] %}
+          <label class="check-item">
+            <input type="checkbox" name="condicao" value="{{ opt }}" {% if opt in condicoes %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea name="obs_condicao" rows="7" placeholder="Observações sobre a condição...">{{ ana.obs_condicao or '' if ana else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Patologia + Obs Patologia -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Patologia</label>
+        <div class="check-group">
+          {% for opt in ['Seborréia','Dermatite','Alopecias','Caspa','Queda Capilar','Psoríase','Foliculite'] %}
+          <label class="check-item">
+            <input type="checkbox" name="patologia" value="{{ opt }}" {% if opt in patologias %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações Patologia</label>
+        <textarea name="obs_patologia" rows="5" placeholder="Descreva a patologia...">{{ ana.obs_patologia or '' if ana else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Tempo surgiu + Toma Medicamento -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>A quanto tempo surgiu?</label>
+        <input type="text" name="tempo_surgiu" value="{{ ana.tempo_surgiu or '' if ana else '' }}" placeholder="ex: 6 meses, 2 anos" />
+      </div>
+      <div class="form-group">
+        <label>Toma Medicamento?</label>
+        <input type="text" name="toma_medicamento" value="{{ ana.toma_medicamento or '' if ana else '' }}" placeholder="Nome do medicamento ou Não" />
+      </div>
+    </div>
+
+    <!-- Procurou Médico + Diagnóstico -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Procurou Médico?</label>
+        <div class="radio-group">
+          <label class="radio-item">
+            <input type="radio" name="procurou_medico" value="Sim" {% if ana and ana.procurou_medico == 'Sim' %}checked{% endif %}> Sim
+          </label>
+          <label class="radio-item">
+            <input type="radio" name="procurou_medico" value="Não" {% if not ana or ana.procurou_medico != 'Sim' %}checked{% endif %}> Não
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Qual o diagnóstico?</label>
+        <input type="text" name="diagnostico" value="{{ ana.diagnostico or '' if ana else '' }}" placeholder="Diagnóstico médico" />
+      </div>
+    </div>
+
+    <!-- Antecedentes Alérgicos + Observações -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Antecedentes Alérgicos</label>
+        <div class="check-group">
+          {% for opt in ['Tinturas','Alisantes','Líquido Permanente','Tratamentos Capilares','Medicamentos','Outro'] %}
+          <label class="check-item">
+            <input type="checkbox" name="antecedentes_alergicos" value="{{ opt }}" {% if opt in alergicos %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações sobre antecedentes</label>
+        <textarea name="obs_antecedentes" rows="5" placeholder="Descreva os antecedentes...">{{ ana.obs_antecedentes or '' if ana else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Tratamentos Atuais + Medicamentos 3 meses -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Tratamentos Atuais</label>
+        <div class="check-group">
+          {% for opt in ['Gravidez','Neoplasia','Distúrbio Cardíaco','Distúrbio Respiratório','Distúrbio Nervoso','Distúrbio Genital','Distúrbio Intestinal','Distúrbio Gastrointestinal','Distúrbio Endócrino','Diabetes','Dependente de Insulina'] %}
+          <label class="check-item">
+            <input type="checkbox" name="tratamentos_atuais" value="{{ opt }}" {% if opt in tratamentos %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Medicamentos utilizados nos últimos três meses</label>
+        <textarea name="medicamentos_3meses" rows="7" placeholder="Liste os medicamentos...">{{ ana.medicamentos_3meses or '' if ana else '' }}</textarea>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Salvar Anamnese
+    </button>
+    <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">← Voltar</a>
+  </div>
+
+</form>
+</div><!-- /tab-anamnese -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     PAINEL 3 — Anamnese Corporal
+     ══════════════════════════════════════════════════════════ -->
+<div id="tab-anamnese-corporal" class="cli-panel" hidden>
+
+{% set pess = (anc.antecedentes_pessoais   or '' if anc else '').split(',') %}
+{% set fami = (anc.antecedentes_familiares or '' if anc else '').split(',') %}
+{% set alim = (anc.tipo_alimentacao        or '' if anc else '').split(',') %}
+
+<form method="POST" action="{{ url_for('admin.cliente_anamnese_corporal', cliente_id=c.id) }}">
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card__header">
+      <h3>Anamnese Corporal</h3>
+      {% if anc %}<span style="font-size:.78rem;color:var(--text-muted)">Atualizado em {{ anc.updated_at.strftime('%d/%m/%Y') }}</span>{% endif %}
+    </div>
+
+    <!-- Motivo da visita -->
+    <div class="form-group">
+      <label>Motivo da visita / queixa principal</label>
+      <input type="text" name="motivo_visita" value="{{ anc.motivo_visita or '' if anc else '' }}" placeholder="Descreva o motivo..." />
+    </div>
+
+    <!-- Tratamentos anteriores -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Tratamentos estéticos anteriores?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="tratamentos_anteriores" value="{{ v }}"
+              {% if anc and anc.tratamentos_anteriores == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Quais tratamentos?</label>
+        <textarea name="quais_tratamentos_anteriores" rows="3" placeholder="Descreva os tratamentos...">{{ anc.quais_tratamentos_anteriores or '' if anc else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Resultados -->
+    <div class="form-group">
+      <label>Resultados dos tratamentos anteriores</label>
+      <textarea name="resultados_tratamentos" rows="3" placeholder="Resultados obtidos...">{{ anc.resultados_tratamentos or '' if anc else '' }}</textarea>
+    </div>
+
+    <!-- Antecedentes Pessoais -->
+    {% set ant_opts = ['Cárdio Circulatório','Diabetes','Digestivo','Endocrinológico','Pressão Arterial','Trombose','Neoplasia','Obesidade'] %}
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Antecedentes Pessoais</label>
+        <div class="check-group">
+          {% for opt in ant_opts %}
+          <label class="check-item">
+            <input type="checkbox" name="antecedentes_pessoais" value="{{ opt }}" {% if opt in pess %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Antecedentes Familiares</label>
+        <div class="check-group">
+          {% for opt in ant_opts %}
+          <label class="check-item">
+            <input type="checkbox" name="antecedentes_familiares" value="{{ opt }}" {% if opt in fami %}checked{% endif %}> {{ opt }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Alérgicos -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Antecedentes Alérgicos?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="antecedentes_alergicos" value="{{ v }}"
+              {% if anc and anc.antecedentes_alergicos == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Quais?</label>
+        <textarea name="quais_antecedentes_alergicos" rows="3" placeholder="Descreva as alergias...">{{ anc.quais_antecedentes_alergicos or '' if anc else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Cirúrgicos -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Antecedentes Cirúrgicos?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="antecedentes_cirurgicos" value="{{ v }}"
+              {% if anc and anc.antecedentes_cirurgicos == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Quais cirurgias?</label>
+        <textarea name="quais_antecedentes_cirurgicos" rows="3" placeholder="Descreva as cirurgias...">{{ anc.quais_antecedentes_cirurgicos or '' if anc else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Atividade Física -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Pratica Atividade Física?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="atividade_fisica" value="{{ v }}"
+              {% if anc and anc.atividade_fisica == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Frequência</label>
+        <input type="text" name="frequencia_atividade" value="{{ anc.frequencia_atividade or '' if anc else '' }}" placeholder="ex: 3x por semana" />
+      </div>
+    </div>
+
+    <!-- Sono + Álcool + Fuma -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Horas de Sono</label>
+        <input type="text" name="horas_sono" value="{{ anc.horas_sono or '' if anc else '' }}" placeholder="ex: 7-8h" />
+      </div>
+      <div class="form-group">
+        <label>Consome Álcool?</label>
+        <select name="toma_alcool">
+          <option value="">Selecione</option>
+          {% for opt in ['Nunca','Raramente','Socialmente','Frequentemente','Diariamente'] %}
+          <option value="{{ opt }}" {% if anc and anc.toma_alcool == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Fuma + Preenchimento -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Fuma?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="fuma" value="{{ v }}"
+              {% if anc and anc.fuma == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Usa preenchimento?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="preenchimento" value="{{ v }}"
+              {% if anc and anc.preenchimento == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Sol + Roupas apertadas -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Toma Sol?</label>
+        <select name="toma_sol">
+          <option value="">Selecione</option>
+          {% for opt in ['Nunca','Raramente','Às vezes','Frequentemente','Diariamente'] %}
+          <option value="{{ opt }}" {% if anc and anc.toma_sol == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Usa roupas apertadas?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="roupas_apertadas" value="{{ v }}"
+              {% if anc and anc.roupas_apertadas == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Alimentação -->
+    <div class="form-group">
+      <label>Tipo de Alimentação</label>
+      <div class="check-group check-group--inline">
+        {% for opt in ['Gordura','Doces','Condimentada','Verdura','Dieta','Fibra'] %}
+        <label class="check-item">
+          <input type="checkbox" name="tipo_alimentacao" value="{{ opt }}" {% if opt in alim %}checked{% endif %}> {{ opt }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Apetite + Intestino -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Muito apetite?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="muito_apetite" value="{{ v }}"
+              {% if anc and anc.muito_apetite == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Intestino preso?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="intestino_preso" value="{{ v }}"
+              {% if anc and anc.intestino_preso == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Água + Urina -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Consumo de Água</label>
+        <select name="consumo_agua">
+          <option value="">Selecione</option>
+          {% for opt in ['Menos de 1L','1-2L','2-3L','Mais de 3L'] %}
+          <option value="{{ opt }}" {% if anc and anc.consumo_agua == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Urina</label>
+        <select name="urina">
+          <option value="">Selecione</option>
+          {% for opt in ['Normal','Frequente','Escassa','Com ardor','Com sangue'] %}
+          <option value="{{ opt }}" {% if anc and anc.urina == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Posição do dia -->
+    <div class="form-group">
+      <label>Posição que mais fica de dia</label>
+      <input type="text" name="posicao_dia" value="{{ anc.posicao_dia or '' if anc else '' }}" placeholder="ex: Sentada, Em pé, Deitada..." />
+    </div>
+
+    <!-- DIU + Gravidez + Menopausa -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Usa DIU?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="usa_diu" value="{{ v }}"
+              {% if anc and anc.usa_diu == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Está grávida?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="gravidez" value="{{ v }}"
+              {% if anc and anc.gravidez == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Menopausa + Gestações -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Menopausa?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="menopausa" value="{{ v }}"
+              {% if anc and anc.menopausa == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Número de Gestações</label>
+        <input type="text" name="num_gestacoes" value="{{ anc.num_gestacoes or '' if anc else '' }}" placeholder="ex: 2" />
+      </div>
+    </div>
+
+    <!-- Menstruação regular + Medicamentos -->
+    <div class="ana-grid">
+      <div class="form-group">
+        <label>Menstruação Regular?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="menstruacao_regular" value="{{ v }}"
+              {% if anc and anc.menstruacao_regular == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Usa Medicamentos?</label>
+        <div class="radio-group">
+          {% for v in ['Sim','Não'] %}
+          <label class="radio-item">
+            <input type="radio" name="uso_medicamentos" value="{{ v }}"
+              {% if anc and anc.uso_medicamentos == v %}checked{% elif not anc and v == 'Não' %}checked{% endif %}> {{ v }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Quais remédios -->
+    <div class="form-group">
+      <label>Quais Remédios?</label>
+      <input type="text" name="quais_remedios" value="{{ anc.quais_remedios or '' if anc else '' }}" placeholder="Liste os medicamentos em uso..." />
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Salvar Anamnese Corporal
+    </button>
+    <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">← Voltar</a>
+  </div>
+
+</form>
+</div><!-- /tab-anamnese-corporal -->
+
+{% endif %}
+
+
+<script>
+// ── Troca de abas ────────────────────────────────────────────
+const TAB_MAP = {
+  'tab-info':               'tabInfo',
+  'tab-anamnese':           'tabAnamnese',
+  'tab-anamnese-corporal':  'tabAnamneseCorporal',
+};
+function switchTab(panelId) {
+  document.querySelectorAll('.cli-panel').forEach(p => p.hidden = true);
+  document.querySelectorAll('.cli-tab').forEach(t => t.classList.remove('cli-tab--active'));
+  const panel = document.getElementById(panelId);
+  if (panel) panel.hidden = false;
+  const tabEl = document.getElementById(TAB_MAP[panelId]);
+  if (tabEl) tabEl.classList.add('cli-tab--active');
+  history.replaceState(null, '', '#' + panelId);
+}
+const hash = location.hash.replace('#', '');
+if (hash && document.getElementById(hash)) switchTab(hash);
+else switchTab('tab-info');
+
+// ── Seções colapsáveis ───────────────────────────────────────
+function toggleSec(hdr) {
+  const body = hdr.nextElementSibling;
+  const chv  = hdr.querySelector('.cli-chevron');
+  const open = !body.hidden;
+  body.hidden = open;
+  hdr.classList.toggle('cli-section__hdr--closed', open);
+  chv.style.transform = open ? 'rotate(-90deg)' : '';
+}
+function toggleInfo(hdr) {
+  const body = hdr.nextElementSibling;
+  const chv  = hdr.querySelector('.cli-chevron');
+  body.hidden = !body.hidden;
+  hdr.classList.toggle('cli-info-hdr--open', !body.hidden);
+  chv.style.transform = body.hidden ? 'rotate(-90deg)' : '';
+}
+
+// ── Toggle bloquear ──────────────────────────────────────────
+document.getElementById('bloqueadoChk')?.addEventListener('change', function() {
+  document.getElementById('bloqueadoStatus').textContent = this.checked ? 'SIM' : 'NÃO';
+});
+
+// ── Máscara CPF ──────────────────────────────────────────────
+document.getElementById('cpfInput')?.addEventListener('input', function() {
+  let v = this.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d+)/, '$1.$2');
+  this.value = v;
+});
+
+// ── Auto-preenchimento CEP ───────────────────────────────────
+document.getElementById('cepInput')?.addEventListener('blur', async function() {
+  const cep = this.value.replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const d = await r.json();
+    if (d.erro) return;
+    document.getElementById('enderecoInput').value = d.logradouro || '';
+    document.getElementById('bairroInput').value   = d.bairro     || '';
+    document.getElementById('cidadeInput').value   = d.localidade || '';
+    const sel = document.getElementById('estadoInput');
+    if (sel) { const opt = [...sel.options].find(o => o.value === d.uf); if (opt) sel.value = d.uf; }
+  } catch (_) {}
+});
+</script>
+
+{% endblock %}

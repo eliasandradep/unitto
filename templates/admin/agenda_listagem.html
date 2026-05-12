@@ -1,0 +1,149 @@
+{% extends 'admin/base.html' %}
+{% block title %}Listagem de Agendamentos{% endblock %}
+{% block page_title %}Agenda / Listagem{% endblock %}
+
+{% block content %}
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    <div class="form-group" style="margin:0;flex:1;min-width:180px">
+      <label style="font-size:.8rem">Procurar por Responsável</label>
+      <input type="text" name="responsavel" value="{{ resp_q }}" placeholder="Nome do profissional..." />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Data Início</label>
+      <input type="date" name="dt_ini" value="{{ dt_ini }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Data Fim</label>
+      <input type="date" name="dt_fim" value="{{ dt_fim }}" />
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button type="submit" class="btn-primary">Buscar</button>
+      <a href="{{ url_for('admin.agenda_listagem') }}" class="btn-secondary">Exibir todos</a>
+    </div>
+  </form>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar" style="margin-bottom:.8rem">
+  <button type="button" class="btn-danger" id="btnBulkDelete"
+          onclick="submitBulkDelete()" style="display:none">
+    Remover selecionados
+  </button>
+  <a href="{{ url_for('admin.agenda') }}" class="btn-primary">+ Novo Agendamento</a>
+</div>
+
+<!-- Listagem -->
+<form id="bulkForm" method="POST">
+  <input type="hidden" name="responsavel" value="{{ resp_q }}" />
+  <input type="hidden" name="dt_ini"      value="{{ dt_ini }}" />
+  <input type="hidden" name="dt_fim"      value="{{ dt_fim }}" />
+  <div class="card" style="overflow:hidden">
+    {% if agendamentos %}
+    <div style="overflow-x:auto">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th style="width:36px">
+              <input type="checkbox" id="chkAll" style="accent-color:var(--gold);cursor:pointer"
+                     onchange="toggleAll(this)" />
+            </th>
+            <th>Responsável</th>
+            <th>Data</th>
+            <th>Hora Início</th>
+            <th>Hora Fim</th>
+            <th>Cliente</th>
+            <th>Serviço / Descritivo</th>
+            <th style="text-align:center">Status</th>
+            <th style="width:80px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agendamentos %}
+          <tr>
+            <td>
+              <input type="checkbox" name="ids" value="{{ a.id }}"
+                     style="accent-color:var(--gold);cursor:pointer"
+                     onchange="updateBulkBtn()" />
+            </td>
+            <td style="font-weight:500;white-space:nowrap">{{ a.profissional.nome }}</td>
+            <td style="white-space:nowrap">{{ a.data.strftime('%d/%m/%Y') }}</td>
+            <td>{{ a.hora_inicio.strftime('%H:%M') }}</td>
+            <td style="color:var(--text-muted)">{{ a.hora_fim.strftime('%H:%M') }}</td>
+            <td style="font-size:.83rem">{{ a.nome_cliente }}</td>
+            <td style="font-size:.83rem;color:var(--text-muted)">
+              {{ a.servico.nome if a.servico else (a.observacoes or '—') }}
+            </td>
+            <td style="text-align:center">
+              {% set sc = {'agendado':'badge--info','confirmado':'badge--convertido',
+                           'concluido':'','cancelado':'badge--perdido','faltou':'badge--warning'} %}
+              <span class="badge {{ sc.get(a.status, '') }}" style="font-size:.72rem">
+                {{ a.status | capitalize }}
+              </span>
+            </td>
+            <td>
+              <div style="display:flex;gap:.3rem">
+                <a href="{{ url_for('admin.agenda', data=a.data.isoformat()) }}"
+                   class="btn-icon btn-icon--edit" title="Ver no calendário">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </a>
+                <button type="button" class="btn-icon btn-icon--danger" title="Excluir"
+                        onclick="excluirAg({{ a.id }})">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:.6rem 1rem;font-size:.8rem;color:var(--text-muted);border-top:1px solid var(--border)">
+      {{ agendamentos | length }} agendamento(s) encontrado(s)
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--text-muted)">
+      <p>Nenhum agendamento encontrado para o período.</p>
+      <a href="{{ url_for('admin.agenda') }}" class="btn-primary"
+         style="display:inline-block;margin-top:.8rem">Abrir calendário</a>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Form de exclusão individual -->
+<form id="deleteForm" method="POST" style="display:none">
+  <input type="hidden" name="ids" id="deleteId" />
+</form>
+
+<style>
+.badge--info    { background:#dbeafe; color:#1e40af; }
+.badge--warning { background:#fef3c7; color:#92400e; }
+</style>
+
+<script>
+const DEL_BASE = "{{ url_for('admin.agenda_excluir', ag_id=0) }}".replace('/0/', '/');
+
+function excluirAg(id) {
+  if (!confirm('Excluir este agendamento permanentemente?')) return;
+  var f = document.getElementById('deleteForm');
+  f.action = DEL_BASE + id + '/excluir';
+  f.submit();
+}
+function toggleAll(chk) {
+  document.querySelectorAll('input[name="ids"]').forEach(function(c) { c.checked = chk.checked; });
+  updateBulkBtn();
+}
+function updateBulkBtn() {
+  var any = document.querySelectorAll('input[name="ids"]:checked').length > 0;
+  document.getElementById('btnBulkDelete').style.display = any ? '' : 'none';
+}
+function submitBulkDelete() {
+  if (!confirm('Remover os agendamentos selecionados permanentemente?')) return;
+  document.getElementById('bulkForm').submit();
+}
+</script>
+
+{% endblock %}

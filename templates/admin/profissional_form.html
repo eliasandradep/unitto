@@ -1,0 +1,418 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ 'Editar' if p else 'Novo' }} Profissional{% endblock %}
+{% block page_title %}{{ 'Editar Profissional' if p else 'Novo Profissional' }}{% endblock %}
+
+{% block content %}
+
+<!-- Toolbar de navegação -->
+<div class="toolbar" style="margin-bottom:1.2rem">
+  <a href="{{ url_for('admin.profissionais') }}" class="btn-secondary">← Profissionais</a>
+  {% if p %}
+  <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem">
+    <span class="badge {% if p.ativo %}badge--convertido{% else %}badge--perdido{% endif %}">
+      {{ 'Ativo' if p.ativo else 'Inativo' }}
+    </span>
+    <form method="POST" action="{{ url_for('admin.profissionais') }}" style="display:inline"
+          onsubmit="return confirm('Excluir este profissional permanentemente?')">
+      <input type="hidden" name="action" value="delete" />
+      <input type="hidden" name="id" value="{{ p.id }}" />
+      <button type="submit" class="btn-danger">Excluir</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Formulário principal -->
+<form method="POST"
+      action="{{ url_for('admin.profissional_detalhe', prof_id=p.id) if p else url_for('admin.profissional_novo') }}"
+      id="profForm">
+
+  <div class="pform-layout">
+
+    <!-- ═══════════ COLUNA ESQUERDA ═══════════ -->
+    <div class="pform-left">
+
+      <!-- Dados básicos -->
+      <div class="card" style="padding:1.5rem;margin-bottom:1rem">
+        <h4 class="pform-sec">Dados do Profissional</h4>
+
+        <div class="form-group">
+          <label>Nome <span class="required">*</span></label>
+          <input type="text" name="nome" value="{{ p.nome if p else '' }}"
+                 required placeholder="Nome completo" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cargo / Especialidade</label>
+            <input type="text" name="cargo"
+                   value="{{ p.cargo or '' if p else '' }}"
+                   placeholder="ex: Colorista, Cabeleireira..." />
+          </div>
+          <div class="form-group">
+            <label>Telefone / Celular</label>
+            <input type="tel" name="telefone"
+                   value="{{ p.telefone or '' if p else '' }}"
+                   placeholder="(00) 00000-0000" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-mail</label>
+            <input type="email" name="email"
+                   value="{{ p.email or '' if p else '' }}"
+                   placeholder="email@exemplo.com" />
+          </div>
+          <div class="form-group pform-inativo-row">
+            <input type="checkbox" name="inativo" id="chkInativo"
+                   style="accent-color:var(--gold-dark);width:16px;height:16px;cursor:pointer;flex-shrink:0"
+                   {% if p and not p.ativo %}checked{% endif %} />
+            <label for="chkInativo" style="font-size:.85rem;cursor:pointer;margin:0">Marcar como inativo</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Unidade</label>
+          <select name="unidade_id">
+            <option value="">Sem unidade definida</option>
+            {% for u in unidades %}
+            <option value="{{ u.id }}"
+              {% if p and p.unidade_id == u.id %}selected{% endif %}>
+              {{ u.nome }}{% if u.cidade %} — {{ u.cidade }}/{{ u.estado }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Expediente</label>
+          <select name="expediente_id">
+            <option value="">Sem expediente definido</option>
+            {% for e in expedientes_list %}
+            <option value="{{ e.id }}"
+              {% if p and p.expediente_id == e.id %}selected{% endif %}>
+              {{ e.nome }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Observações internas</label>
+          <textarea name="obs" rows="2"
+                    placeholder="Anotações internas sobre este profissional...">{{ p.obs or '' if p else '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Categorias -->
+      <div class="card" style="padding:1.5rem">
+        <h4 class="pform-sec">Categorias de Serviços</h4>
+        {% if categorias %}
+        <div class="check-grid">
+          {% for cat in categorias %}
+          <label class="check-item">
+            <input type="checkbox" name="categorias" value="{{ cat.id }}"
+                   {% if p and cat in p.categorias %}checked{% endif %} />
+            {{ cat.nome }}
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-size:.82rem;color:var(--text-muted)">Nenhuma categoria cadastrada.</p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ═══════════ COLUNA DIREITA: tabs ═══════════ -->
+    <div class="pform-right">
+      <div class="card" style="overflow:hidden">
+
+        <!-- Nav de abas -->
+        <div class="ptab-nav">
+          <button type="button" class="ptab-btn active" data-tab="perfil">Perfil de Acesso</button>
+          <button type="button" class="ptab-btn" data-tab="comissoes">Comissões</button>
+          <button type="button" class="ptab-btn" data-tab="restricoes">Restrições</button>
+        </div>
+
+        <!-- ABA: Perfil de Acesso -->
+        <div class="ptab-pane" id="ptab-perfil">
+          <div style="padding:1rem">
+            <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.9rem;line-height:1.4">
+              Selecione o nível de acesso deste profissional ao sistema.
+            </p>
+            {% for val, label, desc in perfis %}
+            <label class="perfil-opt">
+              <input type="radio" name="perfil_acesso" value="{{ val }}"
+                     {% if (p and p.perfil_acesso == val) or (not p and val == 'profissional') %}checked{% endif %} />
+              <div class="perfil-opt-text">
+                <strong>{{ label }}</strong>
+                <span>{{ desc }}</span>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- ABA: Comissões (renderizada via JS) -->
+        <div class="ptab-pane" id="ptab-comissoes" style="display:none">
+          <div id="comissoes-mount"></div>
+        </div>
+
+        <!-- ABA: Restrições -->
+        <div class="ptab-pane" id="ptab-restricoes" style="display:none">
+          <div style="padding:1rem">
+
+            <div class="restricao-item">
+              <div class="restricao-item-text">
+                <strong>Permitir Agendamento Online</strong>
+                <span>Seu cliente poderá agendar com este profissional através de aplicativos e outros canais.</span>
+              </div>
+              <label class="ptoggle">
+                <input type="checkbox" name="agendamento_online"
+                       {% if not p or p.agendamento_online %}checked{% endif %} />
+                <span class="ptoggle-track"></span>
+              </label>
+            </div>
+
+            <div class="restricao-item" style="margin-top:1.2rem">
+              <div class="restricao-item-text">
+                <strong>Agendamentos Simultâneos</strong>
+                <span>Permite mais de um cliente agendado no mesmo horário com este profissional.</span>
+              </div>
+              <label class="ptoggle">
+                <input type="checkbox" name="agendamentos_simult"
+                       {% if p and p.agendamentos_simult %}checked{% endif %} />
+                <span class="ptoggle-track"></span>
+              </label>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- .card -->
+    </div><!-- .pform-right -->
+
+  </div><!-- .pform-layout -->
+
+  <div class="form-actions" style="margin-top:1rem">
+    <button type="submit" class="btn-primary">Salvar</button>
+    <a href="{{ url_for('admin.profissionais') }}" class="btn-secondary">Cancelar</a>
+  </div>
+
+</form>
+
+<style>
+/* Layout duas colunas */
+.pform-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 960px) { .pform-layout { grid-template-columns: 1fr; } }
+
+.pform-sec {
+  font-size: .74rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); margin-bottom: 1rem;
+  padding-bottom: .5rem; border-bottom: 1px solid var(--border);
+}
+
+/* Linha do checkbox "inativo" alinhada com os outros inputs */
+.pform-inativo-row {
+  display: flex !important;
+  align-items: center;
+  gap: .5rem;
+  padding-top: 1.7rem;
+}
+
+/* Tab nav */
+.ptab-nav {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: #f5f2ee;
+}
+.ptab-btn {
+  flex: 1; padding: .65rem .3rem;
+  font-size: .78rem; font-weight: 500;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.ptab-btn:hover { color: var(--text); }
+.ptab-btn.active { color: var(--gold-dark); border-bottom-color: var(--gold-dark); }
+
+/* Perfil de acesso */
+.perfil-opt {
+  display: flex; align-items: flex-start; gap: .65rem;
+  padding: .55rem .7rem; border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; margin-bottom: .35rem;
+  transition: border-color .15s, background .15s;
+}
+.perfil-opt:has(input:checked) {
+  border-color: var(--gold-dark);
+  background: rgba(201,169,122,.07);
+}
+.perfil-opt input { accent-color: var(--gold-dark); cursor: pointer; margin-top: .18rem; flex-shrink: 0; }
+.perfil-opt-text  { display: flex; flex-direction: column; gap: .08rem; }
+.perfil-opt-text strong { font-size: .85rem; }
+.perfil-opt-text span   { font-size: .74rem; color: var(--text-muted); line-height: 1.3; }
+
+/* Toggle */
+.ptoggle {
+  position: relative; display: inline-block;
+  width: 46px; height: 26px; flex-shrink: 0; cursor: pointer;
+}
+.ptoggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.ptoggle-track {
+  position: absolute; inset: 0;
+  background: #ccc; border-radius: 26px; transition: background .2s; cursor: pointer;
+}
+.ptoggle-track::before {
+  content: ''; position: absolute;
+  width: 20px; height: 20px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.ptoggle input:checked + .ptoggle-track { background: var(--success); }
+.ptoggle input:checked + .ptoggle-track::before { transform: translateX(20px); }
+
+/* Restrição */
+.restricao-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.restricao-item-text { flex: 1; }
+.restricao-item-text strong { display: block; font-size: .88rem; margin-bottom: .3rem; }
+.restricao-item-text span   { font-size: .78rem; color: var(--text-muted); line-height: 1.4; }
+
+/* Comissões */
+.com-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.com-table th {
+  text-align: left; padding: .4rem .65rem;
+  font-size: .73rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted);
+  background: #f9f7f5; border-bottom: 2px solid var(--border);
+}
+.com-table td { padding: .5rem .65rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.com-table tbody tr:last-child td { border-bottom: none; }
+.com-empty { padding: 1.2rem; text-align: center; font-size: .82rem; color: var(--text-muted); }
+.com-add-row {
+  padding: .75rem; background: #f9f7f5; border-top: 2px solid var(--border);
+  display: flex; gap: .4rem; flex-wrap: wrap; align-items: center;
+}
+.com-add-row select,
+.com-add-row input[type=number] {
+  font-size: .83rem; padding: .37rem .6rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--ff); color: var(--text); background: #fff;
+}
+.com-add-row select { flex: 1; min-width: 120px; }
+</style>
+
+<script>
+const _PROF_ID       = {{ p.id | tojson if p else 'null' }};
+window._comissoes    = {{ comissoes_data | tojson }};
+window._allServicos  = {{ servicos_data | tojson }};
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+document.querySelectorAll('.ptab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ptab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.ptab-pane').forEach(function(p) { p.style.display = 'none'; });
+    btn.classList.add('active');
+    var pane = document.getElementById('ptab-' + btn.dataset.tab);
+    if (pane) {
+      pane.style.display = 'block';
+      if (btn.dataset.tab === 'comissoes') renderComissoes();
+    }
+  });
+});
+
+// ── Comissões AJAX ─────────────────────────────────────────────────────────
+function renderComissoes() {
+  var mount = document.getElementById('comissoes-mount');
+  if (!mount) return;
+
+  if (!_PROF_ID) {
+    mount.innerHTML = '<div class="com-empty">Salve o profissional primeiro para gerenciar comissões personalizadas.</div>';
+    return;
+  }
+
+  var list   = window._comissoes || [];
+  var usedIds = new Set(list.map(function(c) { return c.servico_id; }));
+  var allSvcs = window._allServicos || [];
+
+  var rows = '';
+  if (list.length === 0) {
+    rows = '<tr><td colspan="3" class="com-empty">Nenhuma comissão personalizada cadastrada.</td></tr>';
+  } else {
+    rows = list.map(function(c) {
+      var formatted = c.tipo === '%'
+        ? c.valor.toFixed(1) + '%'
+        : 'R$ ' + c.valor.toFixed(2);
+      return '<tr>'
+        + '<td>' + c.servico_nome + '</td>'
+        + '<td style="font-weight:500">' + formatted + '</td>'
+        + '<td><button type="button" class="btn-icon btn-icon--danger" title="Remover comissão"'
+        + ' onclick="delComissao(' + c.id + ')">'
+        + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">'
+        + '<polyline points="3 6 5 6 21 6"/>'
+        + '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+        + '<path d="M10 11v6M14 11v6"/>'
+        + '</svg></button></td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  var availOpts = allSvcs
+    .filter(function(s) { return !usedIds.has(s.id); })
+    .map(function(s) { return '<option value="' + s.id + '">' + s.nome + '</option>'; })
+    .join('');
+
+  mount.innerHTML =
+    '<table class="com-table"><thead><tr>'
+    + '<th>Serviço</th><th>Comissão</th><th style="width:42px"></th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>'
+    + '<div class="com-add-row">'
+    + '<select id="comSvc"><option value="">Selecionar serviço</option>' + availOpts + '</select>'
+    + '<input type="number" id="comValor" placeholder="Valor" step="0.01" min="0" style="width:90px" />'
+    + '<select id="comTipo" style="width:68px"><option value="%">%</option><option value="R">R$</option></select>'
+    + '<button type="button" class="btn-primary" style="padding:.37rem .75rem;font-size:.82rem" onclick="addComissao()">+ Adicionar</button>'
+    + '</div>';
+}
+
+async function addComissao() {
+  var svcEl   = document.getElementById('comSvc');
+  var valorEl = document.getElementById('comValor');
+  var tipoEl  = document.getElementById('comTipo');
+  if (!svcEl.value)      { svcEl.focus(); alert('Selecione um serviço.'); return; }
+  var valor = parseFloat(valorEl.value);
+  if (isNaN(valor) || valor < 0) { valorEl.focus(); alert('Informe um valor válido.'); return; }
+  try {
+    var res = await fetch('/admin/profissionais/' + _PROF_ID + '/comissao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ servico_id: parseInt(svcEl.value), comissao_valor: valor, comissao_tipo: tipoEl.value }),
+    });
+    var data = await res.json();
+    if (!data.ok) { alert(data.error || 'Erro ao adicionar.'); return; }
+    window._comissoes.push(data);
+    renderComissoes();
+  } catch (e) { alert('Erro de comunicação.'); }
+}
+
+async function delComissao(comId) {
+  if (!confirm('Remover esta comissão personalizada?')) return;
+  try {
+    var res = await fetch('/admin/profissionais/' + _PROF_ID + '/comissao/' + comId + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (!data.ok) { alert('Erro ao remover.'); return; }
+    window._comissoes = window._comissoes.filter(function(c) { return c.id !== comId; });
+    renderComissoes();
+  } catch (e) { alert('Erro de comunicação.'); }
+}
+</script>
+
+{% endblock %}

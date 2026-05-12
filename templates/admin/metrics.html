@@ -1,0 +1,227 @@
+{% extends 'admin/base.html' %}
+{% block title %}Métricas{% endblock %}
+{% block page_title %}Métricas de Acesso{% endblock %}
+
+{% block content %}
+
+<p class="page-description">Dados dos últimos 30 dias. Rastreamento próprio — sem cookies ou ferramentas externas.</p>
+
+<!-- KPI Cards -->
+<div class="stats-grid stats-grid--6">
+  <div class="stat-card stat-card--blue">
+    <div class="stat-card__value">{{ views_30d }}</div>
+    <div class="stat-card__label">Visitas (30 dias)</div>
+  </div>
+  <div class="stat-card stat-card--teal">
+    <div class="stat-card__value">{{ unique_30d }}</div>
+    <div class="stat-card__label">Visitantes únicos (30 dias)</div>
+  </div>
+  <div class="stat-card stat-card--total">
+    <div class="stat-card__value">{{ conversion }}%</div>
+    <div class="stat-card__label">Taxa de conversão</div>
+  </div>
+  <div class="stat-card stat-card--convertido">
+    <div class="stat-card__value">{{ leads_30d }}</div>
+    <div class="stat-card__label">Leads captados (30 dias)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__value">{{ views_total }}</div>
+    <div class="stat-card__label">Visitas totais</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__value">{{ leads_total }}</div>
+    <div class="stat-card__label">Leads totais</div>
+  </div>
+</div>
+
+<!-- Daily chart -->
+<div class="card">
+  <div class="card__header">
+    <h3>Visitas e leads — últimos 30 dias</h3>
+  </div>
+  <canvas id="dailyChart" height="75"></canvas>
+</div>
+
+<!-- Row: Dispositivos | Origens de tráfego | Horários de pico -->
+<div class="metrics-row">
+  <div class="card">
+    <div class="card__header"><h3>Dispositivos</h3></div>
+    {% if views_30d %}
+    <canvas id="deviceChart" height="200"></canvas>
+    {% else %}
+    <p class="empty-state">Sem dados ainda.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header"><h3>Origens de tráfego</h3></div>
+    {% if top_refs %}
+    <table class="data-table">
+      <thead><tr><th>Origem</th><th class="col-num">Visitas</th></tr></thead>
+      <tbody>
+        {% for ref, count in top_refs %}
+        <tr>
+          <td>{{ ref }}</td>
+          <td class="col-num muted">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Tráfego direto ou sem dados.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header"><h3>Horários de pico</h3></div>
+    <canvas id="hourChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- Row: Origem dos leads | Status dos leads | Serviços de interesse -->
+<div class="metrics-row">
+  <div class="card">
+    <div class="card__header">
+      <h3>Origem dos leads</h3>
+      <span class="card__hint">Canal que gerou o contato</span>
+    </div>
+    {% if leads_total %}
+    <canvas id="leadSrcChart" height="200"></canvas>
+    {% else %}
+    <p class="empty-state">Sem leads ainda.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header">
+      <h3>Status dos leads</h3>
+      <span class="card__hint">Progresso no funil</span>
+    </div>
+    {% if leads_total %}
+    <canvas id="leadStsChart" height="200"></canvas>
+    {% else %}
+    <p class="empty-state">Sem leads ainda.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header">
+      <h3>Serviços de interesse</h3>
+      <span class="card__hint">O que os clientes buscam</span>
+    </div>
+    {% if lead_svc %}
+    <table class="data-table">
+      <thead><tr><th>Serviço</th><th class="col-num">Leads</th></tr></thead>
+      <tbody>
+        {% for svc, count in lead_svc %}
+        <tr>
+          <td>{{ svc }}</td>
+          <td class="col-num muted">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Sem dados de serviços.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const GOLD   = '#C9A97A';
+const BLUE   = '#2980B9';
+const GREEN  = '#27AE60';
+const ORANGE = '#E67E22';
+const PURPLE = '#8E44AD';
+const GREY   = '#95A5A6';
+const TEAL   = '#16A085';
+
+Chart.defaults.font.family = "'Jost', system-ui, sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#8A7060';
+
+// Visitas diárias
+new Chart(document.getElementById('dailyChart'), {
+  type: 'line',
+  data: {
+    labels: {{ daily_labels | safe }},
+    datasets: [
+      {
+        label: 'Visitas',
+        data: {{ daily_views | safe }},
+        borderColor: BLUE,
+        backgroundColor: 'rgba(41,128,185,.08)',
+        fill: true, tension: .4, pointRadius: 2, borderWidth: 2,
+      },
+      {
+        label: 'Leads',
+        data: {{ daily_leads | safe }},
+        borderColor: GOLD,
+        backgroundColor: 'rgba(201,169,122,.12)',
+        fill: true, tension: .4, pointRadius: 3, borderWidth: 2,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+
+// Dispositivos
+{% if views_30d %}
+new Chart(document.getElementById('deviceChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ device_labels | safe }},
+    datasets: [{ data: {{ device_data | safe }}, backgroundColor: [BLUE, GOLD, TEAL], borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+{% endif %}
+
+// Horários de pico
+new Chart(document.getElementById('hourChart'), {
+  type: 'bar',
+  data: {
+    labels: Array.from({length: 24}, (_, i) => `${String(i).padStart(2,'0')}h`),
+    datasets: [{
+      label: 'Visitas',
+      data: {{ hour_counts | safe }},
+      backgroundColor: 'rgba(201,169,122,.65)',
+      borderColor: GOLD,
+      borderWidth: 1,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+
+// Origem dos leads
+{% if leads_total %}
+new Chart(document.getElementById('leadSrcChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ lead_src_labels | safe }},
+    datasets: [{ data: {{ lead_src_data | safe }}, backgroundColor: [BLUE, GREEN, PURPLE], borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+// Status dos leads
+new Chart(document.getElementById('leadStsChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ lead_sts_labels | safe }},
+    datasets: [{ data: {{ lead_sts_data | safe }}, backgroundColor: [BLUE, '#D4AC0D', ORANGE, GREEN, GREY], borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+{% endif %}
+</script>
+{% endblock %}

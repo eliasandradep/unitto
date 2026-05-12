@@ -1,0 +1,170 @@
+{% extends 'admin/base.html' %}
+{% block title %}Financeiro{% endblock %}
+{% block page_title %}Financeiro / Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Cards de resumo -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem">
+
+  <div class="card" style="padding:1.2rem 1.4rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Faturamento do Mês</div>
+    <div style="font-size:1.7rem;font-weight:600;color:var(--gold)">
+      R$ {{ '%.2f'|format(fat_mes) | replace('.', ',') }}
+    </div>
+  </div>
+
+  <div class="card" style="padding:1.2rem 1.4rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Comandas Abertas</div>
+    <div style="font-size:1.7rem;font-weight:600;color:var(--text)">{{ abertas }}</div>
+  </div>
+
+  <div class="card" style="padding:1.2rem 1.4rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Faturamento Hoje</div>
+    <div style="font-size:1.7rem;font-weight:600;color:var(--text)">
+      R$ {{ '%.2f'|format(fat_hoje) | replace('.', ',') }}
+    </div>
+  </div>
+
+</div>
+
+<!-- Gráfico + Formas de pagamento -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1.5rem">
+
+  <!-- Gráfico últimos 14 dias -->
+  <div class="card" style="padding:1.2rem 1.4rem">
+    <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Faturamento — últimos 14 dias</div>
+    <canvas id="chartFat" height="200"></canvas>
+  </div>
+
+  <!-- Por forma de pagamento -->
+  <div class="card" style="padding:1.2rem 1.4rem">
+    <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Por forma de pagamento (mês)</div>
+    {% if por_forma %}
+    <table class="admin-table" style="font-size:.82rem">
+      <thead>
+        <tr>
+          <th>Forma</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in por_forma %}
+        <tr>
+          <td>{{ row.forma }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(row.total) | replace('.', ',') }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:.85rem">Nenhum pagamento registrado este mês.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Últimas comandas -->
+<div class="card" style="overflow:hidden">
+  <div style="padding:.8rem 1.2rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:.85rem;font-weight:600">Últimas Comandas</span>
+    <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary" style="font-size:.8rem;padding:.3rem .8rem">Ver todas</a>
+  </div>
+  {% if recentes %}
+  <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Data</th>
+          <th>Cliente</th>
+          <th>Responsável</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">Saldo</th>
+          <th style="text-align:center">Status</th>
+          <th style="width:60px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in recentes %}
+        <tr>
+          <td style="font-weight:500;white-space:nowrap">#{{ c.codigo }}</td>
+          <td style="white-space:nowrap">{{ c.data.strftime('%d/%m/%Y') }}</td>
+          <td style="font-size:.83rem">{{ c.nome_cliente or '—' }}</td>
+          <td style="font-size:.83rem;white-space:nowrap">{{ c.profissional.nome if c.profissional else '—' }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(c.valor_total) | replace('.', ',') }}
+          </td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;color:{% if c.saldo > 0 %}#b45309{% else %}var(--text-muted){% endif %}">
+            R$ {{ '%.2f'|format(c.saldo) | replace('.', ',') }}
+          </td>
+          <td style="text-align:center">
+            {% if c.status == 'aberta' %}
+              <span class="badge badge--info" style="font-size:.72rem">Aberta</span>
+            {% else %}
+              <span class="badge badge--convertido" style="font-size:.72rem">Fechada</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('admin.comanda_detalhe', comanda_id=c.id) }}"
+               class="btn-icon btn-icon--edit" title="Ver comanda">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--text-muted)">
+    <p>Nenhuma comanda registrada ainda.</p>
+    <a href="{{ url_for('admin.comanda_nova') }}" class="btn-primary" style="display:inline-block;margin-top:.8rem">+ Nova Comanda</a>
+  </div>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const labels = {{ chart_labels | tojson }};
+  const values = {{ chart_values | tojson }};
+  const ctx = document.getElementById('chartFat');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'R$',
+        data: values,
+        backgroundColor: 'rgba(180,143,89,0.7)',
+        borderColor: 'rgba(180,143,89,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(v) { return 'R$ ' + v.toFixed(0); },
+            font: { size: 11 },
+          },
+          grid: { color: 'rgba(0,0,0,.06)' },
+        },
+        x: {
+          ticks: { font: { size: 11 } },
+          grid: { display: false },
+        }
+      }
+    }
+  });
+})();
+</script>
+
+{% endblock %}

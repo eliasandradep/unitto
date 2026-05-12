@@ -1,0 +1,81 @@
+{% extends 'admin/base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+
+{% block content %}
+
+<div class="toolbar">
+  <form method="GET" action="{{ url_for('admin.clientes') }}" class="toolbar__filters">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nome, telefone, e-mail ou cidade" class="toolbar__search" />
+    <select name="bloqueado" class="toolbar__select">
+      <option value="">Todos</option>
+      <option value="0" {% if bloqueado == '0' %}selected{% endif %}>Ativos</option>
+      <option value="1" {% if bloqueado == '1' %}selected{% endif %}>Bloqueados</option>
+    </select>
+    <button type="submit" class="btn-primary">Filtrar</button>
+    {% if q or bloqueado %}
+    <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">Limpar</a>
+    {% endif %}
+  </form>
+  <a href="{{ url_for('admin.cliente_novo') }}" class="btn-primary">+ Novo cliente</a>
+</div>
+
+{% if clientes %}
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Telefone</th>
+        <th>E-mail</th>
+        <th>Cidade / UF</th>
+        <th>Aniversário</th>
+        <th>Cadastro</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cli in clientes %}
+      <tr>
+        <td><strong>{{ cli.nome }}</strong></td>
+        <td>
+          {% set fone = cli.telefone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
+          <a href="https://wa.me/55{{ fone }}" target="_blank" rel="noopener" class="wa-link">{{ cli.telefone }}</a>
+        </td>
+        <td>{{ cli.email or '—' }}</td>
+        <td>
+          {% if cli.cidade %}{{ cli.cidade }}{% if cli.estado %} / {{ cli.estado }}{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ cli.aniversario.strftime('%d/%m') if cli.aniversario else '—' }}</td>
+        <td>{{ cli.created_at.strftime('%d/%m/%Y') }}</td>
+        <td>
+          {% if cli.bloqueado %}
+          <span class="badge badge--perdido">Bloqueado</span>
+          {% else %}
+          <span class="badge badge--convertido">Ativo</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cli.id) }}" class="btn-icon btn-icon--view" title="Ver detalhes">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p style="font-size:.8rem;color:var(--text-muted);text-align:right;margin-top:-.6rem">
+  {{ clientes|length }} cliente(s) encontrado(s)
+</p>
+{% else %}
+<div class="card">
+  <p class="empty-state">Nenhum cliente encontrado.
+    <a href="{{ url_for('admin.cliente_novo') }}" style="color:var(--gold-dark)">Cadastrar primeiro cliente →</a>
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

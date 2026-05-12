@@ -1,0 +1,138 @@
+{% extends 'admin/base.html' %}
+{% block title %}Lead #{{ lead.id }}{% endblock %}
+{% block page_title %}Lead #{{ lead.id }} — {{ lead.name or lead.phone }}{% endblock %}
+
+{% block content %}
+
+<div class="detail-grid">
+
+  <!-- Informações principais -->
+  <div class="card">
+    <div class="card__header">
+      <h3>Informações</h3>
+    </div>
+    <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+      <input type="hidden" name="action" value="update_info" />
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" name="name" value="{{ lead.name or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>Telefone</label>
+        <div class="input-with-action">
+          <input type="text" value="{{ lead.phone }}" readonly />
+          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
+             target="_blank" rel="noopener" class="btn-sm btn-wa">WhatsApp</a>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" name="email" value="{{ lead.email or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>Serviço de interesse</label>
+        <input type="text" name="service" value="{{ lead.service or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>Unidade</label>
+        <select name="unit">
+          <option value="">—</option>
+          <option value="varginha"  {% if lead.unit == 'varginha' %}selected{% endif %}>Varginha – MG</option>
+          <option value="sao_jose" {% if lead.unit == 'sao_jose' %}selected{% endif %}>São José dos Campos – SP</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Origem</label>
+          <input type="text" value="{{ lead.source_label() }}" readonly />
+        </div>
+        <div>
+          <label>Cadastrado em</label>
+          <input type="text" value="{{ lead.created_at.strftime('%d/%m/%Y %H:%M') }}" readonly />
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">Salvar informações</button>
+    </form>
+
+    <!-- Mensagem original -->
+    {% if lead.message %}
+    <div class="lead-message">
+      <label>Mensagem original</label>
+      <p>{{ lead.message }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Status + Notas -->
+  <div class="detail-side">
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card__header"><h3>Status</h3></div>
+      <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+          <input type="hidden" name="action" value="update_status" />
+        <div class="status-buttons">
+          {% for key, label in statuses %}
+          <label class="status-option status-option--{{ key }} {% if lead.status == key %}selected{% endif %}">
+            <input type="radio" name="status" value="{{ key }}" {% if lead.status == key %}checked{% endif %} />
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn-primary btn-full" style="margin-top:1rem">Atualizar status</button>
+      </form>
+    </div>
+
+    <!-- Anotações -->
+    <div class="card">
+      <div class="card__header"><h3>Anotações</h3></div>
+      <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+          <input type="hidden" name="action" value="add_note" />
+        <textarea name="note" rows="3" placeholder="Adicionar anotação..." class="notes-input"></textarea>
+        <button type="submit" class="btn-primary btn-full" style="margin-top:.5rem">Adicionar</button>
+      </form>
+      {% if lead.notes %}
+      <div class="notes-history">
+        <pre>{{ lead.notes }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Ações -->
+    <div class="card">
+      <div class="card__header"><h3>Ações</h3></div>
+      <div class="action-buttons">
+
+        <!-- Converter em cliente -->
+        {% if lead.status != 'convertido' %}
+        <form method="POST" action="{{ url_for('admin.lead_convert', lead_id=lead.id) }}"
+              onsubmit="return confirm('Converter este lead em cliente? O status será atualizado para Convertido.')">
+          <button type="submit" class="btn-primary btn-full">
+            ✦ Converter em Cliente
+          </button>
+        </form>
+        {% else %}
+        <div class="lead-converted-badge">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Lead convertido
+        </div>
+        {% if cliente_vinculado %}
+        <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cliente_vinculado.id) }}"
+           class="btn-secondary btn-full">
+          Ver cadastro do cliente →
+        </a>
+        {% endif %}
+        {% endif %}
+
+        <a href="{{ url_for('admin.leads') }}" class="btn-secondary btn-full">← Voltar</a>
+        <form method="POST" action="{{ url_for('admin.lead_delete', lead_id=lead.id) }}"
+              onsubmit="return confirm('Remover este lead?')">
+              <button type="submit" class="btn-danger btn-full">Remover lead</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

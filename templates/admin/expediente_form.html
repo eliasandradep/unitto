@@ -1,0 +1,181 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ e.nome if e else 'Novo Expediente' }}{% endblock %}
+{% block page_title %}{% if e %}Editar Expediente{% else %}Novo Expediente{% endif %}{% endblock %}
+
+{% block content %}
+
+<form method="POST">
+
+  <div class="card" style="padding:1.4rem;margin-bottom:1rem">
+
+    <div class="form-group" style="max-width:420px;margin-bottom:1.2rem">
+      <label>Nome do Expediente <span class="required">*</span></label>
+      <input type="text" name="nome" required placeholder="Ex.: Horário Padrão, Meio Período..."
+             value="{{ e.nome if e else '' }}" />
+    </div>
+
+    <p style="font-size:.82rem;color:#b45309;margin-bottom:1rem">
+      Informe os dias da semana e seus horários de trabalho.
+      Informar um horário de almoço é opcional.
+    </p>
+
+    <!-- Grade semanal -->
+    <div style="overflow-x:auto">
+      <table class="exp-grid">
+        <thead>
+          <tr>
+            <th style="width:110px"></th>
+            {% for val, label in dias %}
+            <th class="exp-col" data-dia="{{ val }}">
+              <label style="display:flex;align-items:center;justify-content:center;gap:.4rem;cursor:pointer;font-weight:500;font-size:.82rem">
+                <input type="checkbox" name="dia_{{ val }}_ativo" id="ativo_{{ val }}"
+                       value="1"
+                       {% if dias_map.get(val) %}checked{% endif %}
+                       onchange="toggleDia({{ val }})"
+                       style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer" />
+                {{ label.split('-')[0] }}
+              </label>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Entrada -->
+          <tr>
+            <td class="exp-label">Entrada</td>
+            {% for val, label in dias %}
+            {% set d = dias_map.get(val) %}
+            <td class="exp-cell dia-{{ val }}" {% if not d %}data-disabled="1"{% endif %}>
+              <input type="time" name="dia_{{ val }}_hi" step="900"
+                     value="{{ d.hora_inicio.strftime('%H:%M') if d else '09:00' }}"
+                     {% if not d %}disabled{% endif %} />
+            </td>
+            {% endfor %}
+          </tr>
+          <!-- Almoço checkbox -->
+          <tr>
+            <td class="exp-label">Almoço</td>
+            {% for val, label in dias %}
+            {% set d = dias_map.get(val) %}
+            {% set tem_almoco = d and d.almoco_inicio %}
+            <td class="exp-cell dia-{{ val }}" {% if not d %}data-disabled="1"{% endif %}>
+              <label style="display:flex;align-items:center;justify-content:center;gap:.3rem;font-size:.78rem;cursor:pointer;color:var(--text-muted)">
+                <input type="checkbox" name="dia_{{ val }}_almoco" id="almoco_{{ val }}"
+                       value="1" {% if tem_almoco %}checked{% endif %}
+                       onchange="toggleAlmoco({{ val }})"
+                       {% if not d %}disabled{% endif %}
+                       style="accent-color:var(--gold);width:13px;height:13px;cursor:pointer" />
+                Intervalo
+              </label>
+              <div id="almoco_fields_{{ val }}" style="margin-top:.3rem;{% if not tem_almoco %}display:none{% endif %}">
+                <input type="time" name="dia_{{ val }}_ai" step="900"
+                       value="{{ d.almoco_inicio.strftime('%H:%M') if tem_almoco else '12:00' }}"
+                       {% if not d %}disabled{% endif %}
+                       style="margin-bottom:.2rem" />
+                <input type="time" name="dia_{{ val }}_af" step="900"
+                       value="{{ d.almoco_fim.strftime('%H:%M') if tem_almoco else '13:00' }}"
+                       {% if not d %}disabled{% endif %} />
+              </div>
+            </td>
+            {% endfor %}
+          </tr>
+          <!-- Saída -->
+          <tr>
+            <td class="exp-label">Saída</td>
+            {% for val, label in dias %}
+            {% set d = dias_map.get(val) %}
+            <td class="exp-cell dia-{{ val }}" {% if not d %}data-disabled="1"{% endif %}>
+              <input type="time" name="dia_{{ val }}_hf" step="900"
+                     value="{{ d.hora_fim.strftime('%H:%M') if d else '18:00' }}"
+                     {% if not d %}disabled{% endif %} />
+            </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:.7rem;align-items:center">
+    <button type="submit" class="btn-primary">Salvar</button>
+    <a href="{{ url_for('admin.expedientes') }}" class="btn-secondary">Cancelar</a>
+    {% if e %}
+    <form method="POST" action="{{ url_for('admin.expediente_excluir', exp_id=e.id) }}"
+          style="margin-left:auto"
+          onsubmit="return confirm('Excluir este expediente permanentemente?')">
+      <button type="submit" class="btn-danger">Excluir expediente</button>
+    </form>
+    {% endif %}
+  </div>
+
+</form>
+
+<style>
+.exp-grid {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 680px;
+}
+.exp-grid th, .exp-grid td {
+  border: 1px solid var(--border);
+  padding: .5rem .4rem;
+  text-align: center;
+  vertical-align: middle;
+}
+.exp-grid th { background: var(--content-bg); }
+.exp-label {
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: left !important;
+  padding-left: .8rem !important;
+  background: var(--content-bg);
+}
+.exp-cell input[type=time] {
+  width: 100%;
+  text-align: center;
+  padding: .3rem .2rem;
+  font-size: .82rem;
+}
+.exp-cell[data-disabled="1"] {
+  background: rgba(0,0,0,.03);
+  opacity: .5;
+}
+</style>
+
+<script>
+function toggleDia(dia) {
+  var ativo = document.getElementById('ativo_' + dia).checked;
+  var cells = document.querySelectorAll('.dia-' + dia);
+  cells.forEach(function(cell) {
+    if (ativo) {
+      cell.removeAttribute('data-disabled');
+      cell.style.opacity = '';
+    } else {
+      cell.setAttribute('data-disabled', '1');
+      cell.style.opacity = '.4';
+    }
+    cell.querySelectorAll('input').forEach(function(inp) {
+      if (inp.type === 'checkbox' && inp.id === 'ativo_' + dia) return;
+      inp.disabled = !ativo;
+    });
+  });
+}
+function toggleAlmoco(dia) {
+  var on = document.getElementById('almoco_' + dia).checked;
+  var fields = document.getElementById('almoco_fields_' + dia);
+  if (fields) fields.style.display = on ? '' : 'none';
+  if (fields) fields.querySelectorAll('input[type=time]').forEach(function(i) { i.disabled = !on; });
+}
+
+// Init: apply disabled state for unchecked days on load
+{% for val, label in dias %}
+(function() {
+  var cb = document.getElementById('ativo_{{ val }}');
+  if (cb && !cb.checked) toggleDia({{ val }});
+})();
+{% endfor %}
+</script>
+
+{% endblock %}

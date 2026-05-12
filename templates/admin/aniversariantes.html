@@ -1,0 +1,294 @@
+{% extends 'admin/base.html' %}
+{% block title %}Aniversariantes{% endblock %}
+{% block page_title %}Aniversariantes{% endblock %}
+
+{% block content %}
+
+<!-- ── Filtros ──────────────────────────────────────────────── -->
+<div class="card aniv-filter-card">
+  <form method="GET" action="{{ url_for('admin.aniversariantes') }}" id="filterForm">
+    <div class="aniv-filter-row">
+      <div class="form-group" style="min-width:220px">
+        <label style="font-size:.78rem;font-weight:500;margin-bottom:.3rem;display:block">Buscar por Período</label>
+        <select name="periodo" id="periodoSel" onchange="toggleMes()">
+          <option value="hoje"   {% if periodo=='hoje'   %}selected{% endif %}>Aniversariantes de Hoje</option>
+          <option value="amanha" {% if periodo=='amanha' %}selected{% endif %}>Aniversariantes de Amanhã</option>
+          <option value="mes"    {% if periodo=='mes'    %}selected{% endif %}>Aniversariantes do Mês</option>
+          <option value="outro"  {% if periodo=='outro'  %}selected{% endif %}>Selecionar outro mês</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="mesSel" style="min-width:160px;display:{% if periodo=='outro' %}block{% else %}none{% endif %}">
+        <label style="font-size:.78rem;font-weight:500;margin-bottom:.3rem;display:block">Mês</label>
+        <select name="mes">
+          {% for num, nome in meses.items() %}
+          <option value="{{ num }}" {% if mes_param|int == num %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="aniv-filter-btns">
+        <button type="submit" class="btn-primary" style="height:38px">Buscar</button>
+        <a href="{{ url_for('admin.aniversariantes', periodo='todos') }}" class="btn-secondary" style="height:38px;line-height:38px">Exibir todos</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- ── Ações ─────────────────────────────────────────────────── -->
+{% if clientes %}
+<div class="aniv-actions">
+  <a href="{{ url_for('admin.aniversariantes_export', periodo=periodo, mes=mes_param) }}"
+     class="btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:.4rem">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Salvar CSV
+  </a>
+  <button class="btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:.4rem" onclick="toggleSendPanel()">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+    Enviar Mensagem ({{ clientes|length }})
+  </button>
+  <span class="aniv-count">{{ titulo }} — <strong>{{ clientes|length }}</strong> cliente{{ 's' if clientes|length != 1 }}</span>
+</div>
+
+<!-- ── Painel de envio inline ──────────────────────────────── -->
+<div id="sendPanel" class="card aniv-send-panel" hidden>
+  <div class="aniv-send-hdr">
+    <span>Envio sequencial via WhatsApp</span>
+    <div style="display:flex;align-items:center;gap:.6rem">
+      <span id="sendProgress" style="font-size:.82rem;color:var(--text-muted)">Pronto para iniciar</span>
+      <button id="sendNextBtn" class="btn-primary" style="font-size:.82rem;padding:.35rem .9rem" onclick="sendNext()">
+        Iniciar envio ▶
+      </button>
+      <button onclick="toggleSendPanel()" class="btn-secondary" style="font-size:.82rem;padding:.35rem .7rem">Fechar</button>
+    </div>
+  </div>
+  <div style="padding:.6rem 1rem;font-size:.8rem;color:var(--text-muted);border-bottom:1px solid var(--border)">
+    Mensagem: <em id="msgPreview"></em>
+    <a href="{{ url_for('admin.configuracoes') }}" style="margin-left:.6rem;font-size:.76rem">Editar template →</a>
+  </div>
+  <div id="sendList" style="max-height:240px;overflow-y:auto"></div>
+</div>
+{% endif %}
+
+<!-- ── Tabela ─────────────────────────────────────────────────── -->
+<div class="card" style="overflow:hidden">
+  {% if clientes %}
+  <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th style="width:2rem"><input type="checkbox" id="chkAll" title="Selecionar todos"></th>
+          <th>Nome</th>
+          <th>Telefone</th>
+          <th>Nascimento</th>
+          <th>Sexo</th>
+          <th>Endereço</th>
+          <th>Nº</th>
+          <th>Cidade</th>
+          <th style="width:80px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        {% set fone = (c.telefone or '') | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
+        <tr class="aniv-row"
+            data-nome="{{ c.nome }}"
+            data-phone="{{ fone }}">
+          <td><input type="checkbox" class="row-chk" checked></td>
+          <td>
+            <a href="{{ url_for('admin.cliente_detalhe', cliente_id=c.id) }}" class="aniv-nome">{{ c.nome }}</a>
+            {% if c.aniversario and c.aniversario.month == today.month and c.aniversario.day == today.day %}
+            <span class="aniv-hoje-badge">🎂 Hoje!</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap">{{ c.telefone or '—' }}</td>
+          <td style="white-space:nowrap">{{ c.aniversario.strftime('%d/%m/%Y') if c.aniversario else '—' }}</td>
+          <td>{{ c.sexo or '—' }}</td>
+          <td style="font-size:.82rem">{{ c.endereco or '—' }}</td>
+          <td>{{ c.numero or '—' }}</td>
+          <td>{{ c.cidade or '—' }}</td>
+          <td>
+            <div style="display:flex;gap:.3rem;align-items:center">
+              <a href="{{ url_for('admin.cliente_detalhe', cliente_id=c.id) }}" class="aniv-action-btn" title="Editar">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </a>
+              {% if fone %}
+              <a href="https://wa.me/55{{ fone }}" target="_blank" rel="noopener"
+                 class="aniv-action-btn aniv-action-btn--wa" title="WhatsApp direto">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:3rem;text-align:center;color:var(--text-muted)">
+    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--border)" stroke-width="1.5" style="margin-bottom:.8rem">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+    <p style="font-size:.9rem">Nenhum aniversariante encontrado para o período selecionado.</p>
+    <p style="font-size:.8rem;margin-top:.4rem">Certifique-se de que os clientes têm a data de aniversário preenchida.</p>
+  </div>
+  {% endif %}
+</div>
+
+
+<style>
+.aniv-filter-card  { padding:1rem 1.2rem }
+.aniv-filter-row   { display:flex;flex-wrap:wrap;align-items:flex-end;gap:.8rem }
+.aniv-filter-btns  { display:flex;gap:.5rem;align-items:center;padding-bottom:1px }
+.aniv-actions      { display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-bottom:.8rem }
+.aniv-count        { font-size:.82rem;color:var(--text-muted);margin-left:.2rem }
+
+.aniv-send-panel   { padding:0;margin-bottom:.8rem;overflow:hidden }
+.aniv-send-hdr     { display:flex;align-items:center;justify-content:space-between;
+                     padding:.7rem 1rem;background:var(--bg-sidebar,#f8f5f3);
+                     border-bottom:1px solid var(--border);font-size:.85rem;font-weight:500 }
+
+.aniv-nome         { font-weight:500;color:var(--accent) }
+.aniv-nome:hover   { text-decoration:underline }
+.aniv-hoje-badge   { background:#fef9e6;color:#b45309;font-size:.7rem;font-weight:600;
+                     border:1px solid #fcd34d;border-radius:12px;padding:.1rem .45rem;
+                     margin-left:.4rem;vertical-align:middle }
+.aniv-action-btn   { display:inline-flex;align-items:center;justify-content:center;
+                     width:26px;height:26px;border-radius:5px;border:1px solid var(--border);
+                     color:var(--text-muted);background:var(--bg-card);transition:all .15s }
+.aniv-action-btn:hover     { border-color:var(--accent);color:var(--accent) }
+.aniv-action-btn--wa:hover { border-color:#25d366;color:#25d366;background:#f0fdf4 }
+
+.send-item         { display:flex;align-items:center;gap:.6rem;padding:.5rem .8rem;
+                     border-bottom:1px solid var(--border);font-size:.83rem }
+.send-item:last-child { border-bottom:none }
+.send-item.done    { opacity:.4 }
+.send-item.current { background:#fdf4f9;border-left:3px solid var(--accent) }
+.send-item__nome   { flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.send-item__phone  { color:var(--text-muted);font-size:.77rem;min-width:80px }
+.send-item__btn    { flex-shrink:0;font-size:.75rem;padding:.22rem .55rem;border-radius:4px;
+                     border:1px solid #25d366;color:#25d366;background:none;cursor:pointer;
+                     text-decoration:none;display:inline-flex;align-items:center;gap:.25rem }
+.send-item__btn:hover { background:#f0fdf4 }
+
+@media (max-width:640px) {
+  .aniv-filter-row { flex-direction:column;align-items:stretch }
+  .aniv-send-hdr   { flex-direction:column;align-items:flex-start;gap:.5rem }
+}
+</style>
+
+
+<script>
+const BIRTHDAY_MSG = {{ birthday_msg | tojson }};
+
+// ── Filtro: mês extra ──
+function toggleMes() {
+  const v = document.getElementById('periodoSel').value;
+  document.getElementById('mesSel').style.display = v === 'outro' ? 'block' : 'none';
+}
+
+// ── Selecionar todos ──
+document.getElementById('chkAll')?.addEventListener('change', function () {
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = this.checked);
+});
+
+// ── Painel de envio ──
+let waQueue = [];
+let waIdx   = 0;
+let panelOpen = false;
+
+function toggleSendPanel() {
+  const panel = document.getElementById('sendPanel');
+  panelOpen = !panelOpen;
+  if (panelOpen) {
+    buildQueue();
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  } else {
+    panel.hidden = true;
+  }
+}
+
+function buildQueue() {
+  waQueue = [];
+  document.querySelectorAll('.aniv-row').forEach(row => {
+    if (!row.querySelector('.row-chk')?.checked) return;
+    const phone = row.dataset.phone;
+    if (!phone) return;
+    waQueue.push({ nome: row.dataset.nome, phone });
+  });
+  waIdx = 0;
+
+  document.getElementById('msgPreview').textContent =
+    BIRTHDAY_MSG.replace(/{nome}/g, waQueue[0]?.nome || 'Cliente');
+
+  const list = document.getElementById('sendList');
+  list.innerHTML = waQueue.map((c, i) => `
+    <div class="send-item" id="si${i}">
+      <span class="send-item__nome">${c.nome}</span>
+      <span class="send-item__phone">${fmtPhone(c.phone)}</span>
+      <a class="send-item__btn" href="#" onclick="openFor(${i});return false;">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Enviar
+      </a>
+    </div>`).join('');
+
+  updateProgress();
+}
+
+function sendNext() {
+  if (!waQueue.length) { alert('Nenhuma cliente selecionada com telefone cadastrado.'); return; }
+  if (waIdx >= waQueue.length) return;
+  openFor(waIdx);
+  waIdx++;
+  updateProgress();
+}
+
+function openFor(idx) {
+  const { nome, phone } = waQueue[idx];
+  const msg = BIRTHDAY_MSG.replace(/{nome}/g, nome);
+  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  document.getElementById('si' + idx)?.classList.add('done');
+  if (idx === waIdx) {
+    document.getElementById('si' + idx)?.classList.remove('current');
+  }
+}
+
+function updateProgress() {
+  const btn  = document.getElementById('sendNextBtn');
+  const prog = document.getElementById('sendProgress');
+  if (!waQueue.length) {
+    prog.textContent = 'Nenhuma cliente selecionada';
+    btn.disabled = true;
+    return;
+  }
+  if (waIdx >= waQueue.length) {
+    prog.textContent = `✓ Todos os ${waQueue.length} enviados!`;
+    btn.textContent  = 'Concluído';
+    btn.disabled     = true;
+  } else {
+    prog.textContent = waIdx === 0
+      ? `${waQueue.length} cliente${waQueue.length !== 1 ? 's' : ''} — clique Iniciar`
+      : `${waIdx}/${waQueue.length} enviados`;
+    btn.textContent  = waIdx === 0 ? 'Iniciar envio ▶' : `Próximo (${waIdx + 1}/${waQueue.length}) ▶`;
+    btn.disabled     = false;
+    document.querySelectorAll('.send-item').forEach(el => el.classList.remove('current'));
+    document.getElementById('si' + waIdx)?.classList.add('current');
+  }
+}
+
+function fmtPhone(p) {
+  if (p.length === 11) return `(${p.slice(0,2)}) ${p.slice(2,7)}-${p.slice(7)}`;
+  if (p.length === 10) return `(${p.slice(0,2)}) ${p.slice(2,6)}-${p.slice(6)}`;
+  return p;
+}
+</script>
+
+{% endblock %}

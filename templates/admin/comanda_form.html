@@ -1,0 +1,516 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '#' + c.codigo|string if c else 'Nova Comanda' }}{% endblock %}
+{% block page_title %}{% if c %}Comanda #{{ c.codigo }}{% else %}Nova Comanda{% endif %}{% endblock %}
+
+{% block content %}
+
+{% set readonly = c and c.status == 'fechada' %}
+
+<form method="POST" id="comandaForm">
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:1rem;align-items:start">
+
+  <!-- ── Coluna esquerda: dados + itens ── -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+
+    <!-- Dados básicos -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Dados da Comanda</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data <span class="required">*</span></label>
+          <input type="date" name="data" required value="{{ c.data.isoformat() if c else hoje }}"
+                 {% if readonly %}disabled{% endif %} />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status" {% if readonly %}disabled{% endif %}>
+            <option value="aberta"  {% if not c or c.status == 'aberta'  %}selected{% endif %}>Aberta</option>
+            <option value="fechada" {% if c and c.status == 'fechada' %}selected{% endif %}>Fechada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome do Cliente</label>
+          <input type="text" name="nome_cliente" placeholder="Nome completo"
+                 value="{{ c.nome_cliente or '' if c else '' }}"
+                 {% if readonly %}disabled{% endif %} />
+        </div>
+        <div class="form-group">
+          <label>Cadastro do cliente</label>
+          <select name="cliente_id" {% if readonly %}disabled{% endif %} id="clienteSelect">
+            <option value="">Nenhum</option>
+            {% for cl in clientes %}
+            <option value="{{ cl.id }}"
+                    data-saldo="{{ cl.saldo or 0 }}"
+                    {% if c and c.cliente_id == cl.id %}selected{% endif %}>
+              {{ cl.nome }} — {{ cl.telefone }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Saldo do cliente -->
+      <div id="clienteSaldoBox" style="display:none;padding:.5rem .7rem;border-radius:6px;font-size:.82rem;margin-bottom:.5rem">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Responsável</label>
+          <select name="profissional_id" {% if readonly %}disabled{% endif %}>
+            <option value="">Selecione</option>
+            {% for p in profs %}
+            <option value="{{ p.id }}" {% if c and c.profissional_id == p.id %}selected{% endif %}>{{ p.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Unidade</label>
+          <select name="unidade_id" {% if readonly %}disabled{% endif %}>
+            <option value="">Não identificada</option>
+            {% for u in unidades %}
+            <option value="{{ u.id }}" {% if c and c.unidade_id == u.id %}selected{% endif %}>
+              {{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Desconto (R$)</label>
+          <input type="text" name="desconto" placeholder="0,00"
+                 value="{{ '%.2f'|format(c.desconto)|replace('.', ',') if c and c.desconto else '' }}"
+                 {% if readonly %}disabled{% endif %} />
+        </div>
+        <div class="form-group"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea name="observacoes" rows="2" placeholder="Anotações internas..."
+                  {% if readonly %}disabled{% endif %}>{{ c.observacoes or '' if c else '' }}</textarea>
+      </div>
+
+    </div>
+
+    <!-- Itens da comanda -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text);display:flex;justify-content:space-between;align-items:center">
+        <span>Serviços / Produtos</span>
+        {% if not readonly %}
+        <button type="button" class="btn-secondary" style="font-size:.78rem;padding:.3rem .7rem" onclick="addItem()">+ Adicionar item</button>
+        {% endif %}
+      </div>
+
+      <div id="itensList">
+        {% if c and c.itens %}
+          {% for item in c.itens %}
+          <div class="item-row" style="display:grid;grid-template-columns:2fr 1fr 60px auto;gap:.5rem;align-items:end;margin-bottom:.5rem">
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted)">Descrição</label>
+              <input type="text" name="item_descricao" value="{{ item.descricao }}"
+                     placeholder="Nome do serviço/produto" required {% if readonly %}disabled{% endif %} />
+              {% if item.venda_pacote_item_id %}
+              <span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:.1rem .4rem;border-radius:4px;display:inline-block;margin-top:.2rem">
+                🎁 Abatido do pacote
+              </span>
+              {% endif %}
+            </div>
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted)">Valor (R$)</label>
+              <input type="text" name="item_valor" value="{{ '%.2f'|format(item.valor)|replace('.', ',') }}"
+                     placeholder="0,00" {% if readonly %}disabled{% endif %} />
+            </div>
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted)">Qtd</label>
+              <input type="number" name="item_quantidade" value="{{ item.quantidade }}" min="1" step="1"
+                     {% if readonly %}disabled{% endif %} />
+            </div>
+            <input type="hidden" name="item_servico_id" value="{{ item.servico_id or '' }}" />
+            <input type="hidden" name="item_venda_pacote_item_id" value="{{ item.venda_pacote_item_id or '' }}" />
+            {% if not readonly %}
+            <button type="button" class="btn-icon btn-icon--danger" onclick="removeItem(this)" title="Remover" style="margin-bottom:2px">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+
+      {% if not readonly %}
+      <div id="itemsEmpty" style="color:var(--text-muted);font-size:.83rem;padding:.5rem 0;
+           display:{% if c and c.itens %}none{% else %}block{% endif %}">
+        Nenhum item adicionado.
+      </div>
+
+      <!-- Seletor rápido de serviço -->
+      <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)">
+        <label style="font-size:.75rem;color:var(--text-muted)">Adicionar serviço do catálogo</label>
+        <div style="display:flex;gap:.5rem;margin-top:.3rem">
+          <select id="svcPicker" style="flex:1">
+            <option value="">Selecione um serviço...</option>
+            {% for s in servicos %}
+            <option value="{{ s.id }}"
+                    data-nome="{{ s.nome }}"
+                    data-preco="{{ '%.2f'|format(s.preco)|replace('.', ',') if s.preco else '0,00' }}">
+              {{ s.nome }}{% if s.preco %} — R$ {{ '%.2f'|format(s.preco)|replace('.', ',') }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn-secondary" onclick="addFromCatalog()">Inserir</button>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    {% if not readonly %}
+    <!-- Ações de salvar -->
+    <div style="display:flex;gap:.7rem">
+      <button type="submit" class="btn-primary">Salvar comanda</button>
+      <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary">Cancelar</a>
+      {% if c %}
+      <form method="POST" action="{{ url_for('admin.comanda_excluir', comanda_id=c.id) }}"
+            style="margin-left:auto"
+            onsubmit="return confirm('Excluir esta comanda permanentemente?')">
+        <button type="submit" class="btn-danger">Excluir comanda</button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div style="display:flex;gap:.7rem">
+      <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary">← Voltar</a>
+      <form method="POST" action="{{ url_for('admin.comanda_excluir', comanda_id=c.id) }}"
+            onsubmit="return confirm('Excluir esta comanda permanentemente?')">
+        <button type="submit" class="btn-danger">Excluir comanda</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- ── Coluna direita: pagamentos ── -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+
+    <!-- Resumo financeiro -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Resumo</div>
+      <table style="width:100%;font-size:.88rem;border-collapse:collapse">
+        <tr>
+          <td style="padding:.35rem 0;color:var(--text-muted)">Subtotal</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(c.valor_total if c else 0)|replace('.', ',') }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:.35rem 0;color:var(--text-muted)">Desconto</td>
+          <td style="text-align:right;color:var(--text-muted);font-size:.83rem">
+            R$ {{ '%.2f'|format(c.desconto if c and c.desconto else 0)|replace('.', ',') }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:.35rem 0;color:var(--text-muted)">Pago</td>
+          <td style="text-align:right;color:#15803d;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(c.valor_pago if c else 0)|replace('.', ',') }}
+          </td>
+        </tr>
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:.5rem 0 0;font-weight:600">Saldo</td>
+          <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;
+                     padding-top:.5rem;
+                     color:{% if c and c.saldo > 0 %}#b45309{% else %}#15803d{% endif %}">
+            R$ {{ '%.2f'|format(c.saldo if c else 0)|replace('.', ',') }}
+          </td>
+        </tr>
+      </table>
+
+      {% if c and c.status == 'aberta' %}
+      <!-- Projeção de fechamento -->
+      {% if c.saldo != 0 and c.cliente %}
+      <div style="margin-top:.8rem;padding:.5rem .7rem;border-radius:6px;font-size:.81rem;
+                  {% if c.saldo > 0 %}background:#fef3c7;color:#92400e{% else %}background:#d1fae5;color:#065f46{% endif %}">
+        {% if c.saldo > 0 %}
+          Ao fechar, <strong>R$ {{ '%.2f'|format(c.saldo)|replace('.', ',') }}</strong> serão lançados como dívida de {{ c.cliente.nome }}.
+        {% else %}
+          Ao fechar, <strong>R$ {{ '%.2f'|format(-c.saldo)|replace('.', ',') }}</strong> serão creditados para {{ c.cliente.nome }}.
+        {% endif %}
+      </div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('admin.comanda_fechar', comanda_id=c.id) }}"
+            style="margin-top:.8rem"
+            onsubmit="return confirm('Fechar esta comanda?{% if c.saldo > 0 and c.cliente %} R$ {{ '%.2f'|format(c.saldo)|replace('.', ',') }} serão lançados como dívida do cliente.{% elif c.saldo < 0 and c.cliente %} R$ {{ '%.2f'|format(-c.saldo)|replace('.', ',') }} serão creditados ao cliente.{% endif %}')">
+        <button type="submit" class="btn-primary" style="width:100%">Fechar comanda</button>
+      </form>
+      {% endif %}
+      {% if c and c.saldo_ajustado is not none and c.saldo_ajustado != 0 %}
+      <div style="margin-top:.5rem;font-size:.79rem;color:var(--text-muted)">
+        {% if c.saldo_ajustado > 0 %}
+          Dívida transferida ao cliente: R$ {{ '%.2f'|format(c.saldo_ajustado)|replace('.', ',') }}
+        {% else %}
+          Crédito transferido ao cliente: R$ {{ '%.2f'|format(-c.saldo_ajustado)|replace('.', ',') }}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Pagamentos registrados -->
+    {% if c %}
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:.8rem;color:var(--text)">Pagamentos</div>
+      {% if c.pagamentos %}
+        {% for p in c.pagamentos %}
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-size:.83rem;font-weight:500">{{ dict(formas).get(p.forma_pagamento, p.forma_pagamento) }}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">
+              {{ p.data_pagamento.strftime('%d/%m/%Y') }}
+              {% if p.parcelas and p.parcelas > 1 %} · {{ p.parcelas }}x{% endif %}
+            </div>
+          </div>
+          <div style="font-weight:600;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(p.valor)|replace('.', ',') }}
+          </div>
+          {% if c.status == 'aberta' %}
+          <form method="POST" action="{{ url_for('admin.comanda_pagamento_excluir', comanda_id=c.id, pag_id=p.id) }}"
+                onsubmit="return confirm('Remover este pagamento?')">
+            <button type="submit" class="btn-icon btn-icon--danger" title="Remover">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:.83rem;color:var(--text-muted)">Nenhum pagamento registrado.</p>
+      {% endif %}
+
+      {% if c.status == 'aberta' %}
+      <!-- Registrar pagamento -->
+      <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:.6rem;color:var(--text)">Registrar pagamento</div>
+
+        {% if c.cliente %}
+        <div id="saldoClienteInfo" style="margin-bottom:.6rem;padding:.4rem .6rem;border-radius:5px;font-size:.79rem;
+          {% if c.cliente.saldo > 0 %}background:#d1fae5;color:#065f46{% elif c.cliente.saldo < 0 %}background:#fee2e2;color:#991b1b{% else %}background:var(--bg-muted);color:var(--text-muted){% endif %}">
+          {% if c.cliente.saldo > 0 %}
+            Crédito disponível de {{ c.cliente.nome }}: <strong>R$ {{ '%.2f'|format(c.cliente.saldo)|replace('.', ',') }}</strong>
+          {% elif c.cliente.saldo < 0 %}
+            {{ c.cliente.nome }} possui dívida de <strong>R$ {{ '%.2f'|format(-c.cliente.saldo)|replace('.', ',') }}</strong>
+          {% else %}
+            {{ c.cliente.nome }} não possui saldo.
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('admin.comanda_pagamento_add', comanda_id=c.id) }}">
+          <div class="form-group" style="margin-bottom:.5rem">
+            <label style="font-size:.75rem">Forma</label>
+            <select name="forma_pagamento" required id="formaPagSelect">
+              <option value="">Selecione</option>
+              {% for val, label in formas %}
+              {% if val == 'saldo_cliente' %}
+                {% if c.cliente and c.cliente.saldo > 0 %}
+                <option value="{{ val }}">{{ label }} (R$ {{ '%.2f'|format(c.cliente.saldo)|replace('.', ',') }} disponível)</option>
+                {% endif %}
+              {% else %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row" style="margin-bottom:.5rem" id="parcelasRow">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:.75rem">Valor (R$)</label>
+              <input type="text" name="valor" id="valorPagInput" placeholder="0,00" required />
+            </div>
+            <div class="form-group" style="margin:0" id="parcelasGroup">
+              <label style="font-size:.75rem">Parcelas</label>
+              <input type="number" name="parcelas" value="1" min="1" max="24" />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%;margin-top:.3rem">Registrar</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if c and c.agendamento %}
+    <div class="card" style="padding:1rem 1.2rem">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.4rem">Originado do agendamento</div>
+      <a href="{{ url_for('admin.agenda', data=c.agendamento.data.isoformat()) }}"
+         style="font-size:.85rem;color:var(--gold);text-decoration:none">
+        {{ c.agendamento.data.strftime('%d/%m/%Y') }} · {{ c.agendamento.hora_inicio.strftime('%H:%M') }}
+        — {{ c.agendamento.nome_cliente }}
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Pacotes ativos do cliente -->
+    {% if not readonly %}
+    <div class="card" id="painelPacotes" style="padding:1rem 1.2rem;display:none">
+      <div style="font-size:.82rem;font-weight:600;margin-bottom:.6rem;color:var(--text)">🎁 Pacotes Ativos</div>
+      <div id="listaPacotesAtivos" style="font-size:.82rem"></div>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+</form>
+
+<script>
+// Saldo do cliente + pacotes ativos ao trocar cliente
+(function() {
+  var sel = document.getElementById('clienteSelect');
+  var box = document.getElementById('clienteSaldoBox');
+  if (!sel) return;
+
+  function updateSaldoBox() {
+    if (!box) return;
+    var opt = sel.selectedOptions[0];
+    var saldo = parseFloat(opt ? opt.dataset.saldo : 0) || 0;
+    if (!opt || !opt.value) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    if (saldo > 0) {
+      box.style.cssText = 'display:block;padding:.5rem .7rem;border-radius:6px;font-size:.82rem;margin-bottom:.5rem;background:#d1fae5;color:#065f46';
+      box.textContent = 'Crédito disponível: R$ ' + saldo.toFixed(2).replace('.', ',');
+    } else if (saldo < 0) {
+      box.style.cssText = 'display:block;padding:.5rem .7rem;border-radius:6px;font-size:.82rem;margin-bottom:.5rem;background:#fee2e2;color:#991b1b';
+      box.textContent = 'Saldo devedor: R$ ' + Math.abs(saldo).toFixed(2).replace('.', ',');
+    } else {
+      box.style.cssText = 'display:block;padding:.5rem .7rem;border-radius:6px;font-size:.82rem;margin-bottom:.5rem;background:var(--bg-muted);color:var(--text-muted)';
+      box.textContent = 'Sem saldo.';
+    }
+  }
+
+  async function carregarPacotesAtivos() {
+    var painel = document.getElementById('painelPacotes');
+    var lista  = document.getElementById('listaPacotesAtivos');
+    if (!painel || !lista) return;
+    var opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) { painel.style.display = 'none'; return; }
+    try {
+      const resp = await fetch(`/admin/api/clientes/${opt.value}/pacotes-ativos`);
+      const data = await resp.json();
+      if (!data.length) { painel.style.display = 'none'; return; }
+      lista.innerHTML = '';
+      for (const item of data) {
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)';
+        div.innerHTML = `
+          <div>
+            <div style="font-weight:500">${escHtml(item.servico_nome)}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">${escHtml(item.pacote_nome)} · ${item.restantes} de ${item.total} restantes</div>
+          </div>
+          <button type="button" class="btn btn-outline" style="font-size:.75rem;padding:.15rem .5rem;white-space:nowrap"
+                  onclick="usarSessaoPacote('${escHtml(item.servico_nome)}', '${item.servico_id}', '${item.venda_pacote_item_id}')">
+            Usar sessão
+          </button>`;
+        lista.appendChild(div);
+      }
+      painel.style.display = '';
+    } catch(e) {
+      painel.style.display = 'none';
+    }
+  }
+
+  sel.addEventListener('change', function() {
+    updateSaldoBox();
+    carregarPacotesAtivos();
+  });
+  updateSaldoBox();
+  carregarPacotesAtivos();
+})();
+
+function usarSessaoPacote(nome, svcId, vpItemId) {
+  addItem(nome, '0,00', svcId, vpItemId, true);
+}
+
+// Ao selecionar "Saldo do cliente", preencher valor com o saldo disponível e esconder parcelas
+(function() {
+  var formaSel = document.getElementById('formaPagSelect');
+  var valorInput = document.getElementById('valorPagInput');
+  var parcelasGroup = document.getElementById('parcelasGroup');
+  if (!formaSel) return;
+  formaSel.addEventListener('change', function() {
+    if (this.value === 'saldo_cliente') {
+      if (parcelasGroup) parcelasGroup.style.display = 'none';
+      // Preencher com saldo disponível se campo vazio
+      var opt = this.selectedOptions[0];
+      var label = opt ? opt.textContent : '';
+      var m = label.match(/R\$\s*([\d.,]+)/);
+      if (m && valorInput && !valorInput.value) {
+        valorInput.value = m[1];
+      }
+    } else {
+      if (parcelasGroup) parcelasGroup.style.display = '';
+    }
+  });
+})();
+
+function addItem(nome, valor, svcId, vpItemId, isPacote) {
+  nome     = nome     || '';
+  valor    = valor    || '';
+  svcId    = svcId    || '';
+  vpItemId = vpItemId || '';
+  isPacote = !!isPacote;
+  var list = document.getElementById('itensList');
+  var empty = document.getElementById('itemsEmpty');
+  if (empty) empty.style.display = 'none';
+  var row = document.createElement('div');
+  row.className = 'item-row';
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 60px auto;gap:.5rem;align-items:end;margin-bottom:.5rem';
+  var pacoteBadge = isPacote
+    ? `<span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:.1rem .4rem;border-radius:4px;display:inline-block;margin-top:.2rem">🎁 Abatido do pacote</span>`
+    : '';
+  row.innerHTML = `
+    <div>
+      <label style="font-size:.75rem;color:var(--text-muted)">Descrição</label>
+      <input type="text" name="item_descricao" value="${escHtml(nome)}" placeholder="Nome do serviço/produto" required />
+      ${pacoteBadge}
+    </div>
+    <div>
+      <label style="font-size:.75rem;color:var(--text-muted)">Valor (R$)</label>
+      <input type="text" name="item_valor" value="${escHtml(valor)}" placeholder="0,00" />
+    </div>
+    <div>
+      <label style="font-size:.75rem;color:var(--text-muted)">Qtd</label>
+      <input type="number" name="item_quantidade" value="1" min="1" step="1" />
+    </div>
+    <input type="hidden" name="item_servico_id" value="${escHtml(svcId)}" />
+    <input type="hidden" name="item_venda_pacote_item_id" value="${escHtml(vpItemId)}" />
+    <button type="button" class="btn-icon btn-icon--danger" onclick="removeItem(this)" title="Remover" style="margin-bottom:2px">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  list.appendChild(row);
+}
+
+function removeItem(btn) {
+  btn.closest('.item-row').remove();
+  var list = document.getElementById('itensList');
+  var empty = document.getElementById('itemsEmpty');
+  if (empty && list.querySelectorAll('.item-row').length === 0) empty.style.display = '';
+}
+
+function addFromCatalog() {
+  var sel = document.getElementById('svcPicker');
+  if (!sel.value) return;
+  var opt = sel.selectedOptions[0];
+  addItem(opt.dataset.nome, opt.dataset.preco, sel.value);
+  sel.value = '';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+{% endblock %}

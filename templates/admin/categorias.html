@@ -1,0 +1,126 @@
+{% extends 'admin/base.html' %}
+{% block title %}Categorias{% endblock %}
+{% block page_title %}Categorias de Serviços{% endblock %}
+
+{% block content %}
+
+<div class="svc-subnav">
+  <a href="{{ url_for('admin.servicos') }}">Serviços</a>
+  <a href="{{ url_for('admin.categorias') }}" class="active">Categorias</a>
+  <a href="{{ url_for('admin.profissionais') }}">Profissionais</a>
+</div>
+
+<div style="display:grid;grid-template-columns:340px 1fr;gap:1.2rem;align-items:start">
+
+  <!-- Formulário -->
+  <div class="card" id="formCard">
+    <div class="card__header">
+      <h3 id="formTitle">Nova Categoria</h3>
+    </div>
+    <form method="POST" action="{{ url_for('admin.categorias') }}" id="catForm">
+      <input type="hidden" name="action" value="save" />
+      <input type="hidden" name="id" id="catId" value="" />
+
+      <div class="form-group">
+        <label>Nome <span class="required">*</span></label>
+        <input type="text" name="nome" id="catNome" required placeholder="Nome da categoria" />
+      </div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" name="descricao" id="catDescricao" placeholder="Opcional..." />
+      </div>
+      <div class="form-actions" style="margin-top:1rem">
+        <button type="submit" class="btn-primary">Salvar</button>
+        <button type="button" class="btn-secondary" onclick="resetForm()">Limpar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Listagem -->
+  <div class="card" style="overflow:hidden">
+    {% if categorias %}
+    <div style="overflow-x:auto">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th style="text-align:center">Serviços</th>
+            <th style="text-align:center">Profissionais</th>
+            <th style="text-align:center">Status</th>
+            <th style="width:74px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat in categorias %}
+          <tr>
+            <td style="font-weight:500">{{ cat.nome }}</td>
+            <td style="color:var(--text-muted);font-size:.83rem">{{ cat.descricao or '—' }}</td>
+            <td style="text-align:center">{{ cat.servicos | length }}</td>
+            <td style="text-align:center">{{ cat.profissionais | length }}</td>
+            <td style="text-align:center">
+              {% if cat.ativo %}
+              <span class="badge badge--convertido">Ativo</span>
+              {% else %}
+              <span class="badge badge--perdido">Inativo</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display:flex;gap:.3rem">
+                <button type="button" class="btn-icon btn-icon--edit" title="Editar"
+                  onclick="editCat({{ cat.id }}, {{ cat.nome|tojson }}, {{ (cat.descricao or '')|tojson }})">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <form method="POST" action="{{ url_for('admin.categorias') }}" style="display:inline"
+                      onsubmit="return confirm('Excluir {{ cat.nome }}?')">
+                  <input type="hidden" name="action" value="delete" />
+                  <input type="hidden" name="id" value="{{ cat.id }}" />
+                  <button type="submit" class="btn-icon btn-icon--danger" title="{% if cat.servicos or cat.profissionais %}Em uso — não pode excluir{% else %}Excluir{% endif %}"
+                    {% if cat.servicos or cat.profissionais %}disabled style="opacity:.35;cursor:default"{% endif %}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--text-muted)">
+      <p>Nenhuma categoria cadastrada ainda.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+.svc-subnav { display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid var(--border) }
+.svc-subnav a { padding:.55rem 1.1rem;font-size:.85rem;font-weight:500;color:var(--text-muted);
+                border-bottom:2px solid transparent;margin-bottom:-2px;text-decoration:none;transition:all .15s }
+.svc-subnav a:hover,.svc-subnav a.active { color:var(--accent);border-bottom-color:var(--accent) }
+.btn-danger-sm { border-color:var(--error,#ef4444);color:var(--error,#ef4444) }
+.btn-danger-sm:hover { background:var(--error,#ef4444);color:#fff }
+.btn-danger-sm:disabled { opacity:.35;cursor:default }
+</style>
+
+<script>
+function editCat(id, nome, descricao) {
+  document.getElementById('catId').value       = id;
+  document.getElementById('catNome').value     = nome;
+  document.getElementById('catDescricao').value= descricao;
+  document.getElementById('formTitle').textContent = 'Editar Categoria';
+  document.getElementById('catNome').focus();
+  document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function resetForm() {
+  document.getElementById('catId').value        = '';
+  document.getElementById('catNome').value      = '';
+  document.getElementById('catDescricao').value = '';
+  document.getElementById('formTitle').textContent = 'Nova Categoria';
+}
+</script>
+
+{% endblock %}

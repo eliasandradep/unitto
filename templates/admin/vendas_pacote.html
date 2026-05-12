@@ -1,0 +1,72 @@
+{% extends 'admin/base.html' %}
+{% block title %}Vendas de Pacotes{% endblock %}
+{% block page_title %}Vendas de Pacotes{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.6rem">
+  <form method="GET" style="display:flex;gap:.4rem">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar cliente ou pacote…" style="min-width:220px" />
+    <button type="submit" class="btn btn-outline">Buscar</button>
+    {% if q %}<a href="{{ url_for('admin.vendas_pacote') }}" class="btn btn-outline">✕</a>{% endif %}
+  </form>
+  <a href="{{ url_for('admin.venda_pacote_nova') }}" class="btn btn-primary" style="font-size:.85rem">
+    + Nova Venda de Pacote
+  </a>
+</div>
+
+{% if vendas %}
+<div class="card" style="overflow:hidden">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Pacote</th>
+        <th>Cliente</th>
+        <th>Data</th>
+        <th style="text-align:right">Valor</th>
+        <th style="text-align:center">Sessões</th>
+        <th style="text-align:center">Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in vendas %}
+      <tr>
+        <td style="color:var(--text-muted);font-size:.8rem">{{ v.id }}</td>
+        <td><strong>{{ v.nome_pacote }}</strong></td>
+        <td>{{ v.nome_cliente or (v.cliente.nome if v.cliente else '—') }}</td>
+        <td style="white-space:nowrap">{{ v.data_venda.strftime('%d/%m/%Y') }}</td>
+        <td style="text-align:right;white-space:nowrap">R$ {{ '%.2f'|format(v.valor_total)|replace('.', ',') }}</td>
+        <td style="text-align:center">
+          <span style="font-weight:600;color:var(--primary)">{{ v.sessoes_restantes }}</span>
+          <span style="color:var(--text-muted)"> / {{ v.sessoes_total }}</span>
+        </td>
+        <td style="text-align:center">
+          {% if v.status == 'ativo' %}
+            <span class="badge badge-success">Ativo</span>
+          {% elif v.status == 'concluido' %}
+            <span class="badge" style="background:#6c757d;color:#fff">Concluído</span>
+          {% else %}
+            <span class="badge badge-danger">Cancelado</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('admin.venda_pacote_detalhe', venda_id=v.id) }}"
+             class="btn btn-outline" style="font-size:.78rem;padding:.2rem .6rem">Ver</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  {% if q %}
+    <p>Nenhuma venda encontrada para "{{ q }}".</p>
+  {% else %}
+    <p>Nenhuma venda de pacote registrada ainda.</p>
+    <a href="{{ url_for('admin.venda_pacote_nova') }}" class="btn btn-primary">Registrar primeira venda</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

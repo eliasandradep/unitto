@@ -1,0 +1,69 @@
+{% extends 'admin/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="stats-grid">
+  <div class="stat-card stat-card--total">
+    <div class="stat-card__value">{{ total }}</div>
+    <div class="stat-card__label">Total de Leads</div>
+  </div>
+  {% for key, label in statuses %}
+  <div class="stat-card stat-card--{{ key }}">
+    <div class="stat-card__value">{{ by_status[key] }}</div>
+    <div class="stat-card__label">{{ label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="dashboard-row">
+  <div class="card">
+    <div class="card__header">
+      <h3>Leads recentes</h3>
+      <a href="{{ url_for('admin.leads') }}" class="card__link">Ver todos →</a>
+    </div>
+    {% if recent %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nome / Telefone</th>
+          <th>Origem</th>
+          <th>Status</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in recent %}
+        <tr>
+          <td>
+            <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+              <strong>{{ lead.name or '—' }}</strong><br />
+              <small>{{ lead.phone }}</small>
+            </a>
+          </td>
+          <td><span class="badge badge--source-{{ lead.source }}">{{ lead.source_label() }}</span></td>
+          <td><span class="badge badge--{{ lead.status }}">{{ lead.status_label() }}</span></td>
+          <td>{{ lead.created_at.strftime('%d/%m %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Nenhum lead cadastrado ainda.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__header">
+      <h3>Tema ativo</h3>
+      <a href="{{ url_for('admin.themes') }}" class="card__link">Alterar →</a>
+    </div>
+    <div class="theme-badge-large">
+      <div class="theme-badge-large__name">{{ theme_name }}</div>
+      <a href="{{ url_for('admin.themes') }}" class="btn-secondary">Trocar tema</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

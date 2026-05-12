@@ -1,0 +1,79 @@
+{% extends 'admin/base.html' %}
+{% block title %}Expedientes{% endblock %}
+{% block page_title %}Profissionais / Expedientes{% endblock %}
+
+{% block content %}
+
+<div class="toolbar" style="margin-bottom:.8rem">
+  <a href="{{ url_for('admin.expediente_novo') }}" class="btn-primary">+ Novo Expediente</a>
+</div>
+
+<div class="card" style="overflow:hidden">
+  {% if expedientes %}
+  <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Dias Ativos</th>
+          <th>Profissionais Vinculados</th>
+          <th style="width:100px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expedientes %}
+        {% set dias_ativos = e.dias_ativos %}
+        <tr>
+          <td style="font-weight:500">{{ e.nome }}</td>
+          <td>
+            {% if dias_ativos %}
+              <div style="display:flex;gap:.25rem;flex-wrap:wrap">
+                {% for d in dias_ativos %}
+                <span class="badge" style="background:rgba(201,169,122,.15);color:var(--gold-dark);font-size:.72rem">
+                  {{ dias_abrev[d.dia_semana] }}
+                </span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.83rem">Nenhum dia configurado</span>
+            {% endif %}
+          </td>
+          <td style="font-size:.83rem;color:var(--text-muted)">
+            {% set vinc = e.profissionais_vinculados %}
+            {% if vinc %}
+              {{ vinc | map(attribute='nome') | join(', ') }}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:.3rem">
+              <a href="{{ url_for('admin.expediente_detalhe', exp_id=e.id) }}"
+                 class="btn-icon btn-icon--edit" title="Editar">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </a>
+              <form method="POST" action="{{ url_for('admin.expediente_excluir', exp_id=e.id) }}"
+                    style="display:inline"
+                    onsubmit="return confirm('Excluir este expediente? Os profissionais vinculados ficarão sem expediente.')">
+                <button type="submit" class="btn-icon btn-icon--danger" title="Excluir">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div style="padding:.6rem 1rem;font-size:.8rem;color:var(--text-muted);border-top:1px solid var(--border)">
+    {{ expedientes | length }} expediente(s) cadastrado(s)
+  </div>
+  {% else %}
+  <div style="padding:2.5rem;text-align:center;color:var(--text-muted)">
+    <p>Nenhum expediente cadastrado ainda.</p>
+    <a href="{{ url_for('admin.expediente_novo') }}" class="btn-primary"
+       style="display:inline-block;margin-top:.8rem">+ Novo Expediente</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

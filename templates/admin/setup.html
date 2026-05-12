@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuração inicial — OSBeauty</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    .setup-wrap { max-width: 560px; margin: 3rem auto; padding: 0 1rem; }
+    .setup-header { text-align: center; margin-bottom: 2rem; }
+    .setup-header__logo { font-size: 2rem; font-weight: 700; color: var(--primary, #c9a27e); letter-spacing: -.5px; }
+    .setup-header__sub  { font-size: .85rem; color: var(--text-muted); margin-top: .25rem; }
+    .setup-section { margin-bottom: 1.8rem; }
+    .setup-section__title {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-muted);
+      border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: 1rem;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body class="admin-body" style="background:var(--surface,#f8f6f4)">
+
+<div class="setup-wrap">
+
+  <div class="setup-header">
+    <div class="setup-header__logo">OSBeauty</div>
+    <div class="setup-header__sub">Bem-vindo! Configure seu estúdio para começar.</div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert--{{ cat }}" style="margin-bottom:1rem">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('admin.setup') }}" class="card" style="padding:1.8rem">
+
+    <!-- Dados do estúdio -->
+    <div class="setup-section">
+      <div class="setup-section__title">Dados do Estúdio</div>
+
+      <div class="form-group">
+        <label>Nome do estúdio / salão <span class="required">*</span></label>
+        <input type="text" name="studio_nome" required placeholder="Ex: Studio Bella Arte"
+               value="{{ form.studio_nome or '' }}" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Slug (identificador único) <span class="required">*</span></label>
+          <input type="text" name="slug" id="inpSlug" required
+                 placeholder="bella-arte"
+                 pattern="[a-z0-9\-]+"
+                 title="Apenas letras minúsculas, números e hífens"
+                 value="{{ form.slug or '' }}" />
+          <p style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem">
+            Usado como identificador interno. Ex: <em>bella-arte</em>
+          </p>
+        </div>
+        <div class="form-group">
+          <label>Telefone / WhatsApp</label>
+          <input type="text" name="studio_telefone" placeholder="(11) 99999-9999"
+                 value="{{ form.studio_telefone or '' }}" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Cidade</label>
+        <input type="text" name="studio_cidade" placeholder="São Paulo"
+               value="{{ form.studio_cidade or '' }}" />
+      </div>
+    </div>
+
+    <!-- Conta de administrador -->
+    <div class="setup-section">
+      <div class="setup-section__title">Conta de Administrador</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome completo <span class="required">*</span></label>
+          <input type="text" name="name" required placeholder="Seu nome"
+                 value="{{ form.name or '' }}" />
+        </div>
+        <div class="form-group">
+          <label>Usuário <span class="required">*</span></label>
+          <input type="text" name="username" required placeholder="admin"
+                 value="{{ form.username or '' }}" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" name="email" placeholder="voce@email.com"
+                 value="{{ form.email or '' }}" />
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="text" name="phone" placeholder="(11) 99999-9999"
+                 value="{{ form.phone or '' }}" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Senha <span class="required">*</span></label>
+          <input type="password" name="password" required id="inpPwd" />
+        </div>
+        <div class="form-group">
+          <label>Confirmar senha <span class="required">*</span></label>
+          <input type="password" name="confirm" required id="inpConfirm" />
+        </div>
+      </div>
+      <p id="pwdMsg" style="font-size:.78rem;color:var(--danger,#e05c5c);display:none;margin-top:-.4rem;margin-bottom:.5rem">
+        As senhas não conferem.
+      </p>
+    </div>
+
+    <button type="submit" class="btn-primary btn-full" id="btnSetup">Criar conta e acessar</button>
+
+  </form>
+</div>
+
+<script>
+const nomeInp  = document.querySelector('[name=studio_nome]');
+const slugInp  = document.getElementById('inpSlug');
+const pwdInp   = document.getElementById('inpPwd');
+const confInp  = document.getElementById('inpConfirm');
+const pwdMsg   = document.getElementById('pwdMsg');
+const btnSetup = document.getElementById('btnSetup');
+
+nomeInp.addEventListener('input', function () {
+  if (!slugInp.dataset.edited) {
+    slugInp.value = this.value.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+  }
+});
+slugInp.addEventListener('input', function () { this.dataset.edited = '1'; });
+
+function checkPwd() {
+  const ok = pwdInp.value === confInp.value || confInp.value === '';
+  pwdMsg.style.display = ok ? 'none' : 'block';
+  btnSetup.disabled = !ok || pwdInp.value === '';
+}
+pwdInp.addEventListener('input', checkPwd);
+confInp.addEventListener('input', checkPwd);
+</script>
+
+</body>
+</html>

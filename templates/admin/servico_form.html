@@ -1,0 +1,343 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ s.nome if s else 'Novo Serviço' }}{% endblock %}
+{% block page_title %}{{ s.nome if s else 'Novo Serviço' }}{% endblock %}
+
+{% block content %}
+{% set action_url = url_for('admin.servico_detalhe', servico_id=s.id) if s else url_for('admin.servico_novo') %}
+
+<!-- Sub-navegação -->
+<div class="svc-subnav">
+  <a href="{{ url_for('admin.servicos') }}">Serviços</a>
+  <a href="{{ url_for('admin.categorias') }}">Categorias</a>
+  <a href="{{ url_for('admin.profissionais') }}">Profissionais</a>
+</div>
+
+<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem">
+  <a href="{{ url_for('admin.servicos') }}" class="btn-secondary btn-sm">← Voltar</a>
+  <span style="font-size:.82rem;color:var(--text-muted)">
+    {{ 'Editando: ' + s.nome if s else 'Novo Serviço' }}
+  </span>
+</div>
+
+<form method="POST" action="{{ action_url }}" id="svcForm">
+<div class="svc-layout">
+
+  <!-- ── Coluna esquerda: dados do serviço ── -->
+  <div class="svc-main">
+
+    <div class="card">
+      <div class="card__header"><h3>Informações de Cadastro do Serviço</h3></div>
+
+      <!-- Nome -->
+      <div class="form-group">
+        <label>Nome do Serviço <span class="required">*</span></label>
+        <input type="text" name="nome" required value="{{ s.nome if s else '' }}" placeholder="ex: Babyliss com escova curto" />
+      </div>
+
+      <!-- Descrição -->
+      <div class="form-group">
+        <label>Descrição</label>
+        <textarea name="descricao" id="descricaoTa" rows="4" maxlength="500"
+                  placeholder="Descrição do serviço...">{{ s.descricao or '' if s else '' }}</textarea>
+        <div style="text-align:right;font-size:.74rem;color:var(--text-muted);margin-top:.2rem">
+          <span id="descCount">0</span>/500 caracteres
+        </div>
+      </div>
+
+      <!-- Imagem -->
+      <div class="form-group">
+        <label>Imagem do Serviço <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(URL)</span></label>
+        <input type="url" name="imagem_url" value="{{ s.imagem_url or '' if s else '' }}" placeholder="https://..." />
+      </div>
+
+      <!-- Preço + Duração -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Preço Unitário (R$)</label>
+          <input type="number" name="preco" step="0.01" min="0"
+                 value="{{ '%.2f'|format(s.preco|float) if s and s.preco else '' }}" placeholder="0,00" />
+        </div>
+        <div class="form-group">
+          <label>Duração do atendimento <span class="required">*</span></label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <select name="duracao_horas" style="width:80px">
+              {% for h in range(0, 13) %}
+              <option value="{{ h }}" {% if s and s.duracao_horas == h %}selected{% elif not s and h == 1 %}selected{% endif %}>{{ h }}h</option>
+              {% endfor %}
+            </select>
+            <select name="duracao_minutos" style="width:80px">
+              {% for m in [0, 15, 30, 45] %}
+              <option value="{{ m }}" {% if s and s.duracao_minutos == m %}selected{% endif %}>{{ '%02d'|format(m) }}m</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comissão + Recorrência -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comissão</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input type="number" name="comissao_valor" step="0.01" min="0" style="flex:1"
+                   value="{{ '%.2f'|format(s.comissao_valor|float) if s and s.comissao_valor else '' }}" placeholder="0" />
+            <select name="comissao_tipo" style="width:70px">
+              <option value="%" {% if not s or s.comissao_tipo == '%' %}selected{% endif %}>%</option>
+              <option value="R" {% if s and s.comissao_tipo == 'R' %}selected{% endif %}>R$</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Recorrência</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <span style="font-size:.84rem;color:var(--text-muted);white-space:nowrap">Retornar em:</span>
+            <input type="number" name="recorrencia_dias" min="0" style="width:70px"
+                   value="{{ s.recorrencia_dias if s else 0 }}" />
+            <span style="font-size:.84rem;color:var(--text-muted)">dias</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categoria -->
+      <div class="form-row" style="align-items:flex-end">
+        <div class="form-group" style="flex:1">
+          <label>Categoria <span class="required">*</span></label>
+          <select name="categoria_id" id="catSelect" onchange="loadCatProfissionais()">
+            <option value="">— Selecionar —</option>
+            {% for cat in categorias %}
+            <option value="{{ cat.id }}"
+              {% if s and s.categoria_id == cat.id %}selected{% endif %}
+              data-profs="{{ cat.profissionais | selectattr('ativo') | map(attribute='nome') | join(', ') }}">
+              {{ cat.nome }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="flex-shrink:0">
+          <a href="{{ url_for('admin.categorias') }}" class="btn-secondary btn-sm" style="white-space:nowrap">+ Nova categoria</a>
+        </div>
+      </div>
+
+      <!-- Profissionais desta categoria (readonly) -->
+      <div class="form-group" id="catProfsWrap" style="{% if not s or not s.categoria_id %}display:none{% endif %}">
+        <label>Profissionais desta categoria</label>
+        <div id="catProfsList" class="svc-prof-display">
+          {% if s and s.categoria %}
+            {% for p in s.categoria.profissionais if p.ativo %}
+            <span class="svc-prof-tag">{{ p.nome }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Profissionais adicionais -->
+      <div class="form-group">
+        <label>Profissionais adicionais</label>
+        {% set svc_prof_ids = s.profissionais_adicionais | map(attribute='id') | list if s else [] %}
+        <div class="check-group check-group--inline">
+          {% for p in profissionais %}
+          <label class="check-item">
+            <input type="checkbox" name="profissionais_adicionais" value="{{ p.id }}"
+              {% if p.id in svc_prof_ids %}checked{% endif %}> {{ p.nome }}
+          </label>
+          {% endfor %}
+          {% if not profissionais %}
+          <span style="font-size:.82rem;color:var(--text-muted)">
+            Nenhum profissional cadastrado.
+            <a href="{{ url_for('admin.profissionais') }}">Cadastrar →</a>
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /card -->
+
+    <!-- Ações -->
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Salvar
+      </button>
+      <a href="{{ url_for('admin.servicos') }}" class="btn-secondary">Cancelar</a>
+      {% if s %}
+      <button type="submit" name="action" value="excluir" class="btn-danger"
+        onclick="return confirm('Excluir este serviço? Esta ação não pode ser desfeita.')">
+        Excluir serviço
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Coluna direita: configurações ── -->
+  <div class="svc-side">
+
+    <!-- Agendamento Online -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card__header">
+        <h3 style="font-size:.9rem">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Agendamento Online
+        </h3>
+      </div>
+      <div style="padding:.8rem 0 0">
+        <div class="svc-toggle-row">
+          <div>
+            <div style="font-size:.84rem;font-weight:500">Permitir agendamento online para esse serviço?</div>
+          </div>
+          <label class="cli-toggle">
+            <input type="checkbox" name="agendamento_online" value="1" id="togOnline"
+              {% if s and s.agendamento_online %}checked{% endif %} />
+            <span class="cli-toggle__slider"></span>
+          </label>
+        </div>
+        <div class="svc-toggle-row" style="margin-top:.8rem">
+          <div>
+            <div style="font-size:.84rem;font-weight:500">Exibir preço nos agendamentos online?</div>
+          </div>
+          <label class="cli-toggle">
+            <input type="checkbox" name="exibir_preco_online" value="1"
+              {% if s and s.exibir_preco_online %}checked{% endif %} />
+            <span class="cli-toggle__slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configurações Avançadas -->
+    <div class="card">
+      <div class="card__header">
+        <h3 style="font-size:.9rem">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem;vertical-align:-1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações Avançadas
+        </h3>
+      </div>
+
+      <!-- Abas config -->
+      <div class="svc-cfg-tabs">
+        <button type="button" class="svc-cfg-tab svc-cfg-tab--active" onclick="switchCfg('cfg-restricoes', this)">Restrições</button>
+        <button type="button" class="svc-cfg-tab" onclick="switchCfg('cfg-estoque', this)">Estoque</button>
+        <button type="button" class="svc-cfg-tab" onclick="switchCfg('cfg-descontos', this)">Descontos</button>
+      </div>
+
+      <!-- Restrições -->
+      <div id="cfg-restricoes" class="svc-cfg-panel">
+        <div class="svc-cfg-section">
+          <div style="font-size:.84rem;font-weight:500;margin-bottom:.3rem">Controlar Agendamentos Simultâneos</div>
+          <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem">
+            Este serviço pode ser executado por mais de um profissional ao mesmo tempo?
+          </div>
+          <label class="cli-toggle">
+            <input type="checkbox" name="agendamentos_simult" value="1"
+              {% if s and s.agendamentos_simult %}checked{% endif %} />
+            <span class="cli-toggle__slider"></span>
+          </label>
+        </div>
+
+        <div class="svc-cfg-divider"></div>
+
+        <div class="svc-cfg-section">
+          <div style="font-size:.84rem;font-weight:500;margin-bottom:.6rem">Restringir Datas e Horários de Agendamento:</div>
+          <div class="radio-group" style="flex-direction:column;gap:.4rem">
+            <label class="radio-item">
+              <input type="radio" name="restricao_horario" value="sempre"
+                {% if not s or s.restricao_horario == 'sempre' %}checked{% endif %}> Sempre disponível para agendamento
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="restricao_horario" value="especifico"
+                {% if s and s.restricao_horario == 'especifico' %}checked{% endif %}> Disponível somente em dias e horários específicos
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estoque -->
+      <div id="cfg-estoque" class="svc-cfg-panel" hidden>
+        <div class="svc-cfg-section" style="text-align:center;padding:1.5rem;color:var(--text-muted)">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--border)" stroke-width="1.5" style="margin-bottom:.5rem"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <p style="font-size:.82rem">Controle de estoque em breve.</p>
+        </div>
+      </div>
+
+      <!-- Descontos -->
+      <div id="cfg-descontos" class="svc-cfg-panel" hidden>
+        <div class="svc-cfg-section" style="text-align:center;padding:1.5rem;color:var(--text-muted)">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--border)" stroke-width="1.5" style="margin-bottom:.5rem"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <p style="font-size:.82rem">Configuração de descontos em breve.</p>
+        </div>
+      </div>
+
+    </div><!-- /card config -->
+
+  </div><!-- /svc-side -->
+</div><!-- /svc-layout -->
+</form>
+
+<style>
+.svc-subnav { display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid var(--border) }
+.svc-subnav a { padding:.55rem 1.1rem;font-size:.85rem;font-weight:500;color:var(--text-muted);
+                border-bottom:2px solid transparent;margin-bottom:-2px;text-decoration:none;transition:all .15s }
+.svc-subnav a:hover,.svc-subnav a.active { color:var(--accent);border-bottom-color:var(--accent) }
+
+.svc-layout { display:grid;grid-template-columns:1fr 320px;gap:1.2rem;align-items:start }
+
+.svc-toggle-row { display:flex;align-items:center;justify-content:space-between;gap:1rem }
+
+.svc-prof-display { display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem;
+                    background:var(--bg-sidebar,#f8f5f3);border:1px solid var(--border);
+                    border-radius:6px;min-height:40px }
+.svc-prof-tag { background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+                padding:.15rem .6rem;font-size:.78rem;color:var(--text) }
+
+.svc-cfg-tabs { display:flex;border-bottom:1px solid var(--border);margin:0 -.1rem }
+.svc-cfg-tab  { flex:1;padding:.5rem;font-size:.8rem;font-weight:500;background:none;border:none;
+                border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;
+                color:var(--text-muted);transition:all .15s }
+.svc-cfg-tab:hover,.svc-cfg-tab--active { color:var(--accent);border-bottom-color:var(--accent) }
+
+.svc-cfg-panel   { padding:.8rem 0 }
+.svc-cfg-section { padding:.2rem 0 .6rem }
+.svc-cfg-divider { height:1px;background:var(--border);margin:.4rem 0 .8rem }
+
+@media (max-width:860px) {
+  .svc-layout { grid-template-columns:1fr }
+}
+</style>
+
+<script>
+// Contador descrição
+const ta = document.getElementById('descricaoTa');
+const dc = document.getElementById('descCount');
+function upCount() { dc.textContent = ta.value.length; }
+ta.addEventListener('input', upCount); upCount();
+
+// Abas configurações avançadas
+function switchCfg(panelId, btn) {
+  document.querySelectorAll('.svc-cfg-panel').forEach(p => p.hidden = true);
+  document.querySelectorAll('.svc-cfg-tab').forEach(b => b.classList.remove('svc-cfg-tab--active'));
+  document.getElementById(panelId).hidden = false;
+  btn.classList.add('svc-cfg-tab--active');
+}
+
+// Profissionais da categoria selecionada
+function loadCatProfissionais() {
+  const sel  = document.getElementById('catSelect');
+  const opt  = sel.options[sel.selectedIndex];
+  const wrap = document.getElementById('catProfsWrap');
+  const list = document.getElementById('catProfsList');
+
+  if (!sel.value) { wrap.style.display = 'none'; return; }
+
+  const profs = opt.dataset.profs ? opt.dataset.profs.split(', ').filter(Boolean) : [];
+  if (profs.length) {
+    list.innerHTML = profs.map(n => `<span class="svc-prof-tag">${n}</span>`).join('');
+    wrap.style.display = 'block';
+  } else {
+    list.innerHTML = '<span style="font-size:.8rem;color:var(--text-muted)">Nenhum profissional nesta categoria.</span>';
+    wrap.style.display = 'block';
+  }
+}
+// Inicializa
+if (document.getElementById('catSelect').value) loadCatProfissionais();
+</script>
+
+{% endblock %}

@@ -1,0 +1,267 @@
+{% extends 'admin/base.html' %}
+{% block title %}Pacotes{% endblock %}
+{% block page_title %}Serviços / Pacotes{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.6rem">
+  <p style="color:var(--text-muted);font-size:.9rem;margin:0">Crie e gerencie pacotes de sessões para seus serviços.</p>
+  <div style="display:flex;gap:.5rem">
+    <a href="{{ url_for('admin.venda_pacote_nova') }}" class="btn btn-outline" style="font-size:.85rem">
+      🎁 Nova Venda de Pacote
+    </a>
+    <button class="btn btn-primary" onclick="abrirModalPacote()" style="font-size:.85rem">
+      + Criar Pacote
+    </button>
+  </div>
+</div>
+
+{% if pacotes %}
+<div class="card" style="overflow:hidden">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Pacote</th>
+        <th>Serviços incluídos</th>
+        <th style="text-align:right">Valor total</th>
+        <th style="text-align:center">Status</th>
+        <th style="text-align:center">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pacotes %}
+      <tr>
+        <td>
+          <strong>{{ p.nome }}</strong>
+          {% if p.descricao %}<br><span style="font-size:.8rem;color:var(--text-muted)">{{ p.descricao }}</span>{% endif %}
+        </td>
+        <td>
+          {% for item in p.itens %}
+          <div style="font-size:.83rem">
+            {{ item.quantidade }}× {{ item.servico.nome }}
+            <span style="color:var(--text-muted)">— R$ {{ '%.2f'|format(item.valor_unitario)|replace('.', ',') }}/sessão</span>
+          </div>
+          {% endfor %}
+        </td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap">
+          R$ {{ '%.2f'|format(p.valor_total)|replace('.', ',') }}
+        </td>
+        <td style="text-align:center">
+          {% if p.ativo %}
+            <span class="badge badge-success">Ativo</span>
+          {% else %}
+            <span class="badge badge-muted">Inativo</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;white-space:nowrap">
+          <button class="btn-icon" title="Editar" onclick="editarPacote({{ p.id }})">✏️</button>
+          <button class="btn-icon" title="Excluir" onclick="excluirPacote({{ p.id }}, '{{ p.nome|e }}')">🗑️</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Nenhum pacote cadastrado ainda.</p>
+  <button class="btn btn-primary" onclick="abrirModalPacote()">Criar primeiro pacote</button>
+</div>
+{% endif %}
+
+
+<!-- ── Modal criar/editar pacote ── -->
+<div id="modalPacote" class="modal-overlay" style="display:none" onclick="fecharModalSeFora(event)">
+  <div class="modal-box" style="max-width:680px;width:95%" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modalTitulo">Criar Novo Pacote</h3>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <input type="hidden" id="pacoteId" value="">
+
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Nome do pacote <span class="required">*</span></label>
+        <input type="text" id="pacoteNome" class="form-control" placeholder="Ex: Escova Premium — 4 Sessões" />
+      </div>
+
+      <div class="form-group" style="margin-bottom:1.2rem">
+        <label>Descrição <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+        <input type="text" id="pacoteDesc" class="form-control" placeholder="Descrição breve do pacote" />
+      </div>
+
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:.6rem;color:var(--text)">Serviços do Pacote</div>
+
+      <div id="listaItens"></div>
+
+      <button type="button" class="btn btn-outline" style="width:100%;margin-top:.5rem;font-size:.83rem" onclick="adicionarLinha()">
+        + Adicionar Serviço
+      </button>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div style="font-size:1rem;font-weight:700;color:var(--text)">
+          Total: <span id="totalPacote" style="color:var(--primary)">R$ 0,00</span>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+          <button class="btn btn-primary" id="btnSalvarPacote" onclick="salvarPacote()">Salvar Pacote</button>
+        </div>
+      </div>
+
+      <p id="modalErro" style="color:#e74c3c;font-size:.83rem;margin-top:.5rem;display:none"></p>
+
+    </div>
+  </div>
+</div>
+
+<!-- Template de linha de item (clonado via JS) -->
+<template id="tplLinha">
+  <div class="pacote-linha" style="display:grid;grid-template-columns:1fr 70px 120px auto;gap:.4rem;margin-bottom:.4rem;align-items:center">
+    <select class="form-control sel-servico" style="font-size:.83rem" onchange="linhaServicoCambiado(this)">
+      <option value="">Selecione o Serviço</option>
+      {% for s in servicos %}
+      <option value="{{ s.id }}" data-preco="{{ s.preco or 0 }}">{{ s.nome }}</option>
+      {% endfor %}
+    </select>
+    <input type="number" class="form-control inp-qtd" min="1" value="1" placeholder="Qtd." style="text-align:center;font-size:.83rem" oninput="recalcularTotal()" />
+    <input type="text"   class="form-control inp-val" placeholder="Valor (R$)" style="font-size:.83rem" oninput="recalcularTotal()" />
+    <button type="button" onclick="removerLinha(this)" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#e74c3c;padding:.2rem .4rem">×</button>
+  </div>
+</template>
+
+<script>
+const SERVICOS_JSON = {{ servicos | tojson }};
+
+function abrirModalPacote() {
+  document.getElementById('pacoteId').value   = '';
+  document.getElementById('pacoteNome').value = '';
+  document.getElementById('pacoteDesc').value = '';
+  document.getElementById('listaItens').innerHTML = '';
+  document.getElementById('modalTitulo').textContent = 'Criar Novo Pacote';
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('totalPacote').textContent = 'R$ 0,00';
+  adicionarLinha();
+  document.getElementById('modalPacote').style.display = 'flex';
+}
+
+async function editarPacote(id) {
+  const resp = await fetch(`/admin/api/pacotes/${id}`);
+  const data = await resp.json();
+  document.getElementById('pacoteId').value   = data.id;
+  document.getElementById('pacoteNome').value = data.nome;
+  document.getElementById('pacoteDesc').value = data.descricao;
+  document.getElementById('modalTitulo').textContent = 'Editar Pacote';
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('listaItens').innerHTML = '';
+  for (const it of data.itens) {
+    adicionarLinha(it.servico_id, it.quantidade, it.valor_unitario.toFixed(2).replace('.', ','));
+  }
+  recalcularTotal();
+  document.getElementById('modalPacote').style.display = 'flex';
+}
+
+function fecharModal() {
+  document.getElementById('modalPacote').style.display = 'none';
+}
+
+function fecharModalSeFora(e) {
+  if (e.target === document.getElementById('modalPacote')) fecharModal();
+}
+
+function adicionarLinha(svc_id = '', qtd = 1, val = '') {
+  const tpl   = document.getElementById('tplLinha');
+  const clone = tpl.content.cloneNode(true);
+  const wrap  = clone.querySelector('.pacote-linha');
+  if (svc_id) wrap.querySelector('.sel-servico').value = svc_id;
+  wrap.querySelector('.inp-qtd').value = qtd;
+  wrap.querySelector('.inp-val').value = val;
+  document.getElementById('listaItens').appendChild(clone);
+}
+
+function removerLinha(btn) {
+  btn.closest('.pacote-linha').remove();
+  recalcularTotal();
+}
+
+function linhaServicoCambiado(sel) {
+  const opt  = sel.selectedOptions[0];
+  const preco = parseFloat(opt?.dataset?.preco || 0);
+  const wrap = sel.closest('.pacote-linha');
+  if (preco > 0) {
+    wrap.querySelector('.inp-val').value = preco.toFixed(2).replace('.', ',');
+  }
+  recalcularTotal();
+}
+
+function recalcularTotal() {
+  let total = 0;
+  for (const linha of document.querySelectorAll('#listaItens .pacote-linha')) {
+    const qtd = parseFloat(linha.querySelector('.inp-qtd').value) || 0;
+    const val = parseFloat(linha.querySelector('.inp-val').value.replace(',', '.')) || 0;
+    total += qtd * val;
+  }
+  document.getElementById('totalPacote').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+}
+
+async function salvarPacote() {
+  const btn  = document.getElementById('btnSalvarPacote');
+  const erro = document.getElementById('modalErro');
+  erro.style.display = 'none';
+
+  const id   = document.getElementById('pacoteId').value;
+  const nome = document.getElementById('pacoteNome').value.trim();
+  const desc = document.getElementById('pacoteDesc').value.trim();
+
+  const itens = [];
+  for (const linha of document.querySelectorAll('#listaItens .pacote-linha')) {
+    const svc_id = linha.querySelector('.sel-servico').value;
+    const qtd    = parseInt(linha.querySelector('.inp-qtd').value) || 1;
+    const val    = parseFloat(linha.querySelector('.inp-val').value.replace(',', '.')) || 0;
+    if (!svc_id) continue;
+    itens.push({ servico_id: svc_id, quantidade: qtd, valor_unitario: val });
+  }
+
+  if (!nome)         { mostrarErro('Nome do pacote é obrigatório.'); return; }
+  if (!itens.length) { mostrarErro('Adicione pelo menos um serviço.'); return; }
+
+  btn.disabled = true;
+  const url    = id ? `/admin/api/pacotes/${id}` : '/admin/api/pacotes';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const resp = await fetch(url, {
+      method,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ nome, descricao: desc, ativo: true, itens }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      location.reload();
+    } else {
+      mostrarErro(data.erro || 'Erro ao salvar.');
+    }
+  } catch(e) {
+    mostrarErro('Erro de conexão.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function excluirPacote(id, nome) {
+  if (!confirm(`Excluir o pacote "${nome}"? Esta ação não pode ser desfeita.`)) return;
+  const resp = await fetch(`/admin/api/pacotes/${id}`, { method: 'DELETE' });
+  const data = await resp.json();
+  if (data.ok) {
+    location.reload();
+  } else {
+    alert(data.erro || 'Erro ao excluir.');
+  }
+}
+
+function mostrarErro(msg) {
+  const el = document.getElementById('modalErro');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+{% endblock %}

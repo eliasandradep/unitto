@@ -1,0 +1,40 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ 'Editar usuário' if user else 'Novo usuário' }}{% endblock %}
+{% block page_title %}{{ 'Editar usuário' if user else 'Novo usuário' }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:520px">
+  <form method="POST"
+        action="{{ url_for('admin.user_edit', user_id=user.id) if user else url_for('admin.user_new') }}">
+    <div class="form-group">
+      <label>Nome completo <span class="required">*</span></label>
+      <input type="text" name="name" value="{{ user.name if user else '' }}" required />
+    </div>
+    <div class="form-group">
+      <label>Nome de usuário <span class="required">*</span></label>
+      <input type="text" name="username" value="{{ user.username if user else '' }}" required />
+    </div>
+    <div class="form-group">
+      <label>E-mail <span class="required">*</span></label>
+      <input type="email" name="email" value="{{ user.email if user else '' }}" required />
+    </div>
+    <div class="form-group">
+      <label>Telefone para contato</label>
+      <input type="tel" name="phone" value="{{ user.phone if user else '' }}" />
+    </div>
+    <div class="form-group">
+      <label>{{ 'Nova senha' if user else 'Senha' }} {% if not user %}<span class="required">*</span>{% endif %}</label>
+      <input type="password" name="password" {% if not user %}required minlength="6"{% endif %}
+             placeholder="{% if user %}Deixe em branco para manter{% endif %}" />
+    </div>
+    <div class="form-group">
+      <label>Confirmar senha</label>
+      <input type="password" name="confirm" />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">{{ 'Salvar alterações' if user else 'Criar usuário' }}</button>
+      <a href="{{ url_for('admin.users') }}" class="btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

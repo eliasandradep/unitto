@@ -1,0 +1,163 @@
+{% extends 'admin/base.html' %}
+{% block title %}Nova Venda de Pacote{% endblock %}
+{% block page_title %}Nova Venda de Pacote{% endblock %}
+
+{% block content %}
+<form method="POST" id="formVenda">
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:1rem;align-items:start">
+
+  <!-- Coluna esquerda -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+
+    <!-- Seleção do pacote -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Pacote</div>
+
+      <div class="form-group">
+        <label>Pacote <span class="required">*</span></label>
+        <select name="pacote_id" id="selPacote" required onchange="carregarPacote()">
+          <option value="">Selecione um pacote</option>
+          {% for p in pacotes %}
+          <option value="{{ p.id }}">
+            {{ p.nome }}{% if p.descricao %} — {{ p.descricao }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Preview dos itens do pacote -->
+      <div id="previewItens" style="display:none;margin-top:1rem">
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:.5rem;color:var(--text-muted)">Sessões do pacote</div>
+        <table class="table" style="font-size:.83rem">
+          <thead><tr><th>Serviço</th><th style="text-align:center">Sessões</th><th style="text-align:right">Valor/sessão</th><th style="text-align:right">Subtotal</th></tr></thead>
+          <tbody id="tblItens"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right;font-weight:600">Total</td>
+              <td style="text-align:right;font-weight:700;color:var(--primary)" id="totalPreview">R$ 0,00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Dados do cliente -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Cliente</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome do cliente</label>
+          <input type="text" name="nome_cliente" placeholder="Nome completo" />
+        </div>
+        <div class="form-group">
+          <label>Cadastro</label>
+          <select name="cliente_id">
+            <option value="">Nenhum</option>
+            {% for cl in clientes %}
+            <option value="{{ cl.id }}">{{ cl.nome }} — {{ cl.telefone }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data da venda</label>
+          <input type="date" name="data_venda" value="{{ hoje }}" />
+        </div>
+        <div class="form-group">
+          <label>Responsável</label>
+          <select name="profissional_id">
+            <option value="">Selecione</option>
+            {% for p in profs %}
+            <option value="{{ p.id }}">{{ p.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Unidade</label>
+        <select name="unidade_id">
+          <option value="">Não identificada</option>
+          {% for u in unidades %}
+          <option value="{{ u.id }}">{{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Coluna direita: resumo do valor -->
+  <div>
+    <div class="card" style="padding:1.2rem 1.4rem;position:sticky;top:1rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Valor da Venda</div>
+
+      <div class="form-group">
+        <label>Valor total (R$)</label>
+        <input type="text" name="valor_total" id="inpValorTotal"
+               placeholder="Preenchido automaticamente" style="font-size:1.1rem;font-weight:600" />
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:.3rem">
+          Você pode ajustar o valor antes de salvar.
+        </p>
+      </div>
+
+      <div style="background:var(--surface2);border-radius:8px;padding:.8rem;margin-bottom:1rem;font-size:.82rem;color:var(--text-muted)">
+        Uma comanda será criada automaticamente com este valor. O pagamento é registrado na comanda normalmente.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <button type="submit" class="btn btn-primary" style="width:100%">Registrar Venda</button>
+        <a href="{{ url_for('admin.pacotes') }}" class="btn btn-outline" style="width:100%;text-align:center">Cancelar</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+<script>
+const PACOTES_DATA = {{ pacotes_json | tojson }};
+
+function carregarPacote() {
+  const sel  = document.getElementById('selPacote');
+  const prev = document.getElementById('previewItens');
+
+  if (!sel.value) {
+    prev.style.display = 'none';
+    document.getElementById('inpValorTotal').value = '';
+    return;
+  }
+
+  const pdata = PACOTES_DATA[sel.value];
+  if (!pdata) { prev.style.display = 'none'; return; }
+
+  document.getElementById('inpValorTotal').value = pdata.valor_total.toFixed(2).replace('.', ',');
+
+  const tbody = document.getElementById('tblItens');
+  tbody.innerHTML = '';
+  let total = 0;
+  for (const it of pdata.itens) {
+    const sub = it.quantidade * it.valor_unitario;
+    total += sub;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escHtml(it.servico_nome)}</td>
+      <td style="text-align:center">${it.quantidade}</td>
+      <td style="text-align:right">R$ ${it.valor_unitario.toFixed(2).replace('.', ',')}</td>
+      <td style="text-align:right">R$ ${sub.toFixed(2).replace('.', ',')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('totalPreview').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  prev.style.display = 'block';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

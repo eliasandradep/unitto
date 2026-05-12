@@ -1,0 +1,72 @@
+{% extends 'admin/base.html' %}
+{% block title %}Leads{% endblock %}
+{% block page_title %}Leads{% endblock %}
+
+{% block content %}
+
+<div class="toolbar">
+  <form method="GET" action="{{ url_for('admin.leads') }}" class="toolbar__filters">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nome, telefone ou e-mail" class="toolbar__search" />
+    <select name="status" class="toolbar__select">
+      <option value="">Todos os status</option>
+      {% for key, label in statuses %}
+      <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="source" class="toolbar__select">
+      <option value="">Todas as origens</option>
+      {% for key, label in sources %}
+      <option value="{{ key }}" {% if source_filter == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary">Filtrar</button>
+    {% if q or status_filter or source_filter %}
+    <a href="{{ url_for('admin.leads') }}" class="btn-secondary">Limpar</a>
+    {% endif %}
+  </form>
+  <a href="{{ url_for('admin.lead_new') }}" class="btn-primary">+ Novo lead</a>
+</div>
+
+{% if leads %}
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Telefone</th>
+        <th>Serviço</th>
+        <th>Origem</th>
+        <th>Status</th>
+        <th>Data</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td>{{ lead.name or '—' }}</td>
+        <td>
+          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
+             target="_blank" rel="noopener" class="wa-link">{{ lead.phone }}</a>
+        </td>
+        <td>{{ lead.service or '—' }}</td>
+        <td><span class="badge badge--source-{{ lead.source }}">{{ lead.source_label() }}</span></td>
+        <td><span class="badge badge--{{ lead.status }}">{{ lead.status_label() }}</span></td>
+        <td>{{ lead.created_at.strftime('%d/%m/%Y') }}</td>
+        <td>
+          <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}" class="btn-icon btn-icon--view" title="Ver detalhes">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <p class="empty-state">Nenhum lead encontrado.</p>
+</div>
+{% endif %}
+
+{% endblock %}
