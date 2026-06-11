@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar conta gratuita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    body { background: #f5f5f7; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .signup-wrap { width: 100%; max-width: 480px; padding: 1.5rem; }
+    .signup-logo { text-align: center; margin-bottom: 1.5rem; }
+    .signup-logo h1 { font-size: 1.4rem; font-weight: 600; color: var(--text, #1a1a2e); margin: 0; }
+    .signup-logo p  { font-size: .85rem; color: #666; margin: .3rem 0 0; }
+    .signup-card { background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 16px rgba(0,0,0,.08); }
+    .signup-footer { text-align: center; margin-top: 1.2rem; font-size: .82rem; color: #888; }
+    .signup-footer a { color: var(--primary, #c1904f); text-decoration: none; }
+    .signup-footer a:hover { text-decoration: underline; }
+    .trial-badge { display: inline-block; background: #d4edda; color: #155724; font-size: .75rem;
+                   font-weight: 600; padding: .2rem .7rem; border-radius: 99px; margin-bottom: 1.2rem; }
+    .slug-hint { font-size: .75rem; color: #888; margin-top: .25rem; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 1.2rem 0; }
+  </style>
+</head>
+<body>
+  <div class="signup-wrap">
+
+    <div class="signup-logo">
+      <h1>Unitto</h1>
+      <p>Gestão Unificada</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div style="padding:.6rem 1rem;border-radius:6px;margin-bottom:1rem;
+                    background:{{ '#d4edda' if cat == 'success' else '#f8d7da' }};
+                    color:{{ '#155724' if cat == 'success' else '#721c24' }}">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="signup-card">
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <span class="trial-badge">14 dias grátis · sem cartão</span>
+        <div style="font-size:1.1rem;font-weight:600">Crie sua conta</div>
+      </div>
+
+      <form method="POST" action="{{ url_for('signup.signup') }}" id="signupForm">
+
+        <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.6rem">
+          Sua empresa
+        </div>
+
+        <div class="form-group">
+          <label>Nome da empresa <span class="required">*</span></label>
+          <input type="text" name="nome_empresa" id="nomeEmpresa"
+                 value="{{ form.get('nome_empresa','') if form else '' }}"
+                 placeholder="Ex: Salão Bella Vista" required autofocus />
+        </div>
+
+        <div class="form-group">
+          <label>Endereço do painel (slug) <span class="required">*</span></label>
+          <input type="text" name="slug" id="slugInput"
+                 value="{{ form.get('slug','') if form else '' }}"
+                 placeholder="bella-vista" pattern="[a-z0-9\-]+"
+                 title="Apenas letras minúsculas, números e hífens" required />
+          <div class="slug-hint">Seu painel ficará em <strong>seuapp.com/t/<span id="slugPreview">…</span>/admin/</strong></div>
+        </div>
+
+        <hr class="divider" />
+
+        <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.6rem">
+          Conta de acesso
+        </div>
+
+        <div class="form-group">
+          <label>Seu nome <span class="required">*</span></label>
+          <input type="text" name="nome_user"
+                 value="{{ form.get('nome_user','') if form else '' }}"
+                 placeholder="Nome do responsável" required />
+        </div>
+
+        <div class="form-group">
+          <label>E-mail <span class="required">*</span></label>
+          <input type="email" name="email"
+                 value="{{ form.get('email','') if form else '' }}"
+                 placeholder="seu@email.com" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Senha <span class="required">*</span></label>
+            <input type="password" name="senha" placeholder="Mínimo 6 caracteres"
+                   minlength="6" required />
+          </div>
+          <div class="form-group">
+            <label>Confirmar senha <span class="required">*</span></label>
+            <input type="password" name="confirma" placeholder="Repita a senha" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;margin-top:.5rem;padding:.7rem">
+          Criar conta e começar →
+        </button>
+
+      </form>
+    </div>
+
+    <div class="signup-footer">
+      Já tem conta? <a href="{{ url_for('admin.login') }}">Entrar</a>
+    </div>
+  </div>
+
+  <script>
+    function slugify(s) {
+      return s.toLowerCase()
+        .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+        .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+        .replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c')
+        .replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-')
+        .replace(/-{2,}/g,'-').replace(/^-|-$/g,'').slice(0,60);
+    }
+    var slugInput = document.getElementById('slugInput');
+    var preview   = document.getElementById('slugPreview');
+    var auto      = slugInput.value === '';
+
+    document.getElementById('nomeEmpresa').addEventListener('input', function() {
+      if (auto) {
+        var s = slugify(this.value);
+        slugInput.value = s;
+        preview.textContent = s || '…';
+      }
+    });
+    slugInput.addEventListener('input', function() {
+      auto = this.value === '';
+      preview.textContent = this.value || '…';
+    });
+    preview.textContent = slugInput.value || '…';
+  </script>
+</body>
+</html>

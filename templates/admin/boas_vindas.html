@@ -1,0 +1,122 @@
+{% extends 'admin/base.html' %}
+{% block title %}Boas-vindas{% endblock %}
+{% block page_title %}Boas-vindas{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+
+  <!-- Cabeçalho -->
+  <div style="text-align:center;padding:2rem 0 1.5rem">
+    <div style="font-size:2.5rem;margin-bottom:.5rem">🎉</div>
+    <h2 style="margin:0 0 .4rem;font-size:1.4rem;font-weight:600">
+      Sua conta está pronta{% if empresa %}, {{ empresa.nome }}{% endif %}!
+    </h2>
+    <p style="margin:0;color:#666;font-size:.9rem">
+      Complete as etapas abaixo para começar a usar o sistema.
+    </p>
+    {% if empresa and empresa.trial_ends_at %}
+    <div style="margin-top:.8rem;display:inline-block;background:#fff3cd;color:#856404;
+                font-size:.78rem;font-weight:600;padding:.25rem .8rem;border-radius:99px">
+      Trial gratuito até {{ empresa.trial_ends_at.strftime('%d/%m/%Y') }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Barra de progresso -->
+  <div class="card" style="padding:1.2rem 1.5rem;margin-bottom:1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+      <span style="font-size:.85rem;font-weight:600">Progresso da configuração</span>
+      <span style="font-size:.85rem;color:#666">{{ feitos }}/{{ total }} concluídos</span>
+    </div>
+    <div style="height:8px;background:#eee;border-radius:99px;overflow:hidden">
+      <div style="height:100%;width:{{ (feitos/total*100)|int if total else 0 }}%;
+                  background:{% if feitos == total %}#28a745{% else %}var(--primary,#c1904f){% endif %};
+                  border-radius:99px;transition:width .4s"></div>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="card" style="padding:0;overflow:hidden">
+
+    {% set items = [
+      ('profissionais', 'Cadastrar profissionais',
+       'Adicione as profissionais que realizam atendimentos.',
+       url_for('admin.profissional_novo'),
+       url_for('admin.profissionais')),
+      ('expediente', 'Configurar expediente',
+       'Defina os horários de trabalho de cada profissional.',
+       url_for('admin.expediente_novo'),
+       url_for('admin.expedientes')),
+      ('servicos', 'Adicionar serviços',
+       'Cadastre os serviços oferecidos com preços e duração.',
+       url_for('admin.servico_novo'),
+       url_for('admin.servicos')),
+      ('whatsapp', 'Configurar integração WhatsApp',
+       'Conecte o chatbot para agendamentos e lembretes automáticos.',
+       url_for('admin.configuracoes'),
+       url_for('admin.configuracoes')),
+    ] %}
+
+    {% for key, titulo, descricao, url_acao, url_ver in items %}
+    {% set feito = checklist.get(key, false) %}
+    <div style="display:flex;align-items:flex-start;gap:1rem;padding:1.1rem 1.4rem;
+                border-bottom:1px solid #f0f0f0;
+                {% if feito %}background:#fafff9{% endif %}">
+
+      <!-- Ícone de status -->
+      <div style="flex-shrink:0;margin-top:.1rem">
+        {% if feito %}
+        <div style="width:28px;height:28px;border-radius:50%;background:#28a745;
+                    display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        {% else %}
+        <div style="width:28px;height:28px;border-radius:50%;border:2px solid #ddd;
+                    display:flex;align-items:center;justify-content:center;color:#ccc">
+          <span style="font-size:.7rem;font-weight:700">{{ loop.index }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Texto -->
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.9rem;
+                    {% if feito %}color:#28a745{% endif %}">
+          {{ titulo }}
+          {% if feito %}<span style="font-size:.75rem;font-weight:400;margin-left:.4rem">✓ Concluído</span>{% endif %}
+        </div>
+        <div style="font-size:.8rem;color:#888;margin-top:.15rem">{{ descricao }}</div>
+      </div>
+
+      <!-- Botão de ação -->
+      <div style="flex-shrink:0">
+        {% if feito %}
+        <a href="{{ url_ver }}" class="btn-secondary"
+           style="font-size:.78rem;padding:.3rem .8rem;white-space:nowrap">Ver</a>
+        {% else %}
+        <a href="{{ url_acao }}" class="btn-primary"
+           style="font-size:.78rem;padding:.3rem .8rem;white-space:nowrap">Configurar</a>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endfor %}
+
+  </div>
+
+  <!-- Ações -->
+  <div style="text-align:center;padding:1.5rem 0">
+    {% if feitos == total %}
+    <p style="color:#28a745;font-weight:600;margin-bottom:1rem">
+      Tudo pronto! Seu painel está 100% configurado.
+    </p>
+    {% endif %}
+    <a href="{{ url_for('admin.dashboard') }}" class="btn-primary">
+      Ir para o painel →
+    </a>
+  </div>
+
+</div>
+{% endblock %}

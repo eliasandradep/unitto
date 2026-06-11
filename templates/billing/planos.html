@@ -1,0 +1,117 @@
+{% extends 'billing/base.html' %}
+{% block title %}Escolha seu plano{% endblock %}
+
+{% block content %}
+<div style="text-align:center;margin-bottom:1.5rem">
+  <h1 style="margin:0 0 .5rem;font-size:1.8rem;font-weight:700">Escolha seu plano</h1>
+  <p style="margin:0;color:#666">14 dias grátis · sem cartão · cancele quando quiser</p>
+</div>
+
+<!-- Toggle mensal / anual -->
+<div class="periodo-toggle">
+  <span class="toggle-label" id="lblMensal" onclick="setPeriodo('mensal')">Mensal</span>
+  <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+    <input type="checkbox" id="periodoToggle" onchange="setPeriodo(this.checked?'anual':'mensal')"
+           style="opacity:0;width:0;height:0">
+    <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#ddd;border-radius:99px;transition:.2s" id="toggleTrack"></span>
+    <span style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)" id="toggleThumb"></span>
+  </label>
+  <span class="toggle-label" id="lblAnual" onclick="setPeriodo('anual')">
+    Anual <span class="economia-badge">-25%</span>
+  </span>
+</div>
+
+<div class="plan-grid">
+  {% for plano in planos %}
+  {% set destaque = plano.slug == 'pro' %}
+  <div class="plan-card {{ 'plan-card--destaque' if destaque }}">
+    {% if destaque %}<span class="plan-badge">Mais popular</span>{% endif %}
+
+    <div class="plan-nome">{{ plano.nome }}</div>
+
+    <!-- Preço anual -->
+    <div class="plan-preco-anual preco-anual" style="{{ 'display:none' if not destaque else '' }}">
+      R${{ '%g' % plano.preco_anual_mensal }}<span style="font-size:1rem;font-weight:400">/mês</span>
+    </div>
+    <div class="plan-preco-sub anual-sub" style="{{ 'display:none' if not destaque else '' }}">
+      R${{ '%g' % plano.preco_anual_total }} cobrado anualmente
+    </div>
+
+    <!-- Preço mensal -->
+    <div class="plan-preco-anual preco-mensal" style="{{ '' if not destaque else 'display:none' }}">
+      R${{ '%g' % plano.preco_mensal }}<span style="font-size:1rem;font-weight:400">/mês</span>
+    </div>
+    <div class="plan-preco-sub mensal-sub" style="{{ '' if not destaque else 'display:none' }}">
+      Cobrado mensalmente
+    </div>
+
+    <hr class="plan-divider" />
+
+    {% macro feat(txt, muted=false) %}
+    <div class="plan-feature {{ 'plan-feature--muted' if muted }}">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      {{ txt }}
+    </div>
+    {% endmacro %}
+
+    {{ feat(plano.max_profissionais ~ ' profissional' ~ ('is' if plano.max_profissionais > 1 else '')) }}
+    {{ feat(plano.max_wa_mes ~ ' notificações WhatsApp/mês') }}
+    {{ feat('Até ' ~ plano.max_simultaneos ~ ' agendamentos simultâneos') }}
+    {% if plano.slug == 'lite' %}
+      {{ feat('Link de agendamento com logo Unitto') }}
+    {% elif plano.slug == 'plus' %}
+      {{ feat('Link com seu logo + logo Unitto') }}
+    {% else %}
+      {{ feat('Link de agendamento com seu logo') }}
+    {% endif %}
+
+    <div class="plan-cta">
+      {% set ja_neste = assinatura and assinatura.plano_id == plano.id and assinatura.status == 'ativa' %}
+      {% if ja_neste %}
+        <div class="btn-secondary" style="text-align:center;padding:.55rem">Plano atual ✓</div>
+      {% elif current_user.is_authenticated %}
+        <form method="POST" action="{{ url_for('billing.checkout') }}" class="checkout-form">
+          <input type="hidden" name="plano_id" value="{{ plano.id }}" />
+          <input type="hidden" name="periodo" value="mensal" class="periodo-input" />
+          <button type="submit" class="{{ 'btn-primary' if destaque else 'btn-secondary' }}"
+                  style="width:100%;padding:.55rem">
+            Assinar agora
+          </button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('signup.signup') }}"
+           class="{{ 'btn-primary' if destaque else 'btn-secondary' }}"
+           style="display:block;text-align:center;padding:.55rem">
+          Começar grátis
+        </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<p style="text-align:center;font-size:.8rem;color:#aaa;margin-top:.5rem">
+  Todos os planos incluem 14 dias de trial gratuito. Pagamento via cartão de crédito.
+  Cancele a qualquer momento.
+</p>
+
+<script>
+var periodo = 'mensal';
+function setPeriodo(p) {
+  periodo = p;
+  var isAnual = (p === 'anual');
+  document.getElementById('periodoToggle').checked = isAnual;
+  document.getElementById('toggleTrack').style.background = isAnual ? '#c1904f' : '#ddd';
+  document.getElementById('toggleThumb').style.left = isAnual ? '23px' : '3px';
+  document.getElementById('lblMensal').className = 'toggle-label' + (isAnual ? '' : ' toggle-label--active');
+  document.getElementById('lblAnual').className  = 'toggle-label' + (isAnual ? ' toggle-label--active' : '');
+  document.querySelectorAll('.preco-anual, .anual-sub').forEach(function(el){ el.style.display = isAnual ? '' : 'none'; });
+  document.querySelectorAll('.preco-mensal, .mensal-sub').forEach(function(el){ el.style.display = isAnual ? 'none' : ''; });
+  document.querySelectorAll('.periodo-input').forEach(function(el){ el.value = p; });
+}
+// Inicia no estado "anual" destacado
+setPeriodo('anual');
+</script>
+{% endblock %}

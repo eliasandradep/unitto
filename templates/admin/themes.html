@@ -1,0 +1,29 @@
+{% extends 'admin/base.html' %}
+{% block title %}Temas{% endblock %}
+{% block page_title %}Temas da Landing Page{% endblock %}
+
+{% block content %}
+
+<p class="page-description">Escolha o tema de cores da landing page. A alteração é aplicada imediatamente para todos os visitantes.</p>
+
+<div class="themes-grid">
+  {% for key, theme in themes.items() %}
+  <div class="theme-card {% if active == key %}theme-card--active{% endif %}">
+    <div class="theme-card__preview" style="background: {{ theme.preview }}"></div>
+    <div class="theme-card__info">
+      <div class="theme-card__title">{{ theme.emoji }} {{ theme.name }}</div>
+      <div class="theme-card__desc">{{ theme.description }}</div>
+      {% if active == key %}
+        <span class="badge badge--active">Ativo</span>
+      {% else %}
+        <form method="POST" action="{{ url_for('admin.theme_set') }}">
+          <input type="hidden" name="theme" value="{{ key }}" />
+          <button type="submit" class="btn-secondary btn-sm-block">Ativar</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

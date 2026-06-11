@@ -1,0 +1,103 @@
+{% extends 'billing/base.html' %}
+{% block title %}Gerenciar assinatura{% endblock %}
+
+{% block content %}
+<h2 style="margin:0 0 1.5rem;font-size:1.3rem;font-weight:600">Minha assinatura</h2>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;max-width:800px">
+
+  <!-- Plano atual -->
+  <div class="card" style="padding:1.4rem">
+    <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.8rem">
+      Plano atual
+    </div>
+    {% if assinatura and assinatura.status == 'ativa' %}
+      <div style="font-size:1.4rem;font-weight:700;margin-bottom:.3rem">
+        {{ assinatura.plano.nome }}
+      </div>
+      <div style="font-size:.85rem;color:#666;margin-bottom:.5rem">
+        Período: {{ 'Anual' if assinatura.periodo == 'anual' else 'Mensal' }}
+      </div>
+      {% if assinatura.proximo_vencimento %}
+      <div style="font-size:.82rem;color:#888">
+        Próximo vencimento: {{ assinatura.proximo_vencimento.strftime('%d/%m/%Y') }}
+      </div>
+      {% endif %}
+      <hr style="border:none;border-top:1px solid #eee;margin:1rem 0" />
+      <div style="font-size:.82rem;color:#666;margin-bottom:.6rem">
+        <strong>Limites do plano:</strong><br />
+        {{ assinatura.plano.max_profissionais }} profissional(is) ·
+        {{ assinatura.plano.max_wa_mes }} WA/mês ·
+        {{ assinatura.plano.max_simultaneos }} simultâneos
+      </div>
+      <form method="POST" action="{{ url_for('billing.portal') }}">
+        <button type="submit" class="btn-secondary" style="width:100%">
+          Gerenciar no Stripe (faturas, cancelar, trocar cartão) →
+        </button>
+      </form>
+    {% elif empresa and empresa.plano == 'trial' %}
+      <div style="font-size:1.2rem;font-weight:700;margin-bottom:.3rem">Trial gratuito</div>
+      {% if empresa.dias_trial_restantes is not none %}
+      <div style="font-size:.85rem;color:{{ '#d9534f' if empresa.dias_trial_restantes <= 3 else '#666' }}">
+        {{ empresa.dias_trial_restantes }} dia(s) restantes
+        {% if empresa.dias_trial_restantes == 0 %}— expirou hoje{% endif %}
+      </div>
+      {% endif %}
+      <hr style="border:none;border-top:1px solid #eee;margin:1rem 0" />
+      <a href="{{ url_for('billing.planos') }}" class="btn-primary" style="display:block;text-align:center;padding:.55rem">
+        Ver planos e assinar
+      </a>
+    {% else %}
+      <div style="color:#d9534f;font-weight:600">Sem assinatura ativa</div>
+      <a href="{{ url_for('billing.planos') }}" class="btn-primary"
+         style="display:block;text-align:center;padding:.55rem;margin-top:1rem">
+        Escolher plano
+      </a>
+    {% endif %}
+  </div>
+
+  <!-- Empresa -->
+  <div class="card" style="padding:1.4rem">
+    <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.8rem">
+      Empresa
+    </div>
+    <div style="font-size:1rem;font-weight:600">{{ empresa.nome }}</div>
+    <div style="font-size:.82rem;color:#888;margin-top:.2rem">{{ empresa.slug }}</div>
+    {% if empresa.email %}
+    <div style="font-size:.82rem;color:#666;margin-top:.3rem">{{ empresa.email }}</div>
+    {% endif %}
+    <hr style="border:none;border-top:1px solid #eee;margin:1rem 0" />
+    <a href="{{ url_for('admin.dashboard') }}" class="btn-secondary"
+       style="display:block;text-align:center;padding:.55rem">
+      ← Voltar ao painel
+    </a>
+  </div>
+
+</div>
+
+<!-- Upgrades disponíveis -->
+{% if assinatura and assinatura.status == 'ativa' %}
+<h3 style="margin:2rem 0 1rem;font-size:1rem;font-weight:600">Outros planos</h3>
+<div class="plan-grid" style="max-width:800px">
+  {% for plano in planos %}
+  {% if not (assinatura and assinatura.plano_id == plano.id) %}
+  <div class="plan-card" style="padding:1.1rem">
+    <div style="font-weight:700">{{ plano.nome }}</div>
+    <div style="font-size:.85rem;color:#888">
+      R${{ '%g' % plano.preco_anual_mensal }}/mês (anual) ·
+      {{ plano.max_profissionais }} prof.
+    </div>
+    <form method="POST" action="{{ url_for('billing.checkout') }}" style="margin-top:.8rem">
+      <input type="hidden" name="plano_id" value="{{ plano.id }}" />
+      <input type="hidden" name="periodo" value="anual" />
+      <button type="submit" class="btn-secondary" style="width:100%;font-size:.8rem">
+        Migrar para {{ plano.nome }}
+      </button>
+    </form>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

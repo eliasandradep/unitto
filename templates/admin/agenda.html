@@ -102,24 +102,20 @@
       </div>
 
       <div style="padding:.3rem 0">
-        <!-- Cobrar Agora -->
-        <form id="actFaturarForm" method="POST">
-          <button type="submit" class="act-row">
-            <span class="act-icon" style="background:#dbeafe;color:#2563eb">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            </span>
-            <span>Cobrar Agora</span>
-          </button>
-        </form>
+        <!-- Abrir Comanda -->
+        <button type="button" class="act-row" onclick="var _id=_actEv.id;closeActsModal();abrirComandaModal(_id,false)">
+          <span class="act-icon" style="background:#dbeafe;color:#2563eb">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </span>
+          <span id="actAbrirCmdLabel">Abrir Comanda</span>
+        </button>
         <!-- Finalizar e Faturar -->
-        <form id="actFaturarForm2" method="POST">
-          <button type="submit" class="act-row">
-            <span class="act-icon" style="background:#dcfce7;color:#16a34a">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg>
-            </span>
-            <span>Finalizar e Faturar</span>
-          </button>
-        </form>
+        <button type="button" class="act-row" onclick="var _id=_actEv.id;closeActsModal();abrirComandaModal(_id,true)">
+          <span class="act-icon" style="background:#dcfce7;color:#16a34a">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg>
+          </span>
+          <span>Finalizar e Faturar</span>
+        </button>
         <!-- Cliente Chegou -->
         <button type="button" id="actChegouBtn" class="act-row" onclick="_actSetStatus('confirmado')">
           <span class="act-icon" style="background:#dcfce7;color:#16a34a">
@@ -221,9 +217,11 @@
         </div>
 
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group" style="position:relative">
             <label>Nome do Cliente <span class="required">*</span></label>
-            <input type="text" name="nome_cliente" id="agFormNome" required placeholder="Nome completo" />
+            <input type="text" name="nome_cliente" id="agFormNome" required placeholder="Nome completo" autocomplete="off" />
+            <input type="hidden" name="cliente_id" id="agFormClienteId" />
+            <ul id="agNomeDropdown" class="ac-dropdown" style="display:none"></ul>
           </div>
           <div class="form-group">
             <label>Telefone / WhatsApp</label>
@@ -324,12 +322,10 @@
       <!-- Ações secundárias (edição apenas) -->
       <div style="margin-top:.6rem;display:flex;justify-content:space-between;align-items:center">
         <!-- Faturar -->
-        <form id="agFaturarForm" method="POST" style="display:none">
-          <button type="submit" class="btn-primary" style="background:var(--gold);border-color:var(--gold)"
-                  onclick="return confirm('Finalizar agendamento e criar comanda?')">
-            Finalizar e Faturar
-          </button>
-        </form>
+        <button type="button" id="agFaturarBtn" class="btn-primary"
+                style="display:none;background:var(--gold);border-color:var(--gold)">
+          Finalizar e Faturar
+        </button>
         <!-- Excluir -->
         <form id="agDeleteForm" method="POST" style="margin-left:auto"
               onsubmit="return confirm('Excluir este agendamento permanentemente?')">
@@ -340,6 +336,256 @@
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ── Modal de Comanda ───────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="cmdModalBg" onclick="if(event.target===this)fecharComandaModal()">
+  <div class="cmd-box">
+
+    <!-- Header -->
+    <div class="cmd-header">
+      <div style="display:flex;flex-direction:column;gap:.1rem">
+        <span id="cmdTitle" class="cmd-header-title">Comanda</span>
+        <span id="cmdHeaderSub" style="font-size:.75rem;color:#c9a97a;opacity:.85"></span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:.6rem">
+        <a id="cmdLinkExterno" href="#" target="_blank" class="cmd-link-ext">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Abrir página
+        </a>
+        <button type="button" class="cmd-close-btn" onclick="fecharComandaModal()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Two-panel: info + pagamentos -->
+    <div class="cmd-panels">
+
+      <!-- Painel esquerdo: Informações -->
+      <div class="cmd-panel">
+        <div class="cmd-panel-hdr">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Informações Da Comanda
+        </div>
+
+        <div class="cmd-field-row">
+          <div class="cmd-field">
+            <label class="cmd-label">Data</label>
+            <input type="date" id="cmdData" class="cmd-input" />
+          </div>
+          <div class="cmd-field" style="flex:0 0 90px">
+            <label class="cmd-label">Código</label>
+            <input type="text" id="cmdCodigo" class="cmd-input cmd-input--readonly" readonly />
+          </div>
+        </div>
+
+        <div class="cmd-field">
+          <label class="cmd-label">Cliente</label>
+          <input type="text" id="cmdNome" class="cmd-input" placeholder="Nome completo" />
+        </div>
+
+        <div class="cmd-field">
+          <label class="cmd-label">Responsável</label>
+          <input type="text" id="cmdResponsavel" class="cmd-input cmd-input--readonly" readonly />
+        </div>
+
+        <div class="cmd-field">
+          <label class="cmd-label">Observações</label>
+          <textarea id="cmdObs" class="cmd-input" rows="2" placeholder="Anotações sobre esta comanda..." style="resize:none"></textarea>
+        </div>
+
+        <div class="cmd-field">
+          <label class="cmd-label">Status</label>
+          <div class="cmd-radio-group">
+            <label class="cmd-radio">
+              <input type="radio" name="cmdStatus" value="aberta" id="cmdStAberta" onchange="cmdRecalc()">
+              <span class="cmd-radio-dot"></span>
+              Aberta
+            </label>
+            <label class="cmd-radio">
+              <input type="radio" name="cmdStatus" value="fechada" id="cmdStFechada" onchange="cmdRecalc()">
+              <span class="cmd-radio-dot"></span>
+              Fechada
+            </label>
+          </div>
+        </div>
+
+        <div id="cmdSaldoAjustInfo" class="cmd-info-box" style="display:none"></div>
+
+        <div class="cmd-actions-row">
+          <button type="button" class="cmd-btn-save" onclick="salvarComandaModal()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Salvar Comanda
+          </button>
+          <button type="button" id="cmdBtnExcluir" class="cmd-btn-del" style="display:none"
+                  onclick="excluirComandaModal()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            Excluir
+          </button>
+        </div>
+      </div>
+
+      <!-- Painel direito: Pagamentos -->
+      <div class="cmd-panel cmd-panel--right">
+        <div class="cmd-panel-hdr">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Informações De Pagamento
+        </div>
+
+        <!-- Totalizador -->
+        <div class="cmd-totals">
+          <div class="cmd-total-item">
+            <span class="cmd-total-label">Total dos serviços</span>
+            <span id="cmdTotalPainel" class="cmd-total-val">R$ 0,00</span>
+          </div>
+          <div class="cmd-total-item">
+            <span class="cmd-total-label">Desconto (R$)</span>
+            <div style="display:flex;align-items:center;gap:.4rem">
+              <input type="text" id="cmdDesconto" value="0,00" class="cmd-input cmd-input--sm"
+                     style="width:80px;text-align:right" oninput="cmdRecalc()" />
+            </div>
+          </div>
+          <div class="cmd-total-item cmd-total-item--destaque">
+            <span class="cmd-total-label">Resta a Pagar</span>
+            <strong id="cmdRestaPagar" class="cmd-resta">R$ 0,00</strong>
+          </div>
+        </div>
+
+        <!-- Prévia de crédito ou saldo devedor (exibida antes do salvamento) -->
+        <div id="cmdSaldoPreview" class="cmd-preview-box" style="display:none"></div>
+
+        <!-- Saldo do cliente -->
+        <div id="cmdSaldoCliente" class="cmd-saldo-box" style="display:none"></div>
+
+        <!-- Botão Registrar -->
+        <button type="button" class="cmd-pag-btn" onclick="toggleCmdFormPag()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Registrar Pagamento
+        </button>
+
+        <!-- Formulário de pagamento -->
+        <div id="cmdFormPag" class="cmd-pag-form" style="display:none">
+          <div class="cmd-pag-grid">
+            <div class="cmd-field" style="margin:0">
+              <label class="cmd-label">Forma de pagamento</label>
+              <select id="cmdFormaPag" class="cmd-input">
+                <option value="">Selecione...</option>
+                {% for val, label in formas %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="cmd-field" style="margin:0">
+              <label class="cmd-label">Valor (R$)</label>
+              <input type="text" id="cmdValorPag" class="cmd-input" placeholder="0,00"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();registrarPagamentoModal();}" />
+            </div>
+          </div>
+          <button type="button" class="cmd-btn-registrar" onclick="registrarPagamentoModal()">
+            Confirmar pagamento
+          </button>
+        </div>
+
+        <!-- Lista de pagamentos -->
+        <div id="cmdPagLista" class="cmd-pag-lista"></div>
+      </div>
+    </div>
+
+    <!-- Serviços -->
+    <div class="cmd-services">
+      <div class="cmd-panel-hdr">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Serviços Da Comanda
+      </div>
+
+      <table class="cmd-table">
+        <thead>
+          <tr>
+            <th>Serviço / Produto</th>
+            <th style="width:140px">Profissional</th>
+            <th style="width:56px;text-align:center">Qtd</th>
+            <th style="width:100px;text-align:right">Preço</th>
+            <th style="width:100px;text-align:right">Total</th>
+            <th style="width:120px;text-align:right">Comissão</th>
+            <th style="width:28px"></th>
+          </tr>
+        </thead>
+        <tbody id="cmdItensTbody"></tbody>
+      </table>
+
+      <!-- Linha vazia -->
+      <div id="cmdItensVazio" class="cmd-empty-row" style="display:none">Nenhum serviço adicionado.</div>
+
+      <!-- Adicionar serviço -->
+      <div class="cmd-add-svc">
+        <div class="cmd-add-svc-grid">
+          <div class="cmd-field" style="margin:0">
+            <label class="cmd-label">Serviço do catálogo</label>
+            <select id="cmdSvcPicker" class="cmd-input" onchange="cmdOnSvcChange(this)">
+              <option value="">Escolha um serviço...</option>
+              {% for s in servicos %}
+              <option value="{{ s.id }}"
+                      data-nome="{{ s.nome }}"
+                      data-preco="{{ '%.2f'|format(s.preco)|replace('.', ',') if s.preco else '0,00' }}"
+                      data-comissao="{{ '%.2f'|format(s.comissao_valor)|replace('.', ',') if s.comissao_valor else '' }}"
+                      data-comissao-tipo="{{ s.comissao_tipo or '%' }}">
+                {{ s.nome }}{% if s.preco %} — R$ {{ '%.2f'|format(s.preco)|replace('.', ',') }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="cmd-field" style="margin:0">
+            <label class="cmd-label">Profissional</label>
+            <select id="cmdSvcProf" class="cmd-input">
+              <option value="">— Selecione —</option>
+              {% for p in profissionais %}
+              <option value="{{ p.id }}">{{ p.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="cmd-field" style="margin:0;flex:0 0 100px">
+            <label class="cmd-label">Valor (R$)</label>
+            <input type="text" id="cmdSvcPreco" class="cmd-input" placeholder="0,00"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();cmdAddItem();}" />
+          </div>
+          <div class="cmd-field" style="margin:0;flex:0 0 56px">
+            <label class="cmd-label">Qtd</label>
+            <input type="number" id="cmdSvcQtd" class="cmd-input" value="1" min="1"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();cmdAddItem();}" />
+          </div>
+          <div class="cmd-field" style="margin:0;flex:0 0 120px">
+            <label class="cmd-label">Comissão</label>
+            <div style="display:flex;gap:2px">
+              <input type="text" id="cmdSvcComissao" class="cmd-input" placeholder="0"
+                     style="min-width:0"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();cmdAddItem();}" />
+              <select id="cmdSvcComissaoTipo" class="cmd-input" style="width:48px;padding:.3rem .2rem;flex-shrink:0">
+                <option value="%">%</option>
+                <option value="R">R$</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" class="cmd-btn-add-svc" onclick="cmdAddItem()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Inserir
+          </button>
+        </div>
+      </div>
+
+      <!-- Rodapé total + salvar -->
+      <div class="cmd-footer">
+        <div class="cmd-footer-total">
+          Subtotal: <strong id="cmdTotal">R$ 0,00</strong>
+        </div>
+        <button type="button" class="cmd-btn-save" onclick="salvarComandaModal()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Salvar Comanda
+        </button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -556,6 +802,342 @@
 .act-badge--concluido  { background:#f3f4f6;color:#4b5563; }
 .act-badge--cancelado  { background:#fee2e2;color:#b91c1c; }
 .act-badge--faltou     { background:#fef3c7;color:#92400e; }
+
+/* ── Modal Comanda ─────────────────────────────────── */
+.cmd-box {
+  background: var(--card-bg);
+  border-radius: 12px;
+  width: min(96vw, 1000px);
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(0,0,0,.45);
+  display: flex;
+  flex-direction: column;
+}
+.cmd-header {
+  display: flex;
+  align-items: center;
+  padding: .9rem 1.4rem;
+  background: linear-gradient(135deg,#2d1f0e 0%,#3d2a10 100%);
+  border-radius: 12px 12px 0 0;
+  color: #fff;
+  flex-shrink: 0;
+  gap: .6rem;
+}
+.cmd-header-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .01em;
+}
+.cmd-link-ext {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .75rem;
+  color: #c9a97a;
+  text-decoration: none;
+  padding: .28rem .6rem;
+  border: 1px solid rgba(201,169,122,.35);
+  border-radius: 20px;
+  transition: background .15s;
+}
+.cmd-link-ext:hover { background: rgba(201,169,122,.12); }
+.cmd-close-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.08);
+  border: none; border-radius: 50%;
+  color: #fff; cursor: pointer;
+  transition: background .15s;
+}
+.cmd-close-btn:hover { background: rgba(255,255,255,.18); }
+
+/* Painéis */
+.cmd-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 2px solid var(--border);
+}
+.cmd-panel { padding: 1.2rem 1.4rem; }
+.cmd-panel--right { border-left: 1px solid var(--border); background: #faf8f5; }
+.cmd-panel-hdr {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #c9a97a;
+  background: #2d1f0e;
+  padding: .4rem .85rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+/* Campos */
+.cmd-field { margin-bottom: .7rem; }
+.cmd-field-row { display: flex; gap: .6rem; margin-bottom: .7rem; }
+.cmd-field-row .cmd-field { flex: 1; margin: 0; }
+.cmd-label {
+  display: block;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin-bottom: .3rem;
+}
+.cmd-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: .46rem .7rem;
+  font-size: .875rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--card-bg);
+  color: var(--text);
+  transition: border-color .15s, box-shadow .15s;
+}
+.cmd-input:focus { outline: none; border-color: #c9a97a; box-shadow: 0 0 0 3px rgba(201,169,122,.15); }
+.cmd-input--readonly { background: var(--content-bg); color: var(--text-muted); cursor: default; }
+.cmd-input--sm { padding: .35rem .55rem; font-size: .83rem; }
+
+/* Status radio */
+.cmd-radio-group { display: flex; gap: 1rem; }
+.cmd-radio {
+  display: flex; align-items: center; gap: .5rem;
+  cursor: pointer; font-size: .875rem; font-weight: 500;
+}
+.cmd-radio input[type=radio] { display: none; }
+.cmd-radio-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0; transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.cmd-radio input[type=radio]:checked + .cmd-radio-dot {
+  border-color: #c9a97a;
+  background: #c9a97a;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+/* Info box */
+.cmd-info-box {
+  font-size: .79rem;
+  color: var(--text-muted);
+  background: var(--content-bg);
+  border-left: 3px solid #c9a97a;
+  padding: .45rem .7rem;
+  border-radius: 0 6px 6px 0;
+  margin-top: .2rem;
+}
+
+/* Botões do painel esquerdo */
+.cmd-actions-row { display: flex; align-items: center; gap: .6rem; margin-top: .2rem; }
+.cmd-btn-save {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .5rem 1.1rem;
+  background: #c9a97a; color: #2d1f0e;
+  border: none; border-radius: 7px; cursor: pointer;
+  font-size: .855rem; font-weight: 700; letter-spacing: .01em;
+  transition: background .15s, transform .1s;
+}
+.cmd-btn-save:hover { background: #b8925f; }
+.cmd-btn-save:active { transform: scale(.97); }
+.cmd-btn-del {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .5rem .9rem;
+  background: #fff0f0; color: #dc2626;
+  border: 1.5px solid #fca5a5; border-radius: 7px; cursor: pointer;
+  font-size: .84rem; font-weight: 600;
+  transition: background .15s;
+}
+.cmd-btn-del:hover { background: #fee2e2; }
+
+/* Totalizador */
+.cmd-totals {
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: .9rem;
+}
+.cmd-total-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .52rem .85rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .855rem;
+}
+.cmd-total-item:last-child { border-bottom: none; }
+.cmd-total-item--destaque { background: #faf3e8; }
+.cmd-total-label { color: var(--text-muted); font-size: .82rem; }
+.cmd-total-val { font-weight: 600; color: var(--text); }
+.cmd-resta { font-size: 1.05rem; font-weight: 700; color: #b45309; }
+
+/* Saldo do cliente */
+.cmd-saldo-box {
+  font-size: .82rem;
+  padding: .5rem .8rem;
+  border-radius: 7px;
+  margin-bottom: .8rem;
+  border-left: 3px solid;
+}
+
+/* Botão registrar pagamento */
+.cmd-pag-btn {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  width: 100%; padding: .55rem;
+  background: #1e40af; color: #fff;
+  border: none; border-radius: 7px; cursor: pointer;
+  font-size: .875rem; font-weight: 600;
+  transition: background .15s;
+}
+.cmd-pag-btn:hover { background: #1d3bab; }
+
+/* Formulário de pagamento */
+.cmd-pag-form {
+  margin-top: .7rem;
+  padding: .85rem;
+  background: #fff;
+  border: 1.5px solid #dbeafe;
+  border-radius: 8px;
+}
+.cmd-pag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+  margin-bottom: .7rem;
+}
+.cmd-btn-registrar {
+  width: 100%; padding: .5rem;
+  background: #1e40af; color: #fff;
+  border: none; border-radius: 7px; cursor: pointer;
+  font-size: .875rem; font-weight: 600;
+  transition: background .15s;
+}
+.cmd-btn-registrar:hover { background: #1d3bab; }
+
+/* Lista de pagamentos */
+.cmd-pag-lista { margin-top: .75rem; }
+
+/* Seção de serviços */
+.cmd-services { padding: 1.2rem 1.4rem; border-top: 2px solid var(--border); }
+.cmd-table {
+  width: 100%; border-collapse: collapse; font-size: .855rem;
+}
+.cmd-table th {
+  font-size: .7rem; color: var(--text-muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 2px solid var(--border);
+  padding: .4rem .55rem; text-align: left;
+}
+.cmd-table td {
+  padding: .38rem .55rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.cmd-table tr:last-child td { border-bottom: none; }
+.cmd-table input[type=text], .cmd-table input[type=number] {
+  width: 100%; padding: .28rem .45rem; font-size: .84rem;
+  border: 1.5px solid var(--border); border-radius: 5px;
+  background: var(--card-bg); color: var(--text);
+  transition: border-color .15s;
+}
+.cmd-table input:focus { outline: none; border-color: #c9a97a; }
+.cmd-empty-row {
+  text-align: center; padding: 1.4rem;
+  font-size: .84rem; color: var(--text-muted);
+  border: 1.5px dashed var(--border); border-radius: 7px;
+  margin-top: .5rem;
+}
+
+/* Adicionar serviço */
+.cmd-add-svc {
+  margin-top: .9rem;
+  background: #faf8f5;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: .85rem 1rem;
+}
+.cmd-add-svc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 100px 56px auto;
+  gap: .55rem;
+  align-items: flex-end;
+}
+.cmd-btn-add-svc {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .46rem .85rem;
+  background: #2d1f0e; color: #c9a97a;
+  border: none; border-radius: 7px; cursor: pointer;
+  font-size: .84rem; font-weight: 600; white-space: nowrap;
+  align-self: flex-end;
+  transition: background .15s;
+}
+.cmd-btn-add-svc:hover { background: #3d2a10; }
+
+/* Rodapé */
+.cmd-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: .9rem; padding-top: .9rem;
+  border-top: 2px solid var(--border);
+}
+.cmd-footer-total { font-size: .95rem; color: var(--text-muted); }
+.cmd-footer-total strong { font-size: 1.15rem; font-weight: 700; color: var(--dark); }
+
+/* Prévia de crédito / saldo devedor */
+.cmd-preview-box {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  padding: .7rem .9rem;
+  border-radius: 8px;
+  margin-bottom: .8rem;
+  font-size: .84rem;
+  border-left: 4px solid;
+  animation: cmdPreviewIn .2s ease;
+}
+@keyframes cmdPreviewIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cmd-preview-box--credito {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+}
+.cmd-preview-box--devedor {
+  background: #fff1f2;
+  border-color: #f43f5e;
+  color: #9f1239;
+}
+.cmd-preview-icon {
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  margin-top: .05rem;
+}
+.cmd-preview-title {
+  font-weight: 700;
+  font-size: .875rem;
+  margin-bottom: .18rem;
+}
+.cmd-preview-sub {
+  font-size: .77rem;
+  opacity: .85;
+  line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .cmd-panels { grid-template-columns: 1fr; }
+  .cmd-panel--right { border-left: none; border-top: 1px solid var(--border); }
+  .cmd-add-svc-grid { grid-template-columns: 1fr 1fr; }
+  .cmd-add-svc-grid .cmd-field:nth-child(3),
+  .cmd-add-svc-grid .cmd-field:nth-child(4) { grid-column: 1; grid-row: 2; }
+  .cmd-btn-add-svc { grid-column: 2; grid-row: 2; align-self: flex-end; }
+}
 </style>
 
 <script>
@@ -751,7 +1333,8 @@ function openActsModal(ev) {
 
   // Painel 1
   document.getElementById('actClienteNome').textContent = ev.nome_cliente;
-  document.getElementById('actServico').textContent     = ev.servico_nome ? '1x ' + ev.servico_nome : '';
+  document.getElementById('actServico').textContent     = ev.servico_nome || '';
+  document.getElementById('actAbrirCmdLabel').textContent = ev.comanda_id ? 'Editar Comanda' : 'Abrir Comanda';
   document.getElementById('actHora').textContent        = ev.hora_inicio + ' – ' + ev.hora_fim;
   document.getElementById('actMaisNome').textContent    = ev.nome_cliente;
 
@@ -759,9 +1342,7 @@ function openActsModal(ev) {
   badge.textContent  = _statusLabel[ev.status] || ev.status;
   badge.className    = 'act-badge act-badge--' + ev.status;
 
-  // Formulários de faturar
-  document.getElementById('actFaturarForm').action  = AG_BASE + ev.id + '/faturar';
-  document.getElementById('actFaturarForm2').action = AG_BASE + ev.id + '/faturar';
+  // (faturar agora via modal — não precisa de form action)
 
   // Botão Editar
   document.getElementById('actBtnEditar').onclick = function() {
@@ -840,7 +1421,7 @@ function _actSetStatus(novoStatus) {
 
 // ── Modal edição completa ─────────────────────────────────────────────────
 function resetAgForm() {
-  ['agFormNome','agFormTel','agFormObs','agFormComo'].forEach(function(id) {
+  ['agFormNome','agFormTel','agFormObs','agFormComo','agFormClienteId'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -854,11 +1435,64 @@ function resetAgForm() {
   document.getElementById('agFormLembrete').checked = false;
 }
 
+// Guarda o label original de cada option de unidade (para restaurar)
+var _unidadeLabelsOriginais = null;
+function _guardarLabelsUnidade() {
+  if (_unidadeLabelsOriginais) return;
+  var sel = document.getElementById('agFormUnidade');
+  _unidadeLabelsOriginais = {};
+  Array.from(sel.options).forEach(function(opt) {
+    _unidadeLabelsOriginais[opt.value] = opt.text;
+  });
+}
+
+function _restaurarUnidades() {
+  var sel = document.getElementById('agFormUnidade');
+  Array.from(sel.options).forEach(function(opt) {
+    opt.disabled = false;
+    if (_unidadeLabelsOriginais && _unidadeLabelsOriginais[opt.value] !== undefined) {
+      opt.text = _unidadeLabelsOriginais[opt.value];
+    }
+  });
+}
+
+async function _aplicarEscalaUnidade(profId, data) {
+  _guardarLabelsUnidade();
+  _restaurarUnidades();
+  if (!profId || !data) return;
+  try {
+    var res = await fetch('/admin/profissionais/' + profId + '/escala-data?data=' + data);
+    var json = await res.json();
+    if (!json.escala) return;
+    var escala = json.escala;
+    var sufixo = ' — Indisponível no período ' + escala.data_inicio + ' a ' + escala.data_fim;
+    var sel = document.getElementById('agFormUnidade');
+    Array.from(sel.options).forEach(function(opt) {
+      if (opt.value === '' || opt.value === String(escala.unidade_id)) return;
+      opt.disabled = true;
+      opt.text = (_unidadeLabelsOriginais[opt.value] || opt.text) + sufixo;
+    });
+    // Pré-seleciona a unidade da escala se nenhuma ainda estiver selecionada
+    if (!sel.value) sel.value = String(escala.unidade_id);
+  } catch(e) { /* silencioso */ }
+}
+
 function syncUnidade(sel) {
   var opt = sel.options[sel.selectedIndex];
   var uid = opt ? opt.dataset.unidade : '';
   if (uid) document.getElementById('agFormUnidade').value = uid;
+  var data = document.getElementById('agFormData').value;
+  var profId = document.getElementById('agFormProf').value;
+  _aplicarEscalaUnidade(profId, data);
 }
+
+// Reavalia escala quando a data muda
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('agFormData').addEventListener('change', function() {
+    var profId = document.getElementById('agFormProf').value;
+    _aplicarEscalaUnidade(profId, this.value);
+  });
+});
 
 function openNewAg(hora, profId) {
   if (hora && profId && _isIndisponivel(hora, profId)) {
@@ -868,12 +1502,14 @@ function openNewAg(hora, profId) {
   document.getElementById('agForm').action = NEW_URL;
   document.getElementById('agModalTitle').textContent = 'Novo Agendamento';
   document.getElementById('agBtnDelete').style.display = 'none';
-  document.getElementById('agFaturarForm').style.display = 'none';
+  document.getElementById('agFaturarBtn').style.display = 'none';
   resetAgForm();
   if (hora) document.getElementById('agFormHora').value = hora;
   if (profId) {
     document.getElementById('agFormProf').value = String(profId);
     syncUnidade(document.getElementById('agFormProf'));
+  } else {
+    _restaurarUnidades && _restaurarUnidades();
   }
   document.getElementById('agModalBg').classList.add('open');
   document.getElementById('agFormNome').focus();
@@ -882,15 +1518,17 @@ function openNewAg(hora, profId) {
 function openEditAg(ev) {
   document.getElementById('agForm').action       = AG_BASE + ev.id + '/editar';
   document.getElementById('agDeleteForm').action  = AG_BASE + ev.id + '/excluir';
-  document.getElementById('agFaturarForm').action = AG_BASE + ev.id + '/faturar';
   document.getElementById('agModalTitle').textContent = 'Editar Agendamento';
   document.getElementById('agBtnDelete').style.display = '';
-  document.getElementById('agFaturarForm').style.display = '';
+  var faturarBtn = document.getElementById('agFaturarBtn');
+  faturarBtn.style.display = '';
+  faturarBtn.onclick = function() { closeAgModal(); abrirComandaModal(ev.id, false); };
 
   document.getElementById('agFormData').value    = currentDate;
   document.getElementById('agFormHora').value    = ev.hora_inicio;
-  document.getElementById('agFormNome').value    = ev.nome_cliente;
-  document.getElementById('agFormTel').value     = ev.telefone || '';
+  document.getElementById('agFormNome').value        = ev.nome_cliente;
+  document.getElementById('agFormClienteId').value  = ev.cliente_id ? String(ev.cliente_id) : '';
+  document.getElementById('agFormTel').value         = ev.telefone || '';
   document.getElementById('agFormProf').value    = String(ev.profissional_id);
   document.getElementById('agFormServico').value = ev.servico_id ? String(ev.servico_id) : '';
   document.getElementById('agFormDur').value     = ev.duracao_min;
@@ -900,6 +1538,7 @@ function openEditAg(ev) {
   document.getElementById('agFormUnidade').value = ev.unidade_id ? String(ev.unidade_id) : '';
   document.getElementById('agFormLembrete').checked = !!ev.lembrete_wa;
 
+  _aplicarEscalaUnidade(ev.profissional_id, currentDate);
   document.getElementById('agModalBg').classList.add('open');
 }
 
@@ -917,6 +1556,7 @@ document.getElementById('agFormServico').addEventListener('change', function() {
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
+    fecharComandaModal();
     closeAgModal();
     closeActsModal();
   }
@@ -926,7 +1566,504 @@ document.addEventListener('keydown', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
   var scroll = document.getElementById('agScroll');
   if (scroll) scroll.scrollTop = 2 * SLOT_H; // 08:00 = 2 slots × 48px = 96px
+
+  // Sobrepõe link "Novo Agendamento" do menu + Criar para abrir o modal
+  var criarAg = document.getElementById('criarAgendamento');
+  if (criarAg) {
+    criarAg.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('criarMenu').classList.remove('open');
+      openNewAg(null, null);
+    });
+  }
 });
+
+// ── Autocomplete nome do cliente ──────────────────────────────────────────────
+(function() {
+  var input    = document.getElementById('agFormNome');
+  var dropdown = document.getElementById('agNomeDropdown');
+  var hiddenId = document.getElementById('agFormClienteId');
+  var telInput = document.getElementById('agFormTel');
+  var _timer   = null;
+  var _active  = -1;
+
+  function closeDropdown() {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    _active = -1;
+  }
+
+  function selectItem(item) {
+    input.value    = item.nome;
+    telInput.value = item.telefone || '';
+    hiddenId.value = item.id;
+    closeDropdown();
+  }
+
+  function renderItems(items) {
+    dropdown.innerHTML = '';
+    _active = -1;
+    if (!items.length) { closeDropdown(); return; }
+    items.forEach(function(item, idx) {
+      var li = document.createElement('li');
+      li.className = 'ac-item';
+      li.innerHTML = '<strong>' + item.nome + '</strong>' +
+        (item.telefone ? '<span class="ac-tel"> ' + item.telefone + '</span>' : '');
+      li.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        selectItem(item);
+      });
+      dropdown.appendChild(li);
+    });
+    dropdown.style.display = 'block';
+  }
+
+  function fetchSuggestions(q) {
+    fetch('/admin/api/clientes/busca?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(renderItems)
+      .catch(function() { closeDropdown(); });
+  }
+
+  input.addEventListener('input', function() {
+    hiddenId.value = '';
+    var q = this.value.trim();
+    clearTimeout(_timer);
+    if (q.length < 2) { closeDropdown(); return; }
+    _timer = setTimeout(function() { fetchSuggestions(q); }, 220);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    var items = dropdown.querySelectorAll('.ac-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _active = Math.min(_active + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _active = Math.max(_active - 1, 0);
+    } else if (e.key === 'Enter' && _active >= 0) {
+      e.preventDefault();
+      items[_active].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      closeDropdown(); return;
+    } else { return; }
+    items.forEach(function(li, i) { li.classList.toggle('ac-active', i === _active); });
+    if (_active >= 0) items[_active].scrollIntoView({ block: 'nearest' });
+  });
+
+  input.addEventListener('blur', function() {
+    setTimeout(closeDropdown, 150);
+  });
+})();
+
+// ── Modal de Comanda ──────────────────────────────────────────────────────────
+var _cmdId   = null;
+var _cmdAgId = null;
+var _cmdClienteId = null;
+var _cmdItens = [];   // [{descricao, valor, quantidade, servico_id, venda_pacote_item_id}]
+var _cmdFmt = function(n) { return 'R$ ' + parseFloat(n || 0).toFixed(2).replace('.', ','); };
+var _cmdFmtInput = function(n) { return parseFloat(n || 0).toFixed(2).replace('.', ','); };
+
+async function abrirComandaModal(agId, finalizar) {
+  _cmdAgId = agId;
+  document.getElementById('cmdModalBg').classList.add('open');
+  document.getElementById('cmdTitle').textContent = 'Carregando…';
+  _cmdItens = [];
+  _renderCmdItens();
+  try {
+    if (finalizar) {
+      await fetch(AG_BASE + agId + '/status', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: 'concluido'})
+      });
+    }
+    var r = await fetch('/admin/api/ag/' + agId + '/comanda', {method: 'POST'});
+    var data = await r.json();
+    _cmdId = data.id;
+    _carregarCmdUI(data);
+  } catch(e) {
+    _showAgToast('Erro ao carregar comanda.');
+    fecharComandaModal();
+  }
+}
+
+function fecharComandaModal() {
+  document.getElementById('cmdModalBg').classList.remove('open');
+  _cmdId = null; _cmdAgId = null; _cmdItens = [];
+  fetch('/admin/agenda/dados?data=' + currentDate)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      renderExpedientes(d.expedientes || []);
+      renderBloqueios(d.bloqueios || []);
+      renderEvents(d.events || []);
+    });
+}
+
+function _carregarCmdUI(data) {
+  _cmdClienteId = data.cliente_id || null;
+  document.getElementById('cmdTitle').textContent = 'Comanda #' + data.codigo;
+  document.getElementById('cmdHeaderSub').textContent = data.nome_cliente ? data.nome_cliente + (data.profissional_nome ? ' · ' + data.profissional_nome : '') : '';
+  document.getElementById('cmdLinkExterno').href = '/admin/financeiro/comandas/' + data.id;
+  document.getElementById('cmdCodigo').value = data.codigo;
+  document.getElementById('cmdData').value   = data.data;
+  document.getElementById('cmdNome').value   = data.nome_cliente || '';
+  document.getElementById('cmdResponsavel').value = data.profissional_nome || '';
+  document.getElementById('cmdObs').value    = data.observacoes || '';
+  document.getElementById('cmdDesconto').value = _cmdFmtInput(data.desconto);
+  document.getElementById(data.status === 'fechada' ? 'cmdStFechada' : 'cmdStAberta').checked = true;
+
+  // Excluir (admin only)
+  var btnEx = document.getElementById('cmdBtnExcluir');
+  {% if current_user.has_role('empresa_admin', 'saas_admin') %}btnEx.style.display = '';{% else %}btnEx.style.display = 'none';{% endif %}
+
+  // Itens
+  _cmdItens = (data.itens || []).map(function(i) {
+    return {descricao: i.descricao, valor: i.valor, quantidade: i.quantidade,
+            servico_id: i.servico_id || '', venda_pacote_item_id: i.venda_pacote_item_id || '',
+            profissional_id: i.profissional_id || '', profissional_nome: i.profissional_nome || '',
+            comissao_valor: i.comissao_valor != null ? i.comissao_valor : null,
+            comissao_tipo: i.comissao_tipo || '%'};
+  });
+  _renderCmdItens();
+
+  // Pagamentos
+  _renderCmdPags(data);
+
+  // Saldo do cliente
+  _renderCmdSaldoCliente(data);
+
+  // Saldo ajustado info
+  var saInfo = document.getElementById('cmdSaldoAjustInfo');
+  if (data.saldo_ajustado !== null && data.saldo_ajustado !== undefined && data.saldo_ajustado !== 0) {
+    saInfo.style.display = '';
+    saInfo.textContent = data.saldo_ajustado > 0
+      ? 'Dívida transferida ao cliente: ' + _cmdFmt(data.saldo_ajustado)
+      : 'Crédito transferido ao cliente: ' + _cmdFmt(-data.saldo_ajustado);
+  } else {
+    saInfo.style.display = 'none';
+  }
+
+  cmdRecalc(data);
+}
+
+var _CMD_PROFS = {{ profissionais | map(attribute='id') | list | tojson }};
+var _CMD_PROF_NAMES = { {% for p in profissionais %}{{ p.id }}: {{ p.nome | tojson }}{% if not loop.last %}, {% endif %}{% endfor %} };
+
+function _profSelectHtml(idx, selectedId) {
+  var html = '<select style="width:100%;font-size:.78rem;padding:.22rem .3rem;border:1px solid var(--border);border-radius:4px;background:var(--card-bg);color:var(--text)" ' +
+             'onchange="_cmdItens[' + idx + '].profissional_id=this.value;_cmdItens[' + idx + '].profissional_nome=this.options[this.selectedIndex].text">' +
+             '<option value="">—</option>';
+  _CMD_PROFS.forEach(function(pid) {
+    html += '<option value="' + pid + '"' + (String(selectedId) === String(pid) ? ' selected' : '') + '>' + _escH(_CMD_PROF_NAMES[pid] || '') + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function _renderCmdItens() {
+  var tbody = document.getElementById('cmdItensTbody');
+  var vazio = document.getElementById('cmdItensVazio');
+  tbody.innerHTML = '';
+  if (vazio) vazio.style.display = _cmdItens.length ? 'none' : '';
+  _cmdItens.forEach(function(item, idx) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" value="' + _escH(item.descricao) + '" oninput="_cmdItens[' + idx + '].descricao=this.value;cmdRecalc()" /></td>' +
+      '<td>' + _profSelectHtml(idx, item.profissional_id) + '</td>' +
+      '<td style="text-align:center"><input type="number" value="' + item.quantidade + '" min="1" style="width:48px;text-align:center" oninput="_cmdItens[' + idx + '].quantidade=parseInt(this.value)||1;cmdRecalc()" /></td>' +
+      '<td style="text-align:right"><input type="text" value="' + _cmdFmtInput(item.valor) + '" style="text-align:right" oninput="_cmdItens[' + idx + '].valor=parseFloat(this.value.replace(\',\',\'.\')||0);cmdRecalc()" /></td>' +
+      '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _cmdFmt(item.valor * item.quantidade) + '</td>' +
+      '<td style="text-align:right"><div style="display:flex;gap:2px;align-items:center;justify-content:flex-end">' +
+        '<input type="text" value="' + (item.comissao_valor != null ? _cmdFmtInput(item.comissao_valor) : '') + '" ' +
+        'style="width:52px;text-align:right" placeholder="—" ' +
+        'oninput="var v=parseFloat(this.value.replace(\',\',\'.\')||\'0\');_cmdItens[' + idx + '].comissao_valor=isNaN(v)?null:v" />' +
+        '<select style="width:46px;padding:.2rem .15rem;font-size:.78rem;border:1px solid var(--border);border-radius:4px;background:var(--card-bg);color:var(--text)" ' +
+        'onchange="_cmdItens[' + idx + '].comissao_tipo=this.value">' +
+        '<option value="%" ' + (item.comissao_tipo !== 'R' ? 'selected' : '') + '>%</option>' +
+        '<option value="R" ' + (item.comissao_tipo === 'R' ? 'selected' : '') + '>R$</option>' +
+        '</select>' +
+      '</div></td>' +
+      '<td><button type="button" style="background:none;border:none;cursor:pointer;color:#ef4444;padding:2px" onclick="_cmdRemoveItem(' + idx + ')" title="Remover">' +
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function _cmdRemoveItem(idx) {
+  _cmdItens.splice(idx, 1);
+  _renderCmdItens();
+  cmdRecalc();
+}
+
+function cmdOnSvcChange(sel) {
+  if (!sel.value) return;
+  var opt = sel.selectedOptions[0];
+  var inp = document.getElementById('cmdSvcPreco');
+  if (inp) { inp.value = opt.dataset.preco || ''; inp.focus(); inp.select(); }
+  var comEl  = document.getElementById('cmdSvcComissao');
+  var comTEl = document.getElementById('cmdSvcComissaoTipo');
+  if (comEl)  comEl.value  = opt.dataset.comissao || '';
+  if (comTEl) comTEl.value = opt.dataset.comissaoTipo || '%';
+}
+
+function cmdAddItem() {
+  var sel  = document.getElementById('cmdSvcPicker');
+  var profSel = document.getElementById('cmdSvcProf');
+  var prec = document.getElementById('cmdSvcPreco');
+  var qtd  = document.getElementById('cmdSvcQtd');
+  var nome = '', svcId = '', valor = 0;
+  if (sel && sel.value) {
+    var opt = sel.selectedOptions[0];
+    nome  = opt.dataset.nome || opt.textContent.split(' — ')[0];
+    svcId = sel.value;
+    valor = parseFloat((prec ? prec.value : '').replace(',', '.')) || 0;
+  } else {
+    _showAgToast('Selecione um serviço.');
+    return;
+  }
+  var profId   = profSel ? profSel.value : '';
+  var profNome = profSel && profSel.value ? profSel.options[profSel.selectedIndex].text : '';
+  var comissaoEl    = document.getElementById('cmdSvcComissao');
+  var comissaoTipoEl = document.getElementById('cmdSvcComissaoTipo');
+  var comissaoValor = comissaoEl && comissaoEl.value.trim()
+    ? (parseFloat(comissaoEl.value.replace(',', '.')) || null) : null;
+  var comissaoTipo  = comissaoTipoEl ? comissaoTipoEl.value : '%';
+  _cmdItens.push({descricao: nome, valor: valor,
+    quantidade: parseInt(qtd ? qtd.value : 1) || 1,
+    servico_id: svcId, venda_pacote_item_id: '',
+    profissional_id: profId, profissional_nome: profNome,
+    comissao_valor: comissaoValor, comissao_tipo: comissaoTipo});
+  _renderCmdItens();
+  cmdRecalc();
+  sel.value = ''; if (prec) prec.value = ''; if (qtd) qtd.value = '1';
+  if (comissaoEl) comissaoEl.value = ''; if (comissaoTipoEl) comissaoTipoEl.value = '%';
+  sel.focus();
+}
+
+function cmdRecalc(data) {
+  var subtotal = _cmdItens.reduce(function(s, i) { return s + (i.valor || 0) * (i.quantidade || 1); }, 0);
+  var desc = parseFloat((document.getElementById('cmdDesconto').value || '0').replace(',', '.')) || 0;
+  var pago = data ? data.valor_pago : parseFloat((document.getElementById('cmdRestaPagar').dataset.pago || '0'));
+  var liquido = subtotal - desc;   // total líquido após desconto
+  var saldo   = liquido - pago;    // >0 = ainda deve, <0 = pagou a mais
+
+  var fmtSubtotal = _cmdFmt(subtotal);
+  document.getElementById('cmdTotal').textContent = fmtSubtotal;
+  var elTotalPainel = document.getElementById('cmdTotalPainel');
+  if (elTotalPainel) elTotalPainel.textContent = fmtSubtotal;
+
+  var elR = document.getElementById('cmdRestaPagar');
+  elR.textContent = _cmdFmt(Math.max(saldo, 0));
+  elR.dataset.pago = String(pago);
+  elR.style.color = saldo > 0.005 ? '#b45309' : '#15803d';
+
+  // ── Prévia de crédito ou saldo devedor ──────────────────────────────
+  var prev = document.getElementById('cmdSaldoPreview');
+  if (!prev) return;
+
+  if (saldo < -0.005) {
+    // Pagou mais que o total → crédito para a cliente
+    var credito = -saldo;
+    prev.style.display = '';
+    prev.className = 'cmd-preview-box cmd-preview-box--credito';
+    prev.innerHTML =
+      '<div class="cmd-preview-icon">↑</div>' +
+      '<div><div class="cmd-preview-title">Crédito para a cliente: ' + _cmdFmt(credito) + '</div>' +
+      '<div class="cmd-preview-sub">Esse valor será adicionado ao saldo da cliente ao salvar como <strong>Fechada</strong>.</div></div>';
+  } else if (saldo > 0.005) {
+    // Ainda deve → verificar se vai fechar com dívida
+    var statusEl = document.querySelector('input[name="cmdStatus"]:checked');
+    var isFechada = statusEl && statusEl.value === 'fechada';
+    if (isFechada) {
+      prev.style.display = '';
+      prev.className = 'cmd-preview-box cmd-preview-box--devedor';
+      prev.innerHTML =
+        '<div class="cmd-preview-icon">↓</div>' +
+        '<div><div class="cmd-preview-title">Saldo devedor: ' + _cmdFmt(saldo) + '</div>' +
+        '<div class="cmd-preview-sub">Esse valor será registrado como dívida no cadastro da cliente ao salvar.</div></div>';
+    } else {
+      prev.style.display = 'none';
+    }
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
+function _renderCmdPags(data) {
+  var pago = data.valor_pago || 0;
+  document.getElementById('cmdRestaPagar').dataset.pago = String(pago);
+  var ul = document.getElementById('cmdPagLista');
+  ul.innerHTML = '';
+  if (!data.pagamentos || !data.pagamentos.length) {
+    ul.innerHTML = '<p style="font-size:.82rem;color:var(--text-muted)">Nenhum pagamento registrado.</p>';
+    return;
+  }
+  data.pagamentos.forEach(function(p) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--border)';
+    row.innerHTML =
+      '<div style="flex:1"><div style="font-size:.83rem;font-weight:500">' + _escH(p.forma_label) + '</div>' +
+      '<div style="font-size:.74rem;color:var(--text-muted)">' + (p.data_pagamento || '') + (p.parcelas > 1 ? ' · ' + p.parcelas + 'x' : '') + '</div></div>' +
+      '<div style="font-weight:600;font-variant-numeric:tabular-nums">' + _cmdFmt(p.valor) + '</div>' +
+      '<button type="button" style="background:none;border:none;cursor:pointer;color:#ef4444;padding:2px;flex-shrink:0" onclick="_delPagModal(' + p.id + ')" title="Remover pagamento"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+    ul.appendChild(row);
+  });
+}
+
+function _renderCmdSaldoCliente(data) {
+  var box = document.getElementById('cmdSaldoCliente');
+  if (!data.cliente_id) { box.style.display = 'none'; return; }
+  var s = data.cliente_saldo || 0;
+  box.style.display = '';
+  box.className = 'cmd-saldo-box';
+  if (s > 0) {
+    box.style.background = '#d1fae5'; box.style.color = '#065f46'; box.style.borderColor = '#34d399';
+    box.textContent = 'Credito disponivel de ' + data.cliente_nome + ': ' + _cmdFmt(s);
+  } else if (s < 0) {
+    box.style.background = '#fee2e2'; box.style.color = '#991b1b'; box.style.borderColor = '#f87171';
+    box.textContent = data.cliente_nome + ' possui divida: ' + _cmdFmt(-s);
+  } else {
+    box.style.background = 'var(--content-bg)'; box.style.color = 'var(--text-muted)'; box.style.borderColor = 'var(--border)';
+    box.textContent = data.cliente_nome + ' sem saldo.';
+  }
+}
+
+function toggleCmdFormPag() {
+  var f = document.getElementById('cmdFormPag');
+  f.style.display = f.style.display === 'none' ? '' : 'none';
+  if (f.style.display !== 'none') document.getElementById('cmdValorPag').focus();
+}
+
+// Monta o FormData com todos os campos e itens da comanda em memória.
+function _buildCmdFormData() {
+  var fd = new FormData();
+  fd.append('data', document.getElementById('cmdData').value);
+  fd.append('nome_cliente', document.getElementById('cmdNome').value);
+  fd.append('observacoes', document.getElementById('cmdObs').value);
+  fd.append('status', document.querySelector('input[name="cmdStatus"]:checked').value);
+  fd.append('desconto', (document.getElementById('cmdDesconto').value || '0').replace(',', '.'));
+  fd.append('profissional_id', '');
+  fd.append('cliente_id', _cmdClienteId || '');
+  fd.append('unidade_id', '');
+  _cmdItens.forEach(function(i) {
+    fd.append('item_descricao', i.descricao);
+    fd.append('item_valor', String(i.valor));
+    fd.append('item_quantidade', String(i.quantidade));
+    fd.append('item_servico_id', i.servico_id || '');
+    fd.append('item_venda_pacote_item_id', i.venda_pacote_item_id || '');
+    fd.append('item_profissional_id', i.profissional_id || '');
+    fd.append('item_comissao_valor', i.comissao_valor != null ? String(i.comissao_valor) : '');
+    fd.append('item_comissao_tipo', i.comissao_tipo || '%');
+  });
+  return fd;
+}
+
+// Persiste itens silenciosamente antes de operações de pagamento.
+async function _salvarCmdItens() {
+  if (!_cmdId) return;
+  await fetch('/admin/financeiro/comandas/' + _cmdId + '/autosave',
+              {method: 'POST', body: _buildCmdFormData()});
+}
+
+async function salvarComandaModal() {
+  if (!_cmdId) return;
+  var btnSave = document.querySelectorAll('.cmd-btn-save');
+  btnSave.forEach(function(b) { b.disabled = true; b.textContent = 'Salvando…'; });
+  try {
+    var r = await fetch('/admin/financeiro/comandas/' + _cmdId + '/autosave',
+                        {method: 'POST', body: _buildCmdFormData()});
+    var data = await r.json();
+    if (!data.ok) { _showAgToast('Erro ao salvar: ' + (data.error || '')); return; }
+    _carregarCmdUI(data.comanda);
+    if (data.comanda.status === 'fechada') {
+      _showAgToast('Comanda fechada com sucesso.');
+      _cmdMostrarBannerFechada();
+    } else {
+      _showAgToast('Comanda salva.');
+    }
+  } catch(e) {
+    _showAgToast('Erro ao salvar.');
+  } finally {
+    btnSave.forEach(function(b) {
+      b.disabled = false;
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Salvar Comanda';
+    });
+  }
+}
+
+function _cmdMostrarBannerFechada() {
+  var hdr = document.querySelector('.cmd-header');
+  if (!hdr) return;
+  hdr.style.background = 'linear-gradient(135deg,#14532d 0%,#166534 100%)';
+  setTimeout(function() {
+    hdr.style.background = '';
+  }, 2500);
+}
+
+async function registrarPagamentoModal() {
+  if (!_cmdId) return;
+  var forma = document.getElementById('cmdFormaPag').value;
+  var valor = document.getElementById('cmdValorPag').value;
+  if (!forma || !valor) { _showAgToast('Preencha forma e valor.'); return; }
+  try {
+    // Salva itens em memória antes de registrar para não perder serviços recém-adicionados
+    await _salvarCmdItens();
+    var r = await fetch('/admin/api/comanda/' + _cmdId + '/pag-add', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({forma_pagamento: forma, valor: parseFloat(valor.replace(',', '.'))})
+    });
+    var data = await r.json();
+    if (!data.ok) { _showAgToast(data.error || 'Erro.'); return; }
+    _carregarCmdUI(data.comanda);
+    document.getElementById('cmdFormPag').style.display = 'none';
+    document.getElementById('cmdFormaPag').value = '';
+    document.getElementById('cmdValorPag').value = '';
+    _showAgToast('Pagamento registrado.');
+  } catch(e) { _showAgToast('Erro ao registrar pagamento.'); }
+}
+
+async function _delPagModal(pagId) {
+  if (!_cmdId || !confirm('Remover este pagamento?')) return;
+  try {
+    await _salvarCmdItens();
+    var r = await fetch('/admin/api/comanda/' + _cmdId + '/pag-del/' + pagId, {method: 'POST'});
+    var data = await r.json();
+    if (data.ok) { _carregarCmdUI(data.comanda); _showAgToast('Pagamento removido.'); }
+    else _showAgToast(data.error || 'Erro.');
+  } catch(e) { _showAgToast('Erro.'); }
+}
+
+async function excluirComandaModal() {
+  if (!_cmdId || !confirm('Excluir esta comanda permanentemente?\nO agendamento vinculado NÃO será excluído.')) return;
+  var fd = new FormData();
+  try {
+    await fetch('/admin/financeiro/comandas/' + _cmdId + '/excluir', {method: 'POST', body: fd});
+    _showAgToast('Comanda excluída.');
+    fecharComandaModal();
+  } catch(e) { _showAgToast('Erro ao excluir.'); }
+}
+
+function _escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 </script>
+
+<style>
+.ac-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
+  background: #fff; border: 1px solid #d4b896; border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); list-style: none;
+  margin: 2px 0 0; padding: 4px 0; max-height: 220px; overflow-y: auto;
+}
+.ac-item {
+  padding: 8px 12px; cursor: pointer; font-size: .875rem; line-height: 1.4;
+}
+.ac-item:hover, .ac-item.ac-active { background: #f9f0e6; }
+.ac-item strong { display: block; color: #3a2a1a; }
+.ac-tel { color: #888; font-size: .8rem; }
+</style>
 
 {% endblock %}

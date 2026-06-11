@@ -1,0 +1,288 @@
+{% extends 'admin/base.html' %}
+{% block title %}Comissões{% endblock %}
+{% block page_title %}Financeiro / Comissões{% endblock %}
+
+{% block content %}
+
+<!-- Totalizadores -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.2rem">
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Total Comissões</div>
+    <div style="font-size:1.5rem;font-weight:600;color:var(--gold)">R$ {{ '%.2f'|format(total_com)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Pendente</div>
+    <div style="font-size:1.5rem;font-weight:600;color:#e74c3c">R$ {{ '%.2f'|format(total_pend)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Pago</div>
+    <div style="font-size:1.5rem;font-weight:600;color:#27ae60">R$ {{ '%.2f'|format(total_pago_com)|replace('.', ',') }}</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    <!-- Período rápido -->
+    <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
+      {% for p, label in [('mes','Mês atual'),('semana','Semana'),('hoje','Hoje'),('custom','Personalizado')] %}
+      <a href="{{ url_for('admin.comissoes', periodo=p, profissional_id=prof_id, status=status_f) }}"
+         class="btn-secondary" style="{% if periodo == p %}background:var(--gold);color:#fff;border-color:var(--gold);{% endif %}padding:.3rem .7rem;font-size:.82rem">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if periodo == 'custom' %}
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">De</label>
+      <input type="date" name="dt_ini" value="{{ dt_ini_s or dt_ini }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Até</label>
+      <input type="date" name="dt_fim" value="{{ dt_fim_s or dt_fim }}" />
+    </div>
+    <input type="hidden" name="periodo" value="custom" />
+    {% else %}
+    <input type="hidden" name="periodo" value="{{ periodo }}" />
+    {% endif %}
+
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Profissional</label>
+      <select name="profissional_id" onchange="this.form.submit()">
+        <option value="">— Todas —</option>
+        {% for p in profs %}
+        <option value="{{ p.id }}" {% if prof_id == p.id|string %}selected{% endif %}>{{ p.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Status</label>
+      <select name="status" onchange="this.form.submit()">
+        <option value="" {% if status_f == '' %}selected{% endif %}>Todos</option>
+        <option value="pendente" {% if status_f == 'pendente' %}selected{% endif %}>Pendente</option>
+        <option value="pago"     {% if status_f == 'pago'     %}selected{% endif %}>Pago</option>
+      </select>
+    </div>
+
+    {% if periodo == 'custom' %}
+    <button type="submit" class="btn-primary">Buscar</button>
+    {% endif %}
+  </form>
+  <div style="font-size:.78rem;color:var(--text-muted);margin-top:.5rem">
+    Período: {{ dt_ini[8:10] }}/{{ dt_ini[5:7] }}/{{ dt_ini[0:4] }} até {{ dt_fim[8:10] }}/{{ dt_fim[5:7] }}/{{ dt_fim[0:4] }}
+  </div>
+</div>
+
+<!-- Toolbar + Bulk pay form -->
+<form method="POST" action="{{ url_for('admin.comissoes', periodo=periodo, profissional_id=prof_id, status=status_f) }}" id="formBulk">
+  <input type="hidden" name="action" value="pagar" />
+  <div class="toolbar" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap">
+    <button type="button" class="btn-primary" onclick="abrirPagarSelecionadas()"
+            id="btnPagarSel" style="display:none">Pagar selecionadas</button>
+    <span id="selCount" style="font-size:.83rem;color:var(--text-muted)"></span>
+  </div>
+
+  <!-- Listagem -->
+  <div class="card" style="padding:0;overflow:hidden">
+    {% if items %}
+    <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th style="width:36px">
+            <input type="checkbox" id="chkAll" onchange="toggleAll(this)" />
+          </th>
+          <th>Data</th>
+          <th>Profissional</th>
+          <th>Cliente</th>
+          <th>Comanda</th>
+          <th>Serviço</th>
+          <th style="text-align:right">Valor Serviço</th>
+          <th style="text-align:right">Comissão</th>
+          <th>Tipo</th>
+          <th>Status</th>
+          <th>Pago em</th>
+          <th>Forma</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        {% set com_calc = item.comissao_calculada %}
+        <tr>
+          <td>
+            {% if not item.comissao_paga %}
+            <input type="checkbox" name="item_ids" value="{{ item.id }}" class="chk-item"
+                   onchange="updateSel()" />
+            {% endif %}
+          </td>
+          <td>{{ item.comanda.data.strftime('%d/%m/%Y') }}</td>
+          <td>{{ item.profissional.nome if item.profissional else '—' }}</td>
+          <td>
+            {% if item.comanda.cliente %}
+              <a href="{{ url_for('admin.cliente_detalhe', cliente_id=item.comanda.cliente_id) }}" style="color:var(--gold)">
+                {{ item.comanda.cliente.nome }}
+              </a>
+            {% else %}
+              {{ item.comanda.nome_cliente or '—' }}
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('admin.comanda_detalhe', comanda_id=item.comanda_id) }}" style="color:var(--gold)">
+              #{{ item.comanda.codigo }}
+            </a>
+          </td>
+          <td>{{ item.descricao }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">
+            R$ {{ '%.2f'|format(item.valor * item.quantidade)|replace('.', ',') }}
+          </td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--gold)">
+            R$ {{ '%.2f'|format(com_calc)|replace('.', ',') }}
+          </td>
+          <td style="font-size:.82rem;color:var(--text-muted)">
+            {% if item.comissao_tipo == 'R' %}
+              R$ fixo
+            {% else %}
+              {{ '%.2f'|format(item.comissao_valor)|replace('.', ',') }}%
+            {% endif %}
+          </td>
+          <td>
+            {% if item.comissao_paga %}
+              <span class="badge badge-success">Pago</span>
+            {% else %}
+              <span class="badge badge-warning">Pendente</span>
+            {% endif %}
+          </td>
+          <td>{{ item.comissao_data_pag.strftime('%d/%m/%Y') if item.comissao_data_pag else '—' }}</td>
+          <td>{{ dict(formas).get(item.comissao_forma_pag, item.comissao_forma_pag or '—') }}</td>
+          <td>
+            {% if not item.comissao_paga %}
+            <button type="button" class="btn-primary" style="padding:.25rem .7rem;font-size:.8rem;white-space:nowrap"
+              onclick="abrirPagarUm({{ item.id }}, '{{ item.profissional.nome if item.profissional else '' }}', '{{ item.descricao|e }}', '{{ '%.2f'|format(com_calc)|replace('.', ',') }}')">
+              Pagar
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">
+      Nenhuma comissão encontrada para o período selecionado.
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Modal: Pagar em lote -->
+<div id="modalPagarLote" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:100%;max-width:400px;padding:1.5rem;position:relative">
+    <button type="button" onclick="document.getElementById('modalPagarLote').style.display='none'"
+            style="position:absolute;top:.8rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted)">✕</button>
+    <h3 style="margin:0 0 .4rem;font-size:1rem;font-weight:600">Pagar Comissões Selecionadas</h3>
+    <p id="loteDesc" style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem"></p>
+    <div class="form-group">
+      <label>Forma de Pagamento <span class="required">*</span></label>
+      <select id="loteForma" required>
+        <option value="">— Selecionar —</option>
+        {% for val, label in formas %}{% if val != 'saldo_cliente' %}
+        <option value="{{ val }}">{{ label }}</option>
+        {% endif %}{% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Data do Pagamento</label>
+      <input type="date" id="loteData" value="{{ hoje }}" />
+    </div>
+    <div style="display:flex;gap:.7rem;justify-content:flex-end;margin-top:.5rem">
+      <button type="button" class="btn-secondary" onclick="document.getElementById('modalPagarLote').style.display='none'">Cancelar</button>
+      <button type="button" class="btn-primary" onclick="confirmarPagarLote()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Pagar individual -->
+<div id="modalPagarUm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:100%;max-width:400px;padding:1.5rem;position:relative">
+    <button type="button" onclick="document.getElementById('modalPagarUm').style.display='none'"
+            style="position:absolute;top:.8rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted)">✕</button>
+    <h3 id="pagarUmTitle" style="margin:0 0 .4rem;font-size:1rem;font-weight:600">Pagar Comissão</h3>
+    <p id="pagarUmDesc" style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem"></p>
+    <form id="formPagarUm" method="POST"
+          action="{{ url_for('admin.comissoes', periodo=periodo, profissional_id=prof_id, status=status_f) }}">
+      <input type="hidden" name="action" value="pagar_um" />
+      <input type="hidden" name="item_id" id="pagarUmItemId" />
+      <div class="form-group">
+        <label>Forma de Pagamento <span class="required">*</span></label>
+        <select name="forma_pagamento" required>
+          <option value="">— Selecionar —</option>
+          {% for val, label in formas %}{% if val != 'saldo_cliente' %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endif %}{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Data do Pagamento</label>
+        <input type="date" name="data_pagamento" value="{{ hoje }}" />
+      </div>
+      <div style="display:flex;gap:.7rem;justify-content:flex-end;margin-top:.5rem">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('modalPagarUm').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn-primary">Confirmar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function updateSel() {
+  var chks = document.querySelectorAll('.chk-item:checked');
+  var btn = document.getElementById('btnPagarSel');
+  var cnt = document.getElementById('selCount');
+  btn.style.display = chks.length > 0 ? '' : 'none';
+  cnt.textContent   = chks.length > 0 ? chks.length + ' selecionada(s)' : '';
+}
+
+function toggleAll(master) {
+  document.querySelectorAll('.chk-item').forEach(function(c) { c.checked = master.checked; });
+  updateSel();
+}
+
+function abrirPagarSelecionadas() {
+  var chks = document.querySelectorAll('.chk-item:checked');
+  if (!chks.length) return;
+  document.getElementById('loteDesc').textContent = chks.length + ' comissão(ões) selecionada(s).';
+  document.getElementById('modalPagarLote').style.display = 'flex';
+}
+
+function confirmarPagarLote() {
+  var forma = document.getElementById('loteForma').value;
+  if (!forma) { alert('Selecione a forma de pagamento.'); return; }
+  var form = document.getElementById('formBulk');
+  // inject hidden fields
+  var existing = form.querySelector('input[name="forma_pagamento"]');
+  if (existing) existing.remove();
+  var existingDate = form.querySelector('input[name="data_pagamento"]');
+  if (existingDate) existingDate.remove();
+  var fInput = document.createElement('input');
+  fInput.type = 'hidden'; fInput.name = 'forma_pagamento'; fInput.value = forma;
+  form.appendChild(fInput);
+  var dInput = document.createElement('input');
+  dInput.type = 'hidden'; dInput.name = 'data_pagamento'; dInput.value = document.getElementById('loteData').value;
+  form.appendChild(dInput);
+  document.getElementById('modalPagarLote').style.display = 'none';
+  form.submit();
+}
+
+function abrirPagarUm(id, prof, svc, valor) {
+  document.getElementById('pagarUmTitle').textContent = 'Pagar Comissão — ' + prof;
+  document.getElementById('pagarUmDesc').textContent  = svc + ' — R$ ' + valor;
+  document.getElementById('pagarUmItemId').value      = id;
+  document.getElementById('modalPagarUm').style.display = 'flex';
+}
+</script>
+
+{% endblock %}

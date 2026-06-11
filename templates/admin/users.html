@@ -17,7 +17,7 @@
         <th>Nome</th>
         <th>Usuário</th>
         <th>E-mail</th>
-        <th>Telefone</th>
+        <th>Papel</th>
         <th>Cadastrado em</th>
         <th></th>
       </tr>
@@ -28,7 +28,10 @@
         <td>{{ user.name }}</td>
         <td>{{ user.username }}</td>
         <td>{{ user.email }}</td>
-        <td>{{ user.phone or '—' }}</td>
+        <td>
+          {% set role_labels = {'saas_admin': 'SaaS Admin', 'empresa_admin': 'Administrador', 'recepcionista': 'Recepcionista', 'profissional': 'Profissional'} %}
+          {{ role_labels.get(user.role, user.role or '—') }}
+        </td>
         <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
         <td class="table-actions">
           <a href="{{ url_for('admin.user_edit', user_id=user.id) }}" class="btn-icon btn-icon--edit" title="Editar">

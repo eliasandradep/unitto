@@ -134,6 +134,7 @@
           <button type="button" class="ptab-btn active" data-tab="perfil">Perfil de Acesso</button>
           <button type="button" class="ptab-btn" data-tab="comissoes">Comissões</button>
           <button type="button" class="ptab-btn" data-tab="restricoes">Restrições</button>
+          <button type="button" class="ptab-btn" data-tab="escalas">Escalas</button>
         </div>
 
         <!-- ABA: Perfil de Acesso -->
@@ -188,6 +189,32 @@
               </label>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ABA: Escalas por unidade -->
+        <div class="ptab-pane" id="ptab-escalas" style="display:none">
+          <div style="padding:1rem">
+            {% if not p %}
+            <p style="font-size:.82rem;color:var(--text-muted)">Salve o profissional primeiro para gerenciar escalas por unidade.</p>
+            {% else %}
+            <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.9rem;line-height:1.4">
+              Defina em qual unidade a profissional estará disponível em cada período.
+              Durante o período, agendamentos em outras unidades serão bloqueados.
+            </p>
+            <div id="escalas-mount"></div>
+            <div class="escala-add-row" style="margin-top:.75rem">
+              <select id="escalaUnidade" style="flex:1;min-width:110px">
+                <option value="">Unidade</option>
+                {% for u in unidades %}
+                <option value="{{ u.id }}">{{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}</option>
+                {% endfor %}
+              </select>
+              <input type="date" id="escalaInicio" />
+              <input type="date" id="escalaFim" />
+              <button type="button" class="btn-primary" style="padding:.37rem .75rem;font-size:.82rem;white-space:nowrap" onclick="addEscala()">+ Adicionar</button>
+            </div>
+            {% endif %}
           </div>
         </div>
 
@@ -286,6 +313,19 @@
 .restricao-item-text { flex: 1; }
 .restricao-item-text strong { display: block; font-size: .88rem; margin-bottom: .3rem; }
 .restricao-item-text span   { font-size: .78rem; color: var(--text-muted); line-height: 1.4; }
+
+/* Escalas */
+.escala-add-row {
+  display: flex; gap: .4rem; flex-wrap: wrap; align-items: center;
+  background: #f9f7f5; border-top: 2px solid var(--border); padding: .65rem;
+}
+.escala-add-row select,
+.escala-add-row input[type=date] {
+  font-size: .82rem; padding: .37rem .55rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--ff); color: var(--text); background: #fff;
+}
+.escala-add-row input[type=date] { width: 130px; }
 
 /* Comissões */
 .com-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
@@ -413,6 +453,93 @@ async function delComissao(comId) {
     renderComissoes();
   } catch (e) { alert('Erro de comunicação.'); }
 }
+
+// ── Escalas por unidade ────────────────────────────────────────────────────
+var _escalas = [];
+var _escalaCarregada = false;
+
+function fmtData(iso) {
+  if (!iso) return '';
+  var p = iso.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function renderEscalas() {
+  var mount = document.getElementById('escalas-mount');
+  if (!mount) return;
+  if (_escalas.length === 0) {
+    mount.innerHTML = '<p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Nenhuma escala cadastrada.</p>';
+    return;
+  }
+  var rows = _escalas.map(function(e) {
+    return '<tr>'
+      + '<td>' + e.unidade_nome + '</td>'
+      + '<td>' + fmtData(e.data_inicio) + '</td>'
+      + '<td>' + fmtData(e.data_fim) + '</td>'
+      + '<td><button type="button" class="btn-icon btn-icon--danger" title="Remover escala"'
+      + ' onclick="delEscala(' + e.id + ')">'
+      + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">'
+      + '<polyline points="3 6 5 6 21 6"/>'
+      + '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+      + '<path d="M10 11v6M14 11v6"/>'
+      + '</svg></button></td>'
+      + '</tr>';
+  }).join('');
+  mount.innerHTML = '<table class="com-table"><thead><tr>'
+    + '<th>Unidade</th><th>De</th><th>Até</th><th style="width:42px"></th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+async function carregarEscalas() {
+  if (!_PROF_ID || _escalaCarregada) return;
+  _escalaCarregada = true;
+  try {
+    var res = await fetch('/admin/profissionais/' + _PROF_ID + '/escalas');
+    _escalas = await res.json();
+    renderEscalas();
+  } catch (e) { /* silencioso */ }
+}
+
+async function addEscala() {
+  if (!_PROF_ID) return;
+  var uEl  = document.getElementById('escalaUnidade');
+  var diEl = document.getElementById('escalaInicio');
+  var dfEl = document.getElementById('escalaFim');
+  if (!uEl.value)  { uEl.focus();  alert('Selecione a unidade.'); return; }
+  if (!diEl.value) { diEl.focus(); alert('Informe a data de início.'); return; }
+  if (!dfEl.value) { dfEl.focus(); alert('Informe a data de fim.'); return; }
+  try {
+    var res = await fetch('/admin/profissionais/' + _PROF_ID + '/escalas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unidade_id: parseInt(uEl.value), data_inicio: diEl.value, data_fim: dfEl.value }),
+    });
+    var data = await res.json();
+    if (!data.ok) { alert(data.error || 'Erro ao adicionar.'); return; }
+    _escalas.push(data);
+    _escalas.sort(function(a, b) { return a.data_inicio.localeCompare(b.data_inicio); });
+    uEl.value = ''; diEl.value = ''; dfEl.value = '';
+    renderEscalas();
+  } catch (e) { alert('Erro de comunicação.'); }
+}
+
+async function delEscala(escalaId) {
+  if (!confirm('Remover esta escala?')) return;
+  try {
+    var res = await fetch('/admin/profissionais/' + _PROF_ID + '/escalas/' + escalaId + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (!data.ok) { alert('Erro ao remover.'); return; }
+    _escalas = _escalas.filter(function(e) { return e.id !== escalaId; });
+    renderEscalas();
+  } catch (e) { alert('Erro de comunicação.'); }
+}
+
+// Carrega escalas ao clicar na aba
+document.querySelectorAll('.ptab-btn').forEach(function(btn) {
+  if (btn.dataset.tab === 'escalas') {
+    btn.addEventListener('click', carregarEscalas);
+  }
+});
 </script>
 
 {% endblock %}

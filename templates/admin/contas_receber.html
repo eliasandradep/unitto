@@ -1,0 +1,209 @@
+{% extends 'admin/base.html' %}
+{% block title %}Contas a Receber{% endblock %}
+{% block page_title %}Financeiro / Contas a Receber{% endblock %}
+
+{% block content %}
+
+<!-- Totalizadores -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.2rem">
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">A Receber</div>
+    <div style="font-size:1.5rem;font-weight:600;color:var(--gold)">R$ {{ '%.2f'|format(total_pendente)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Recebido (filtro atual)</div>
+    <div style="font-size:1.5rem;font-weight:600;color:#27ae60">R$ {{ '%.2f'|format(total_recebido)|replace('.', ',') }}</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Vencimento De</label>
+      <input type="date" name="dt_ini" value="{{ dt_ini }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Até</label>
+      <input type="date" name="dt_fim" value="{{ dt_fim }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Status</label>
+      <select name="status">
+        <option value="" {% if status_f == '' %}selected{% endif %}>Todos</option>
+        <option value="pendente"  {% if status_f == 'pendente'  %}selected{% endif %}>Pendente</option>
+        <option value="recebido"  {% if status_f == 'recebido'  %}selected{% endif %}>Recebido</option>
+        <option value="cancelado" {% if status_f == 'cancelado' %}selected{% endif %}>Cancelado</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button type="submit" class="btn-primary">Buscar</button>
+      <a href="{{ url_for('admin.contas_receber') }}" class="btn-secondary">Limpar</a>
+    </div>
+  </form>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar" style="margin-bottom:.8rem">
+  <button type="button" class="btn-primary" onclick="document.getElementById('modalNovaConta').style.display='flex'">
+    + Nova Conta a Receber
+  </button>
+</div>
+
+<!-- Listagem -->
+<div class="card" style="padding:0;overflow:hidden">
+  {% if contas %}
+  <div style="overflow-x:auto">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Descrição</th>
+        <th>Cliente</th>
+        <th>Comanda</th>
+        <th>Vencimento</th>
+        <th style="text-align:right">Valor</th>
+        <th>Status</th>
+        <th>Recebido em</th>
+        <th>Forma</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cr in contas %}
+      <tr {% if cr.status == 'pendente' and cr.vencimento.isoformat() < hoje %}style="background:rgba(231,76,60,.06)"{% endif %}>
+        <td>{{ cr.descricao }}</td>
+        <td>
+          {% if cr.cliente %}
+            <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cr.cliente_id) }}" style="color:var(--gold)">{{ cr.cliente.nome }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if cr.comanda_id %}
+            <a href="{{ url_for('admin.comanda_detalhe', comanda_id=cr.comanda_id) }}" style="color:var(--gold)">#{{ cr.comanda.codigo if cr.comanda else cr.comanda_id }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {{ cr.vencimento.strftime('%d/%m/%Y') }}
+          {% if cr.status == 'pendente' and cr.vencimento.isoformat() < hoje %}
+            <span style="color:#e74c3c;font-size:.75rem;font-weight:600"> vencida</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">R$ {{ '%.2f'|format(cr.valor)|replace('.', ',') }}</td>
+        <td>
+          {% if cr.status == 'recebido' %}
+            <span class="badge badge-success">Recebido</span>
+          {% elif cr.status == 'cancelado' %}
+            <span class="badge" style="background:#95a5a6;color:#fff">Cancelado</span>
+          {% else %}
+            <span class="badge badge-warning">Pendente</span>
+          {% endif %}
+        </td>
+        <td>{{ cr.data_recebimento.strftime('%d/%m/%Y') if cr.data_recebimento else '—' }}</td>
+        <td>{{ dict(formas).get(cr.forma_pagamento, cr.forma_pagamento or '—') }}</td>
+        <td>
+          <div style="display:flex;gap:.4rem">
+            {% if cr.status == 'pendente' %}
+            <button type="button" class="btn-primary" style="padding:.25rem .7rem;font-size:.8rem"
+              onclick="abrirBaixa({{ cr.id }}, '{{ cr.descricao|e }}', '{{ '%.2f'|format(cr.valor)|replace('.', ',') }}')">
+              Receber
+            </button>
+            {% endif %}
+            <form method="POST" action="{{ url_for('admin.conta_receber_excluir', conta_id=cr.id) }}"
+                  onsubmit="return confirm('Excluir esta conta?')">
+              <button type="submit" class="btn-danger" style="padding:.25rem .7rem;font-size:.8rem">Excluir</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--text-muted)">Nenhuma conta encontrada.</div>
+  {% endif %}
+</div>
+
+<!-- Modal: Nova Conta a Receber -->
+<div id="modalNovaConta" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:100%;max-width:480px;padding:1.5rem;position:relative">
+    <button type="button" onclick="document.getElementById('modalNovaConta').style.display='none'"
+            style="position:absolute;top:.8rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted)">✕</button>
+    <h3 style="margin:0 0 1.2rem;font-size:1rem;font-weight:600">Nova Conta a Receber</h3>
+    <form method="POST" action="{{ url_for('admin.contas_receber') }}">
+      <input type="hidden" name="action" value="nova" />
+      <div class="form-group">
+        <label>Descrição <span class="required">*</span></label>
+        <input type="text" name="descricao" required placeholder="Ex: Mensalidade, Serviço avulso..." />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+        <div class="form-group">
+          <label>Valor (R$) <span class="required">*</span></label>
+          <input type="text" name="valor" required placeholder="0,00" />
+        </div>
+        <div class="form-group">
+          <label>Vencimento <span class="required">*</span></label>
+          <input type="date" name="vencimento" required value="{{ hoje }}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Cliente</label>
+        <select name="cliente_id">
+          <option value="">— Nenhum —</option>
+          {% for cl in clientes_list %}
+          <option value="{{ cl.id }}">{{ cl.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea name="observacoes" rows="2" placeholder="Opcional..."></textarea>
+      </div>
+      <div style="display:flex;gap:.7rem;justify-content:flex-end;margin-top:.5rem">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('modalNovaConta').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Receber (Baixa) -->
+<div id="modalBaixa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="card" style="width:100%;max-width:380px;padding:1.5rem;position:relative">
+    <button type="button" onclick="document.getElementById('modalBaixa').style.display='none'"
+            style="position:absolute;top:.8rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted)">✕</button>
+    <h3 style="margin:0 0 .4rem;font-size:1rem;font-weight:600">Registrar Recebimento</h3>
+    <p id="baixaDesc" style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem"></p>
+    <form id="formBaixa" method="POST">
+      <div class="form-group">
+        <label>Forma de Pagamento <span class="required">*</span></label>
+        <select name="forma_pagamento" required>
+          <option value="">— Selecionar —</option>
+          {% for val, label in formas %}
+          {% if val != 'saldo_cliente' %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Data do Recebimento</label>
+        <input type="date" name="data_recebimento" value="{{ hoje }}" />
+      </div>
+      <div style="display:flex;gap:.7rem;justify-content:flex-end;margin-top:.5rem">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('modalBaixa').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn-primary">Confirmar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function abrirBaixa(id, desc, valor) {
+  document.getElementById('baixaDesc').textContent = desc + ' — R$ ' + valor;
+  document.getElementById('formBaixa').action = '/admin/financeiro/contas-a-receber/' + id + '/receber';
+  document.getElementById('modalBaixa').style.display = 'flex';
+}
+</script>
+
+{% endblock %}

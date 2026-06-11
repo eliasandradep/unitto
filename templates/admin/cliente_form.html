@@ -188,17 +188,100 @@
   <div class="cli-side">
     {% if c %}
 
+    <!-- Banner de saldo -->
+    <div id="saldo" style="margin-bottom:.8rem">
+      {% set saldo_val = c.saldo or 0 %}
+      {% if saldo_val > 0 %}
+      <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:.8rem 1rem;display:flex;align-items:center;gap:.7rem">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#15803d" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <div>
+          <div style="font-weight:600;color:#15803d">Crédito disponível: R$ {{ '%.2f'|format(saldo_val)|replace('.', ',') }}</div>
+          <div style="font-size:.78rem;color:#166534">Pode ser usado como forma de pagamento em próximas comandas.</div>
+        </div>
+      </div>
+      {% elif saldo_val < 0 %}
+      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.8rem 1rem">
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#b91c1c" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <div style="font-weight:600;color:#b91c1c">Saldo devedor: R$ {{ '%.2f'|format(saldo_val|abs)|replace('.', ',') }}</div>
+            <div style="font-size:.78rem;color:#991b1b">Registre o recebimento abaixo para quitar o saldo.</div>
+          </div>
+        </div>
+        <!-- Formulário de recebimento -->
+        <form method="POST" action="{{ url_for('admin.cliente_receber_saldo', cliente_id=c.id) }}"
+              style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#991b1b;display:block;margin-bottom:.2rem">Valor Recebido (R$)</label>
+            <input type="text" name="valor"
+                   value="{{ '%.2f'|format(saldo_val|abs)|replace('.', ',') }}"
+                   style="width:100%;padding:.4rem .6rem;border:1px solid #fca5a5;border-radius:5px;font-size:.85rem"
+                   placeholder="0,00" required />
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#991b1b;display:block;margin-bottom:.2rem">Forma de Pagamento</label>
+            <select name="forma_pagamento" required
+                    style="width:100%;padding:.4rem .6rem;border:1px solid #fca5a5;border-radius:5px;font-size:.85rem;background:#fff">
+              <option value="">— Selecione —</option>
+              {% for val, label in formas %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#991b1b;display:block;margin-bottom:.2rem">Data do Recebimento</label>
+            <input type="date" name="data"
+                   value="{{ hoje if hoje is defined else '' }}"
+                   style="width:100%;padding:.4rem .6rem;border:1px solid #fca5a5;border-radius:5px;font-size:.85rem" required />
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#991b1b;display:block;margin-bottom:.2rem">Observação (opcional)</label>
+            <input type="text" name="observacao"
+                   style="width:100%;padding:.4rem .6rem;border:1px solid #fca5a5;border-radius:5px;font-size:.85rem"
+                   placeholder="ex: pagamento em atraso" />
+          </div>
+          <div style="grid-column:1/-1">
+            <button type="submit"
+                    style="background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;font-size:.85rem;font-weight:600;cursor:pointer;width:100%">
+              ✓ Registrar Recebimento
+            </button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <div style="background:var(--bg-muted);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;font-size:.82rem;color:var(--text-muted)">
+        Sem saldo em aberto.
+      </div>
+      {% endif %}
+    </div>
+
     <div class="cli-info-block">
       <div class="cli-info-hdr cli-info-hdr--open" onclick="toggleInfo(this)">
-        <span>Comportamento</span>
+        <span>Resumo do Cliente</span>
         <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="cli-info-body">
+        {% set saldo_val = c.saldo or 0 %}
         <div class="cli-info-row cli-info-row--total">
-          <span>Saldo do Cliente</span><strong>R$ 0,00</strong>
+          <span>Saldo</span>
+          <strong style="color:{% if saldo_val > 0 %}#15803d{% else %}var(--text-muted){% endif %}">
+            R$ {{ '%.2f'|format([saldo_val, 0]|max)|replace('.', ',') }}
+          </strong>
+        </div>
+        <div class="cli-info-row cli-info-row--total" style="margin-top:-.1rem">
+          <span>Saldo devedor</span>
+          <strong style="color:{% if saldo_val < 0 %}#b91c1c{% else %}var(--text-muted){% endif %}">
+            R$ {{ '%.2f'|format([(-saldo_val), 0]|max)|replace('.', ',') }}
+          </strong>
+        </div>
+        <div class="cli-info-divider" style="margin:.4rem 0"></div>
+        <div class="cli-info-row">
+          <span>Total Gasto</span>
+          <strong class="cli-val--gold">R$ {{ '%.2f'|format(total_gasto if total_gasto is defined else 0)|replace('.', ',') }}</strong>
         </div>
         <div class="cli-info-row">
-          <span>Total Gasto</span><strong class="cli-val--gold">R$ 0,00</strong>
+          <span>Visitas</span>
+          <strong>{{ visitas if visitas is defined else 0 }}</strong>
         </div>
         <div class="cli-info-divider"></div>
         <p class="cli-info-label">Operação</p>
@@ -219,6 +302,76 @@
         </a>
       </div>
     </div>
+
+    {% set dias_semana = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'] %}
+    {% set formas_map  = dict(formas) if formas is defined else {} %}
+
+    <div class="cli-info-block">
+      <div class="cli-info-hdr{% if comandas_hist is defined and comandas_hist %} cli-info-hdr--open{% endif %}" onclick="toggleInfo(this)">
+        <span>Comandas ({{ comandas_hist|length if comandas_hist is defined else 0 }})</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body"{% if not (comandas_hist is defined and comandas_hist) %} hidden{% endif %}>
+        {% if comandas_hist is defined and comandas_hist %}
+        {% for cmd in comandas_hist %}
+        {% set dia = dias_semana[cmd.data.weekday()] %}
+        <div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.78rem">
+            <span style="color:var(--text-muted)">{{ cmd.data.strftime('%d/%m/%Y') }} {{ dia }}</span>
+            {% if cmd.status == 'fechada' %}
+              <span style="background:#d1fae5;color:#065f46;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:600">FECHADA</span>
+            {% elif cmd.status == 'aberta' %}
+              <span style="background:#dbeafe;color:#1e40af;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:600">ABERTA</span>
+            {% else %}
+              <span style="background:#f3f4f6;color:#6b7280;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:600">{{ cmd.status|upper }}</span>
+            {% endif %}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:.2rem">
+            <a href="{{ url_for('admin.comanda_detalhe', comanda_id=cmd.id) }}"
+               style="font-weight:600;color:var(--primary);font-size:.82rem">#{{ cmd.codigo }}</a>
+            <div style="text-align:right;font-size:.78rem">
+              <span style="font-variant-numeric:tabular-nums">Total: R$ {{ '%.2f'|format(cmd.valor_total - (cmd.desconto or 0))|replace('.', ',') }}</span>
+              {% if cmd.saldo_ajustado is not none and cmd.saldo_ajustado != 0 %}
+              <div style="font-size:.71rem;{% if cmd.saldo_ajustado > 0 %}color:#b91c1c{% else %}color:#15803d{% endif %}">
+                Saldo: R$ {{ '%.2f'|format(cmd.saldo_ajustado|abs)|replace('.', ',') }}
+                {% if cmd.saldo_ajustado < 0 %} crédito{% else %} devedor{% endif %}
+              </div>
+              {% else %}
+              <div style="font-size:.71rem;color:var(--text-muted)">Saldo: R$ 0,00</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Nenhuma comanda registrada.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if recebimentos is defined and recebimentos %}
+    <div class="cli-info-block">
+      <div class="cli-info-hdr cli-info-hdr--open" onclick="toggleInfo(this)">
+        <span>Recebimentos de Saldo ({{ recebimentos | length }})</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body">
+        {% set formas_map = dict(formas) if formas is defined else {} %}
+        {% for r in recebimentos %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.79rem">
+          <div>
+            <span style="font-weight:500;color:#15803d">R$ {{ '%.2f'|format(r.valor)|replace('.', ',') }}</span>
+            <span style="color:var(--text-muted);margin-left:.4rem">{{ r.data.strftime('%d/%m/%Y') }}</span>
+            <span style="background:#d1fae5;color:#065f46;border-radius:3px;padding:1px 5px;font-size:.7rem;margin-left:.3rem">
+              {{ formas_map.get(r.forma_pagamento, r.forma_pagamento) }}
+            </span>
+            {% if r.observacao %}<div style="color:var(--text-muted);font-size:.73rem;margin-top:.1rem">{{ r.observacao }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <div class="cli-info-block">
       <div class="cli-info-hdr" onclick="toggleInfo(this)">
@@ -247,11 +400,62 @@
 
     <div class="cli-info-block">
       <div class="cli-info-hdr" onclick="toggleInfo(this)">
-        <span>Agendamentos</span>
+        <span>Agendamentos ({{ agendamentos_cli|length if agendamentos_cli is defined else 0 }})</span>
         <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="cli-info-body" hidden>
-        <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Integração com Gendo em breve.</p>
+        {% if agendamentos_cli is defined and agendamentos_cli %}
+        {% set status_cores = {'agendado':'#dbeafe:#1e40af', 'confirmado':'#d1fae5:#065f46', 'concluido':'#f3f4f6:#374151', 'cancelado':'#fee2e2:#991b1b', 'faltou':'#fef3c7:#92400e'} %}
+        {% for ag in agendamentos_cli %}
+        {% set dia = dias_semana[ag.data.weekday()] %}
+        <div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="color:var(--text-muted)">{{ ag.data.strftime('%d/%m/%Y') }} {{ dia }} · {{ ag.hora_inicio.strftime('%H:%M') }}</span>
+            <span style="border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:600;
+              {% if ag.status == 'agendado' %}background:#dbeafe;color:#1e40af
+              {% elif ag.status == 'confirmado' %}background:#d1fae5;color:#065f46
+              {% elif ag.status == 'concluido' %}background:#f3f4f6;color:#374151
+              {% elif ag.status == 'cancelado' %}background:#fee2e2;color:#991b1b
+              {% elif ag.status == 'faltou' %}background:#fef3c7;color:#92400e
+              {% endif %}">{{ ag.status|upper }}</span>
+          </div>
+          <div style="margin-top:.15rem;color:var(--text)">
+            {{ ag.servico.nome if ag.servico else '—' }}
+            <span style="color:var(--text-muted)"> · {{ ag.profissional.nome if ag.profissional else '—' }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Nenhum agendamento encontrado.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cli-info-block">
+      <div class="cli-info-hdr" onclick="toggleInfo(this)">
+        <span>Mensagens WhatsApp ({{ msgs_wa|length if msgs_wa is defined else 0 }})</span>
+        <svg class="cli-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cli-info-body" hidden>
+        {% if msgs_wa is defined and msgs_wa %}
+        {% for ag in msgs_wa %}
+        {% set dia = dias_semana[ag.data.weekday()] %}
+        <div style="padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
+            <span style="font-weight:600;color:var(--text)">{{ ag.data.strftime('%d/%m/%Y') }} {{ ag.hora_inicio.strftime('%H:%M') }}</span>
+            <span style="color:var(--text-muted)">TEL: {{ c.telefone or '—' }}</span>
+          </div>
+          <div style="background:var(--bg-muted);border-radius:5px;padding:.3rem .5rem;color:var(--text-muted);font-size:.75rem;line-height:1.4">
+            Lembrete enviado: agendamento para {{ dia }}, {{ ag.data.strftime('%d/%m') }}
+            às {{ ag.hora_inicio.strftime('%H:%M') }}
+            {% if ag.servico %} — {{ ag.servico.nome }}{% endif %}
+            {% if ag.profissional %} com {{ ag.profissional.nome }}{% endif %}.
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0">Nenhuma mensagem enviada.</p>
+        {% endif %}
       </div>
     </div>
 

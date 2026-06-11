@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Admin{% endblock %} — {{ current_user.studio.nome }}</title>
+  <title>{% block title %}Admin{% endblock %} — {{ empresa.nome if empresa else 'Unitto' }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
-  {% if theme_css %}<style>{{ theme_css | safe }}</style>{% endif %}
 </head>
 <body class="admin-body">
 
@@ -15,17 +14,8 @@
 
     <!-- Marca -->
     <div class="sidebar__brand">
-      <div class="sidebar__brand-icon" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
-          <circle cx="16" cy="16" r="14" fill="var(--primary,#c9a27e)" opacity=".15"/>
-          <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle"
-                font-family="Jost,sans-serif" font-size="14" font-weight="600"
-                fill="var(--primary,#c9a27e)">
-            {{ current_user.studio.nome[:2].upper() }}
-          </text>
-        </svg>
-      </div>
-      <span class="sidebar__brand-text">{{ current_user.studio.nome }}</span>
+      <div class="sidebar__logo" style="width:32px;height:32px;background:#c1904f;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.95rem;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:-.02em">U</div>
+      <span class="sidebar__brand-text">{{ empresa.nome if empresa else 'Unitto' }}</span>
     </div>
 
     <!-- Navegação -->
@@ -35,7 +25,7 @@
       {% set in_clientes   = 'lead' in ep or 'cliente' in ep or ep == 'admin.aniversariantes' %}
       {% set in_servicos   = ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe','admin.categorias','admin.pacotes'] %}
       {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
-      {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep %}
+      {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' %}
       {% set in_relatorios = ep == 'admin.metrics' %}
       {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades'] %}
 
@@ -80,6 +70,9 @@
         <div class="snav-group-items">
           <a href="{{ url_for('admin.financeiro') }}"          class="snav-sub {% if ep == 'admin.financeiro' %}active{% endif %}">Dashboard</a>
           <a href="{{ url_for('admin.financeiro_comandas') }}" class="snav-sub {% if 'comanda' in ep and 'venda_pacote' not in ep %}active{% endif %}">Comandas</a>
+          <a href="{{ url_for('admin.comissoes') }}"            class="snav-sub {% if ep == 'admin.comissoes' %}active{% endif %}">Comissões</a>
+          <a href="{{ url_for('admin.contas_pagar') }}"        class="snav-sub {% if 'conta_pagar' in ep %}active{% endif %}">Contas a Pagar</a>
+          <a href="{{ url_for('admin.contas_receber') }}"      class="snav-sub {% if 'conta_receber' in ep %}active{% endif %}">Contas a Receber</a>
           <a href="{{ url_for('admin.vendas_pacote') }}"       class="snav-sub {% if 'venda_pacote' in ep %}active{% endif %}">Vendas de Pacote</a>
         </div>
       </div>
@@ -96,9 +89,9 @@
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
         <div class="snav-group-items">
-          <a href="{{ url_for('admin.leads') }}"            class="snav-sub {% if 'lead' in ep %}active{% endif %}">Leads</a>
-          <a href="{{ url_for('admin.clientes') }}"         class="snav-sub {% if 'cliente' in ep %}active{% endif %}">Listagem</a>
-          <a href="{{ url_for('admin.aniversariantes') }}"  class="snav-sub {% if ep == 'admin.aniversariantes' %}active{% endif %}">Aniversários</a>
+          <a href="{{ url_for('admin.leads') }}"         class="snav-sub {% if 'lead' in ep %}active{% endif %}">Leads</a>
+          <a href="{{ url_for('admin.clientes') }}"      class="snav-sub {% if 'cliente' in ep %}active{% endif %}">Listagem</a>
+          <a href="{{ url_for('admin.aniversariantes') }}" class="snav-sub {% if ep == 'admin.aniversariantes' %}active{% endif %}">Aniversários</a>
         </div>
       </div>
 
@@ -127,10 +120,22 @@
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
         <div class="snav-group-items">
-          <a href="{{ url_for('admin.servicos') }}"   class="snav-sub {% if ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe'] %}active{% endif %}">Listagem</a>
-          <a href="{{ url_for('admin.categorias') }}" class="snav-sub {% if ep == 'admin.categorias' %}active{% endif %}">Categorias</a>
-          <a href="{{ url_for('admin.pacotes') }}"    class="snav-sub {% if ep == 'admin.pacotes' %}active{% endif %}">Pacotes</a>
+          <a href="{{ url_for('admin.servicos') }}"    class="snav-sub {% if ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe'] %}active{% endif %}">Listagem</a>
+          <a href="{{ url_for('admin.categorias') }}"  class="snav-sub {% if ep == 'admin.categorias' %}active{% endif %}">Categorias</a>
+          <a href="{{ url_for('admin.pacotes') }}"     class="snav-sub {% if ep == 'admin.pacotes' %}active{% endif %}">Pacotes</a>
         </div>
+      </div>
+
+      <!-- Produtos (em breve) -->
+      <div class="snav-group snav-group--soon">
+        <a href="javascript:void(0)" class="snav-group-btn" data-tooltip="Produtos">
+          <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+          <span class="snav-label">Produtos</span>
+          <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
       </div>
 
       <!-- Profissionais -->
@@ -144,8 +149,19 @@
         </a>
         <div class="snav-group-items">
           <a href="{{ url_for('admin.profissionais') }}" class="snav-sub {% if ep == 'admin.profissionais' %}active{% endif %}">Listagem</a>
-          <a href="{{ url_for('admin.expedientes') }}"  class="snav-sub {% if ep == 'admin.expedientes' %}active{% endif %}">Expedientes</a>
+          <a href="{{ url_for('admin.expedientes') }}"  class="snav-sub {% if ep == 'admin.expedientes'  %}active{% endif %}">Expedientes</a>
         </div>
+      </div>
+
+      <!-- Divulgação (em breve) -->
+      <div class="snav-group snav-group--soon">
+        <a href="javascript:void(0)" class="snav-group-btn" data-tooltip="Divulgação">
+          <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          <span class="snav-label">Divulgação</span>
+          <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
       </div>
 
       <!-- Configurar -->
@@ -159,9 +175,9 @@
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
         <div class="snav-group-items">
-          <a href="{{ url_for('admin.unidades') }}"      class="snav-sub {% if ep == 'admin.unidades' %}active{% endif %}">Unidades</a>
-          <a href="{{ url_for('admin.users') }}"         class="snav-sub {% if 'user' in ep %}active{% endif %}">Usuários</a>
-          <a href="{{ url_for('admin.themes') }}"        class="snav-sub {% if 'theme' in ep %}active{% endif %}">Temas</a>
+          <a href="{{ url_for('admin.unidades') }}"     class="snav-sub {% if ep == 'admin.unidades' %}active{% endif %}">Unidades</a>
+          <a href="{{ url_for('admin.users') }}"        class="snav-sub {% if 'user' in ep %}active{% endif %}">Usuários</a>
+          <a href="{{ url_for('admin.themes') }}"       class="snav-sub {% if 'theme' in ep %}active{% endif %}">Temas</a>
           <a href="{{ url_for('admin.configuracoes') }}" class="snav-sub {% if ep == 'admin.configuracoes' %}active{% endif %}">Configurações</a>
         </div>
       </div>
@@ -170,10 +186,11 @@
 
     <!-- Rodapé -->
     <div class="sidebar__footer">
+      <a href="{{ url_for('billing.planos') }}" target="_blank" class="sidebar__site-link">Planos →</a>
       <a href="{{ url_for('admin.logout') }}" class="sidebar__logout">Sair</a>
     </div>
 
-    <!-- Botão colapso -->
+    <!-- Botão colapso (base do sidebar) -->
     <button class="sidebar__collapse-btn" id="sidebarToggle" title="Recolher menu">
       <svg class="sidebar__collapse-icon" viewBox="0 0 24 24" width="18" height="18"
            fill="none" stroke="currentColor" stroke-width="2">
@@ -196,8 +213,97 @@
         </button>
         <h1 class="admin-topbar__title">{% block page_title %}{% endblock %}</h1>
       </div>
+
+      <!-- Menu + Criar -->
+      <div class="criar-wrap" id="criarWrap">
+        <button type="button" class="criar-btn" id="criarBtn" onclick="toggleCriar(event)">
+          + Criar
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:.25rem"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="criar-menu" id="criarMenu">
+          <a href="{{ url_for('admin.agenda') }}" class="criar-item" id="criarAgendamento">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Novo Agendamento
+          </a>
+          <a href="{{ url_for('admin.agenda_bloqueios') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+            Novo Bloqueio
+          </a>
+          <div class="criar-divider"></div>
+          <a href="{{ url_for('admin.comanda_nova') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Nova Venda / Comanda
+          </a>
+          <a href="{{ url_for('admin.venda_pacote_nova') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+            Nova Venda de Pacote
+          </a>
+          <div class="criar-divider"></div>
+          <a href="{{ url_for('admin.cliente_novo') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
+            </svg>
+            Novo Cliente
+          </a>
+          <a href="{{ url_for('admin.profissional_novo') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Novo Profissional
+          </a>
+        </div>
+      </div>
+
       <span class="admin-topbar__user">{{ current_user.name }}</span>
     </header>
+
+    {% if setup_pendente and request.endpoint != 'admin.boas_vindas' %}
+    <div style="background:#fff3cd;border-bottom:1px solid #ffc107;padding:.45rem 1.4rem;
+                font-size:.82rem;display:flex;align-items:center;gap:.6rem;color:#856404">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+      </svg>
+      Configuração inicial incompleta.
+      <a href="{{ url_for('admin.boas_vindas') }}"
+         style="color:#856404;font-weight:600;text-decoration:underline">Ver checklist →</a>
+    </div>
+    {% endif %}
+
+    <style>
+    .criar-wrap { position: relative; }
+    .criar-btn {
+      display: flex; align-items: center; gap: .15rem;
+      padding: .42rem .85rem; font-size: .83rem; font-weight: 600;
+      background: var(--gold-dark); color: #fff; border: none;
+      border-radius: var(--radius); cursor: pointer;
+      transition: background .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .criar-btn:hover { background: var(--gold); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    .criar-menu {
+      display: none; position: absolute; top: calc(100% + 6px); right: 0;
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 4px 16px rgba(0,0,0,.12); min-width: 210px; z-index: 900;
+      padding: .35rem 0;
+    }
+    .criar-menu.open { display: block; }
+    .criar-item {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .55rem 1rem; font-size: .84rem; color: var(--text);
+      text-decoration: none; transition: background .12s;
+    }
+    .criar-item:hover { background: #f5f2ee; }
+    .criar-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-muted); }
+    .criar-divider { height: 1px; background: var(--border); margin: .3rem 0; }
+    </style>
 
     <div class="admin-content">
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -212,8 +318,8 @@
 
 <script>
 (function () {
-  const KEY     = 'osbeauty_sidebar_col';
-  const GRP_KEY = 'osbeauty_sidebar_grps';
+  const KEY     = 'rrbc_sidebar_col';
+  const GRP_KEY = 'rrbc_sidebar_grps';
   const body    = document.body;
   const sidebar = document.getElementById('sidebar');
 
@@ -232,11 +338,13 @@
   document.getElementById('sidebarToggle')?.addEventListener('click', toggle);
   document.getElementById('topbarToggle')?.addEventListener('click', toggle);
 
+  // Restore saved collapse state (no transition flash)
   if (localStorage.getItem(KEY) === '1') {
     body.classList.add('sidebar--collapsed');
     sidebar.style.overflow = 'visible';
   }
 
+  // Group toggle
   window.toggleGroup = function(id) {
     const grp = document.getElementById(id);
     if (!grp) return;
@@ -248,6 +356,7 @@
     } catch(e) {}
   };
 
+  // Restore saved group open states (skip groups already opened server-side)
   try {
     const states = JSON.parse(localStorage.getItem(GRP_KEY) || '{}');
     Object.keys(states).forEach(function(id) {
@@ -256,6 +365,18 @@
       if (states[id] === '1') grp.classList.add('snav-group--open');
     });
   } catch(e) {}
+
+  // ── Menu + Criar ──────────────────────────────────────────────────────────
+  window.toggleCriar = function(e) {
+    e.stopPropagation();
+    document.getElementById('criarMenu').classList.toggle('open');
+  };
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('criarMenu');
+    if (menu && !document.getElementById('criarWrap').contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
 })();
 </script>
 

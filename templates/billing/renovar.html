@@ -1,0 +1,58 @@
+{% extends 'billing/base.html' %}
+{% block title %}Assinatura expirada{% endblock %}
+
+{% block content %}
+<div style="text-align:center;max-width:520px;margin:2rem auto 0">
+  <div style="font-size:3rem;margin-bottom:.8rem">⏰</div>
+  <h1 style="margin:0 0 .5rem;font-size:1.5rem;font-weight:700">
+    {% if empresa and empresa.plano == 'trial' %}
+      Seu período de trial expirou
+    {% else %}
+      Assinatura expirada
+    {% endif %}
+  </h1>
+  <p style="color:#666;margin:0 0 1.5rem">
+    Para continuar usando o sistema, escolha um plano e ative sua assinatura.
+  </p>
+  <a href="{{ url_for('billing.planos') }}" class="btn-primary"
+     style="font-size:1rem;padding:.7rem 2rem">
+    Ver planos e assinar
+  </a>
+  <div style="margin-top:1rem">
+    <a href="{{ url_for('admin.login') }}" style="font-size:.82rem;color:#888">
+      Já tem assinatura? Entre na sua conta
+    </a>
+  </div>
+</div>
+
+<!-- Tabela resumida -->
+<div class="plan-grid" style="margin-top:2.5rem">
+  {% for plano in planos %}
+  <div class="plan-card {{ 'plan-card--destaque' if plano.slug == 'pro' }}">
+    {% if plano.slug == 'pro' %}<span class="plan-badge">Mais popular</span>{% endif %}
+    <div class="plan-nome">{{ plano.nome }}</div>
+    <div class="plan-preco-anual">
+      R${{ '%g' % plano.preco_anual_mensal }}<span style="font-size:.9rem;font-weight:400">/mês</span>
+    </div>
+    <div class="plan-preco-sub">no plano anual</div>
+    <hr class="plan-divider" />
+    <div class="plan-feature">{{ plano.max_profissionais }} profissional(is)</div>
+    <div class="plan-feature">{{ plano.max_wa_mes }} WA/mês</div>
+    <div class="plan-cta">
+      {% if current_user.is_authenticated %}
+      <form method="POST" action="{{ url_for('billing.checkout') }}">
+        <input type="hidden" name="plano_id" value="{{ plano.id }}" />
+        <input type="hidden" name="periodo" value="anual" />
+        <button type="submit" class="{{ 'btn-primary' if plano.slug == 'pro' else 'btn-secondary' }}"
+                style="width:100%;padding:.5rem">Assinar</button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('signup.signup') }}"
+         class="{{ 'btn-primary' if plano.slug == 'pro' else 'btn-secondary' }}"
+         style="display:block;text-align:center;padding:.5rem">Assinar</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

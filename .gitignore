@@ -1,11 +1,29 @@
+﻿# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-.env
-*.db
-*.sqlite3
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+
+# Virtual environments
 .venv/
 venv/
+env/
+.env
+
+# Flask
 instance/
-.DS_Store
+*.db
+
+# IDE
 .vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

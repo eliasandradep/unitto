@@ -1,0 +1,71 @@
+{% extends 'admin/base.html' %}
+{% block title %}Importar Clientes{% endblock %}
+{% block page_title %}Importar Clientes via CSV{% endblock %}
+
+{% block content %}
+<div class="toolbar" style="margin-bottom:1.5rem">
+  <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">← Voltar para Clientes</a>
+</div>
+
+<div class="card" style="max-width:700px">
+  <h3 style="margin-top:0">Enviar arquivo CSV</h3>
+
+  <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.clientes_importar_csv') }}">
+    <div class="form-group">
+      <label class="form-label">Arquivo CSV <span style="color:var(--danger)">*</span></label>
+      <input type="file" name="arquivo" accept=".csv,text/csv" required class="form-control">
+      <small style="color:var(--text-muted)">Delimitador: ponto-e-vírgula (;) ou vírgula (,). Codificação: UTF-8 ou Latin-1.</small>
+    </div>
+
+    <div class="form-group" style="margin-top:1rem">
+      <label class="form-label">Clientes já existentes (mesmo telefone)</label>
+      <div style="display:flex;gap:1.5rem;margin-top:.4rem">
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <input type="radio" name="modo_duplicata" value="pular" checked> Pular (manter cadastro atual)
+        </label>
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <input type="radio" name="modo_duplicata" value="atualizar"> Atualizar campos preenchidos no CSV
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem;display:flex;gap:.75rem;align-items:center">
+      <button type="submit" class="btn-primary">Importar</button>
+      <a href="{{ url_for('admin.clientes_csv_template') }}" class="btn-secondary">
+        ↓ Baixar planilha modelo
+      </a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="max-width:700px;margin-top:1.5rem">
+  <h4 style="margin-top:0">Colunas aceitas</h4>
+  <p style="color:var(--text-muted);font-size:.85rem;margin-top:0">
+    O cabeçalho não diferencia maiúsculas/minúsculas. Colunas desconhecidas são ignoradas.
+    <strong>Nome</strong> e <strong>Telefone</strong> são obrigatórios; os demais são opcionais.
+  </p>
+  <table class="data-table" style="font-size:.85rem">
+    <thead>
+      <tr><th>Campo</th><th>Nomes aceitos</th><th>Formato</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Nome</strong> *</td><td>Nome, name, cliente</td><td>Texto</td></tr>
+      <tr><td><strong>Telefone</strong> *</td><td>Telefone, fone, celular, whatsapp, tel</td><td>(35) 99999-0001</td></tr>
+      <tr><td>Email</td><td>Email, e-mail</td><td>Texto</td></tr>
+      <tr><td>CPF</td><td>CPF</td><td>Texto</td></tr>
+      <tr><td>Aniversario</td><td>Aniversario, nascimento, data_nascimento</td><td>DD/MM/AAAA ou AAAA-MM-DD</td></tr>
+      <tr><td>Sexo</td><td>Sexo, genero</td><td>M / F</td></tr>
+      <tr><td>CEP</td><td>CEP</td><td>Texto</td></tr>
+      <tr><td>Endereco</td><td>Endereco, endereço, rua, logradouro</td><td>Texto</td></tr>
+      <tr><td>Numero</td><td>Numero, número, nº, num</td><td>Texto</td></tr>
+      <tr><td>Complemento</td><td>Complemento, compl</td><td>Texto</td></tr>
+      <tr><td>Bairro</td><td>Bairro</td><td>Texto</td></tr>
+      <tr><td>Cidade</td><td>Cidade, city</td><td>Texto</td></tr>
+      <tr><td>Estado</td><td>Estado, uf</td><td>MG, SP …</td></tr>
+      <tr><td>Descricao</td><td>Descricao, obs, notas</td><td>Texto livre</td></tr>
+      <tr><td>Telefone_fixo</td><td>Telefone_fixo, fixo</td><td>Texto</td></tr>
+      <tr><td>Como_conheceu</td><td>Como_conheceu, indicacao, origem</td><td>Texto</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

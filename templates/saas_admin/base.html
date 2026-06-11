@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SaaS Admin{% endblock %} — Unitto</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    .saas-header {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: .8rem 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: .85rem;
+    }
+    .saas-header strong { color: #fff; font-size: 1rem; }
+    .saas-header a { color: #a0c4ff; text-decoration: none; }
+    .saas-header a:hover { text-decoration: underline; }
+    .saas-badge {
+      background: #e74c3c;
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .15rem .5rem;
+      border-radius: 99px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .saas-content { padding: 1.5rem; }
+  </style>
+</head>
+<body class="admin-body" style="margin:0;padding:0">
+
+  <div class="saas-header">
+    <span class="saas-badge">SaaS Admin</span>
+    <strong>Unitto — Admin</strong>
+    <span style="margin-left:auto;display:flex;gap:1rem;align-items:center">
+      {{ current_user.name }}
+      <a href="{{ url_for('admin.logout') }}">Sair</a>
+    </span>
+  </div>
+
+  <div class="saas-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert--{{ 'success' if cat == 'success' else 'error' }}"
+             style="margin-bottom:1rem;padding:.6rem 1rem;border-radius:6px;
+                    background:{{ '#d4edda' if cat == 'success' else '#f8d7da' }};
+                    color:{{ '#155724' if cat == 'success' else '#721c24' }}">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+</body>
+</html>

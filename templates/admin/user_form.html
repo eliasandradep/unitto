@@ -31,6 +31,20 @@
       <label>Confirmar senha</label>
       <input type="password" name="confirm" />
     </div>
+    {% if current_user.has_role('empresa_admin', 'saas_admin') %}
+    <div class="form-group">
+      <label>Papel (nível de acesso)</label>
+      <select name="role">
+        {% for role_val, role_label in roles %}
+          {% if role_val != 'saas_admin' or current_user.role == 'saas_admin' %}
+          <option value="{{ role_val }}" {{ 'selected' if user and user.role == role_val else '' }}>
+            {{ role_label }}
+          </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <div class="form-actions">
       <button type="submit" class="btn-primary">{{ 'Salvar alterações' if user else 'Criar usuário' }}</button>
       <a href="{{ url_for('admin.users') }}" class="btn-secondary">Cancelar</a>

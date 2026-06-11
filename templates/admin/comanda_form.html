@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% set readonly = c and c.status == 'fechada' %}
+{% set readonly = c and c.status == 'fechada' and not current_user.has_role('empresa_admin', 'saas_admin') %}
 
 <form method="POST" id="comandaForm">
 
@@ -40,17 +40,31 @@
                  {% if readonly %}disabled{% endif %} />
         </div>
         <div class="form-group">
-          <label>Cadastro do cliente</label>
-          <select name="cliente_id" {% if readonly %}disabled{% endif %} id="clienteSelect">
-            <option value="">Nenhum</option>
-            {% for cl in clientes %}
-            <option value="{{ cl.id }}"
-                    data-saldo="{{ cl.saldo or 0 }}"
-                    {% if c and c.cliente_id == cl.id %}selected{% endif %}>
-              {{ cl.nome }} — {{ cl.telefone }}
-            </option>
-            {% endfor %}
-          </select>
+          {% if c and c.cliente %}
+            {# Cliente vinculado: mostra só o telefone #}
+            <label>Telefone</label>
+            <input type="text" readonly
+                   value="{{ c.cliente.telefone or 'Não informado' }}"
+                   style="background:var(--bg-muted);cursor:default" />
+            <input type="hidden" name="cliente_id" id="clienteSelect"
+                   value="{{ c.cliente_id }}"
+                   data-saldo="{{ c.cliente.saldo or 0 }}" />
+          {% else %}
+            {# Sem vínculo: mostra seletor para corrigir #}
+            <label>Cadastro do cliente
+              <span style="color:#b45309;font-size:.75rem;font-weight:400"> — sem vínculo, saldo não será transferido</span>
+            </label>
+            <select name="cliente_id" id="clienteSelect" {% if readonly %}disabled{% endif %}>
+              <option value="" data-tel="" data-saldo="0">— Nenhum —</option>
+              {% for cl in clientes %}
+              <option value="{{ cl.id }}"
+                      data-tel="{{ cl.telefone or '' }}"
+                      data-saldo="{{ cl.saldo or 0 }}">
+                {{ cl.nome }}{% if cl.telefone %} — {{ cl.telefone }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          {% endif %}
         </div>
       </div>
 
@@ -101,11 +115,8 @@
 
     <!-- Itens da comanda -->
     <div class="card" style="padding:1.2rem 1.4rem">
-      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text);display:flex;justify-content:space-between;align-items:center">
-        <span>Serviços / Produtos</span>
-        {% if not readonly %}
-        <button type="button" class="btn-secondary" style="font-size:.78rem;padding:.3rem .7rem" onclick="addItem()">+ Adicionar item</button>
-        {% endif %}
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">
+        Serviços / Produtos
       </div>
 
       <div id="itensList">
@@ -127,10 +138,10 @@
               <input type="text" name="item_valor" value="{{ '%.2f'|format(item.valor)|replace('.', ',') }}"
                      placeholder="0,00" {% if readonly %}disabled{% endif %} />
             </div>
-            <div>
+            <div style="min-width:0">
               <label style="font-size:.75rem;color:var(--text-muted)">Qtd</label>
               <input type="number" name="item_quantidade" value="{{ item.quantidade }}" min="1" step="1"
-                     {% if readonly %}disabled{% endif %} />
+                     style="width:100%" {% if readonly %}disabled{% endif %} />
             </div>
             <input type="hidden" name="item_servico_id" value="{{ item.servico_id or '' }}" />
             <input type="hidden" name="item_venda_pacote_item_id" value="{{ item.venda_pacote_item_id or '' }}" />
@@ -150,54 +161,57 @@
         Nenhum item adicionado.
       </div>
 
-      <!-- Seletor rápido de serviço -->
+      <!-- Inserir serviço do catálogo -->
       <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)">
-        <label style="font-size:.75rem;color:var(--text-muted)">Adicionar serviço do catálogo</label>
-        <div style="display:flex;gap:.5rem;margin-top:.3rem">
-          <select id="svcPicker" style="flex:1">
-            <option value="">Selecione um serviço...</option>
-            {% for s in servicos %}
-            <option value="{{ s.id }}"
-                    data-nome="{{ s.nome }}"
-                    data-preco="{{ '%.2f'|format(s.preco)|replace('.', ',') if s.preco else '0,00' }}">
-              {{ s.nome }}{% if s.preco %} — R$ {{ '%.2f'|format(s.preco)|replace('.', ',') }}{% endif %}
-            </option>
-            {% endfor %}
-          </select>
-          <button type="button" class="btn-secondary" onclick="addFromCatalog()">Inserir</button>
+        <div style="display:grid;grid-template-columns:1fr 110px 70px auto;gap:.5rem;align-items:flex-end">
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Serviço</label>
+            <select id="svcPicker" onchange="onSvcPickerChange(this)" style="width:100%">
+              <option value="">Selecione um serviço...</option>
+              {% for s in servicos %}
+              <option value="{{ s.id }}"
+                      data-nome="{{ s.nome }}"
+                      data-preco="{{ '%.2f'|format(s.preco)|replace('.', ',') if s.preco else '0,00' }}">
+                {{ s.nome }}{% if s.preco %} — R$ {{ '%.2f'|format(s.preco)|replace('.', ',') }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Valor (R$)</label>
+            <input type="text" id="svcValorInput" placeholder="0,00" style="width:100%"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addFromCatalog();}" />
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Qtd</label>
+            <input type="number" id="svcQtdInput" value="1" min="1" step="1" style="width:100%"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addFromCatalog();}" />
+          </div>
+          <button type="button" class="btn-secondary" style="white-space:nowrap"
+                  onclick="addFromCatalog()">Inserir</button>
         </div>
       </div>
       {% endif %}
 
     </div>
 
-    {% if not readonly %}
-    <!-- Ações de salvar -->
-    <div style="display:flex;gap:.7rem">
+    <div style="display:flex;gap:.7rem;align-items:center">
+      {% if not readonly %}
       <button type="submit" class="btn-primary">Salvar comanda</button>
       <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary">Cancelar</a>
-      {% if c %}
-      <form method="POST" action="{{ url_for('admin.comanda_excluir', comanda_id=c.id) }}"
-            style="margin-left:auto"
-            onsubmit="return confirm('Excluir esta comanda permanentemente?')">
-        <button type="submit" class="btn-danger">Excluir comanda</button>
-      </form>
+      {% else %}
+      <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary">← Voltar</a>
+      {% endif %}
+      {% if c and current_user.has_role('empresa_admin', 'saas_admin') %}
+      <button type="button" class="btn-danger" style="margin-left:auto"
+              onclick="confirmarExclusao()">Excluir comanda</button>
       {% endif %}
     </div>
-    {% else %}
-    <div style="display:flex;gap:.7rem">
-      <a href="{{ url_for('admin.financeiro_comandas') }}" class="btn-secondary">← Voltar</a>
-      <form method="POST" action="{{ url_for('admin.comanda_excluir', comanda_id=c.id) }}"
-            onsubmit="return confirm('Excluir esta comanda permanentemente?')">
-        <button type="submit" class="btn-danger">Excluir comanda</button>
-      </form>
-    </div>
-    {% endif %}
 
   </div>
 
   <!-- ── Coluna direita: pagamentos ── -->
-  <div style="display:flex;flex-direction:column;gap:1rem">
+  <div style="display:flex;flex-direction:column;gap:1rem;position:sticky;top:1rem;align-self:start">
 
     <!-- Resumo financeiro -->
     <div class="card" style="padding:1.2rem 1.4rem">
@@ -205,13 +219,13 @@
       <table style="width:100%;font-size:.88rem;border-collapse:collapse">
         <tr>
           <td style="padding:.35rem 0;color:var(--text-muted)">Subtotal</td>
-          <td style="text-align:right;font-variant-numeric:tabular-nums">
+          <td id="resumo_subtotal" style="text-align:right;font-variant-numeric:tabular-nums">
             R$ {{ '%.2f'|format(c.valor_total if c else 0)|replace('.', ',') }}
           </td>
         </tr>
         <tr>
           <td style="padding:.35rem 0;color:var(--text-muted)">Desconto</td>
-          <td style="text-align:right;color:var(--text-muted);font-size:.83rem">
+          <td id="resumo_desconto" style="text-align:right;color:var(--text-muted);font-size:.83rem">
             R$ {{ '%.2f'|format(c.desconto if c and c.desconto else 0)|replace('.', ',') }}
           </td>
         </tr>
@@ -223,7 +237,7 @@
         </tr>
         <tr style="border-top:1px solid var(--border)">
           <td style="padding:.5rem 0 0;font-weight:600">Saldo</td>
-          <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;
+          <td id="resumo_saldo" style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;
                      padding-top:.5rem;
                      color:{% if c and c.saldo > 0 %}#b45309{% else %}#15803d{% endif %}">
             R$ {{ '%.2f'|format(c.saldo if c else 0)|replace('.', ',') }}
@@ -309,7 +323,7 @@
         </div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('admin.comanda_pagamento_add', comanda_id=c.id) }}">
+        <form method="POST" action="{{ url_for('admin.comanda_pagamento_add', comanda_id=c.id) }}" id="pagamentoForm">
           <div class="form-group" style="margin-bottom:.5rem">
             <label style="font-size:.75rem">Forma</label>
             <select name="forma_pagamento" required id="formaPagSelect">
@@ -327,7 +341,11 @@
           </div>
           <div class="form-row" style="margin-bottom:.5rem" id="parcelasRow">
             <div class="form-group" style="margin:0">
-              <label style="font-size:.75rem">Valor (R$)</label>
+              <label style="font-size:.75rem;display:flex;justify-content:space-between;align-items:center">
+                Valor (R$)
+                <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--gold-dark);cursor:pointer;padding:0"
+                        onclick="preencherSaldo()">↙ usar saldo</button>
+              </label>
               <input type="text" name="valor" id="valorPagInput" placeholder="0,00" required />
             </div>
             <div class="form-group" style="margin:0" id="parcelasGroup">
@@ -366,18 +384,68 @@
 </div>
 </form>
 
+{% if c and current_user.has_role('empresa_admin', 'saas_admin') %}
+<form id="deleteCmdForm" method="POST"
+      action="{{ url_for('admin.comanda_excluir', comanda_id=c.id) }}"
+      style="display:none"></form>
+{% endif %}
+
 <script>
-// Saldo do cliente + pacotes ativos ao trocar cliente
+// ── Recálculo dinâmico do Resumo ─────────────────────────────────────────────
+var _VALOR_PAGO = {{ (c.valor_pago | float) if c else 0 }};
+
+function recalc() {
+  var subtotal = 0;
+  document.querySelectorAll('#itensList .item-row').forEach(function(row) {
+    var vInp = row.querySelector('[name="item_valor"]');
+    var qInp = row.querySelector('[name="item_quantidade"]');
+    var v = parseFloat((vInp ? vInp.value : '0').replace(',', '.')) || 0;
+    var q = parseInt(qInp ? qInp.value : '1') || 1;
+    subtotal += v * q;
+  });
+  var dInp = document.querySelector('[name="desconto"]');
+  var desconto = parseFloat((dInp ? dInp.value : '0').replace(',', '.')) || 0;
+  var saldo = subtotal - desconto - _VALOR_PAGO;
+
+  var fmt = function(n) { return 'R$ ' + n.toFixed(2).replace('.', ','); };
+  var elS = document.getElementById('resumo_subtotal');
+  var elD = document.getElementById('resumo_desconto');
+  var elR = document.getElementById('resumo_saldo');
+  if (elS) elS.textContent = fmt(subtotal);
+  if (elD) elD.textContent = fmt(desconto);
+  if (elR) {
+    elR.textContent = fmt(saldo);
+    elR.style.color = saldo > 0 ? '#b45309' : '#15803d';
+  }
+  // Pré-preenche campo de valor do pagamento com saldo restante
+  var vPag = document.getElementById('valorPagInput');
+  if (vPag && !vPag.value && saldo > 0)
+    vPag.placeholder = saldo.toFixed(2).replace('.', ',');
+}
+
+// Event delegation: captura mudanças em inputs adicionados dinamicamente
+document.getElementById('itensList').addEventListener('input', recalc);
+var dInpGlobal = document.querySelector('[name="desconto"]');
+if (dInpGlobal) dInpGlobal.addEventListener('input', recalc);
+
+// ── Saldo do cliente + pacotes ativos ao trocar cliente ──────────────────────
 (function() {
   var sel = document.getElementById('clienteSelect');
   var box = document.getElementById('clienteSaldoBox');
   if (!sel) return;
 
+  function _clienteOpt() {
+    if (sel.tagName === 'SELECT') return sel.options[sel.selectedIndex] || null;
+    return sel; // hidden input — use dataset directly
+  }
+
+  function updateTelBox() { /* telefone já é read-only quando vinculado */ }
+
   function updateSaldoBox() {
     if (!box) return;
-    var opt = sel.selectedOptions[0];
-    var saldo = parseFloat(opt ? opt.dataset.saldo : 0) || 0;
-    if (!opt || !opt.value) { box.style.display = 'none'; return; }
+    var opt = _clienteOpt();
+    var saldo = parseFloat((opt ? opt.dataset.saldo : null) || 0) || 0;
+    if (!sel.value) { box.style.display = 'none'; return; }
     box.style.display = '';
     if (saldo > 0) {
       box.style.cssText = 'display:block;padding:.5rem .7rem;border-radius:6px;font-size:.82rem;margin-bottom:.5rem;background:#d1fae5;color:#065f46';
@@ -395,10 +463,10 @@
     var painel = document.getElementById('painelPacotes');
     var lista  = document.getElementById('listaPacotesAtivos');
     if (!painel || !lista) return;
-    var opt = sel.selectedOptions[0];
-    if (!opt || !opt.value) { painel.style.display = 'none'; return; }
+    var cliId = sel.tagName === 'SELECT' ? sel.value : sel.value;
+    if (!cliId) { painel.style.display = 'none'; return; }
     try {
-      const resp = await fetch(`/admin/api/clientes/${opt.value}/pacotes-ativos`);
+      const resp = await fetch(`/admin/api/clientes/${cliId}/pacotes-ativos`);
       const data = await resp.json();
       if (!data.length) { painel.style.display = 'none'; return; }
       lista.innerHTML = '';
@@ -423,9 +491,11 @@
   }
 
   sel.addEventListener('change', function() {
+    updateTelBox();
     updateSaldoBox();
     carregarPacotesAtivos();
   });
+  updateTelBox();
   updateSaldoBox();
   carregarPacotesAtivos();
 })();
@@ -456,12 +526,13 @@ function usarSessaoPacote(nome, svcId, vpItemId) {
   });
 })();
 
-function addItem(nome, valor, svcId, vpItemId, isPacote) {
+function addItem(nome, valor, svcId, vpItemId, isPacote, qtd) {
   nome     = nome     || '';
   valor    = valor    || '';
   svcId    = svcId    || '';
   vpItemId = vpItemId || '';
   isPacote = !!isPacote;
+  qtd      = qtd      || '1';
   var list = document.getElementById('itensList');
   var empty = document.getElementById('itemsEmpty');
   if (empty) empty.style.display = 'none';
@@ -481,9 +552,9 @@ function addItem(nome, valor, svcId, vpItemId, isPacote) {
       <label style="font-size:.75rem;color:var(--text-muted)">Valor (R$)</label>
       <input type="text" name="item_valor" value="${escHtml(valor)}" placeholder="0,00" />
     </div>
-    <div>
+    <div style="min-width:0">
       <label style="font-size:.75rem;color:var(--text-muted)">Qtd</label>
-      <input type="number" name="item_quantidade" value="1" min="1" step="1" />
+      <input type="number" name="item_quantidade" value="${escHtml(qtd)}" min="1" step="1" style="width:100%" />
     </div>
     <input type="hidden" name="item_servico_id" value="${escHtml(svcId)}" />
     <input type="hidden" name="item_venda_pacote_item_id" value="${escHtml(vpItemId)}" />
@@ -491,6 +562,7 @@ function addItem(nome, valor, svcId, vpItemId, isPacote) {
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>`;
   list.appendChild(row);
+  recalc();
 }
 
 function removeItem(btn) {
@@ -498,19 +570,79 @@ function removeItem(btn) {
   var list = document.getElementById('itensList');
   var empty = document.getElementById('itemsEmpty');
   if (empty && list.querySelectorAll('.item-row').length === 0) empty.style.display = '';
+  recalc();
+}
+
+function onSvcPickerChange(sel) {
+  var inp = document.getElementById('svcValorInput');
+  if (!sel.value || !inp) return;
+  var opt = sel.selectedOptions[0];
+  inp.value = opt.dataset.preco || '';
+  inp.focus();
+  inp.select();
 }
 
 function addFromCatalog() {
   var sel = document.getElementById('svcPicker');
-  if (!sel.value) return;
-  var opt = sel.selectedOptions[0];
-  addItem(opt.dataset.nome, opt.dataset.preco, sel.value);
+  var inp = document.getElementById('svcValorInput');
+  var qtd = document.getElementById('svcQtdInput');
+  if (!sel.value) { sel.focus(); return; }
+  var opt   = sel.selectedOptions[0];
+  var valor = (inp && inp.value.trim()) ? inp.value.trim() : (opt.dataset.preco || '');
+  var qty   = (qtd && qtd.value) ? qtd.value : '1';
+  addItem(opt.dataset.nome, valor, sel.value, '', false, qty);
   sel.value = '';
+  if (inp) inp.value = '';
+  if (qtd) qtd.value = '1';
+  sel.focus();
 }
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+function confirmarExclusao() {
+  if (!confirm('Excluir esta comanda permanentemente?\nO agendamento vinculado NÃO será excluído.')) return;
+  document.getElementById('deleteCmdForm').submit();
+}
+
+function preencherSaldo() {
+  var elR = document.getElementById('resumo_saldo');
+  var vPag = document.getElementById('valorPagInput');
+  if (!elR || !vPag) return;
+  var txt = elR.textContent.replace('R$','').replace(/\s/g,'').replace(',','.');
+  var saldo = parseFloat(txt) || 0;
+  if (saldo > 0) vPag.value = saldo.toFixed(2).replace('.', ',');
+}
+
+// Recalcula ao carregar (itens já salvos)
+recalc();
+
+// ── Auto-save da comanda antes de registrar pagamento ─────────────────────────
+(function() {
+  var pagForm = document.getElementById('pagamentoForm');
+  if (!pagForm) return;
+  var _saving = false;
+
+  pagForm.addEventListener('submit', function(e) {
+    if (_saving) return;          // segunda chamada após o fetch: deixa passar
+    var cmdForm = document.getElementById('comandaForm');
+    if (!cmdForm) return;
+
+    e.preventDefault();
+    _saving = true;
+    var btn = pagForm.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+
+    var autosaveUrl = window.location.pathname.replace(/\/$/, '') + '/autosave';
+    fetch(autosaveUrl, { method: 'POST', body: new FormData(cmdForm) })
+      .catch(function() { /* ignora erros — não bloqueia o pagamento */ })
+      .finally(function() {
+        if (btn) { btn.disabled = false; btn.textContent = 'Registrar'; }
+        pagForm.submit();   // submete o pagamento (sem interceptar — _saving=true)
+      });
+  });
+})();
 </script>
 
 {% endblock %}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Planos{% endblock %} — Unitto</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    body { background:#f5f5f7; margin:0; }
+    .bill-header {
+      background:#1a1a2e; color:#fff; padding:.8rem 1.5rem;
+      display:flex; align-items:center; justify-content:space-between;
+      font-size:.85rem;
+    }
+    .bill-header a { color:#a0c4ff; text-decoration:none; }
+    .bill-header a:hover { text-decoration:underline; }
+    .bill-body { max-width:1100px; margin:0 auto; padding:2rem 1.5rem; }
+    .plan-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+      gap:1.2rem; margin:2rem 0;
+    }
+    .plan-card {
+      background:#fff; border-radius:12px; padding:1.5rem;
+      box-shadow:0 2px 12px rgba(0,0,0,.07); border:2px solid transparent;
+      display:flex; flex-direction:column; gap:.5rem; position:relative;
+    }
+    .plan-card--destaque { border-color:var(--primary,#c1904f); }
+    .plan-badge {
+      position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+      background:var(--primary,#c1904f); color:#fff;
+      font-size:.7rem; font-weight:700; padding:.2rem .8rem;
+      border-radius:99px; white-space:nowrap; text-transform:uppercase;
+    }
+    .plan-nome { font-size:1.1rem; font-weight:700; }
+    .plan-preco-anual { font-size:2rem; font-weight:700; line-height:1; }
+    .plan-preco-sub { font-size:.78rem; color:#888; }
+    .plan-preco-mensal { font-size:.82rem; color:#aaa; text-decoration:line-through; }
+    .plan-divider { border:none; border-top:1px solid #f0f0f0; margin:.5rem 0; }
+    .plan-feature { font-size:.83rem; color:#444; display:flex; align-items:flex-start; gap:.45rem; }
+    .plan-feature svg { flex-shrink:0; margin-top:.1rem; color:var(--primary,#c1904f); }
+    .plan-feature--muted { color:#aaa; }
+    .plan-cta { margin-top:auto; padding-top:.8rem; }
+    .periodo-toggle {
+      display:flex; align-items:center; justify-content:center; gap:.8rem;
+      margin-bottom:1.5rem; font-size:.9rem;
+    }
+    .toggle-label { font-weight:500; cursor:pointer; }
+    .toggle-label--active { color:var(--primary,#c1904f); font-weight:700; }
+    .economia-badge {
+      background:#d4edda; color:#155724; font-size:.72rem;
+      font-weight:700; padding:.15rem .55rem; border-radius:99px;
+    }
+  </style>
+</head>
+<body>
+  <div class="bill-header">
+    <strong>Unitto — Planos</strong>
+    <span>
+      {% if current_user.is_authenticated %}
+        {{ current_user.name }}
+        {% if empresa %}· {{ empresa.nome }}{% endif %}
+        &nbsp;·&nbsp; <a href="{{ url_for('admin.dashboard') }}">Painel</a>
+        &nbsp;·&nbsp; <a href="{{ url_for('admin.logout') }}">Sair</a>
+      {% else %}
+        <a href="{{ url_for('admin.login') }}">Entrar</a>
+        &nbsp;·&nbsp;
+        <a href="{{ url_for('signup.signup') }}">Criar conta</a>
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="bill-body">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div style="padding:.6rem 1rem;border-radius:6px;margin-bottom:1rem;
+                    background:{{ '#d4edda' if cat == 'success' else '#f8d7da' }};
+                    color:{{ '#155724' if cat == 'success' else '#721c24' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

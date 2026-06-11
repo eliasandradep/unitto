@@ -26,7 +26,7 @@
     <div class="form-group" style="margin:0">
       <label style="font-size:.8rem">Status</label>
       <select name="status">
-        <option value="">Todos</option>
+        <option value="" {% if status_f == '' %}selected{% endif %}>Todas</option>
         <option value="aberta"  {% if status_f == 'aberta'  %}selected{% endif %}>Aberta</option>
         <option value="fechada" {% if status_f == 'fechada' %}selected{% endif %}>Fechada</option>
       </select>
@@ -139,12 +139,12 @@
 <form id="deleteForm" method="POST" style="display:none"></form>
 
 <script>
-const DEL_BASE = "{{ url_for('admin.comanda_excluir', comanda_id=0) }}".replace('/0/', '/');
+const DEL_TMPL = "{{ url_for('admin.comanda_excluir', comanda_id=0) }}";
 
 function excluirComanda(id) {
   if (!confirm('Excluir esta comanda permanentemente?')) return;
   var f = document.getElementById('deleteForm');
-  f.action = DEL_BASE + id + '/excluir';
+  f.action = DEL_TMPL.replace('/0/', '/' + id + '/');
   f.submit();
 }
 function toggleAll(chk) {
