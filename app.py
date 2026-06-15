@@ -1,5 +1,5 @@
 import os
-from flask import Flask, redirect, url_for
+from flask import Flask, render_template
 from flask_login import LoginManager
 from dotenv import load_dotenv
 
@@ -367,7 +367,7 @@ def inject_globals():
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return redirect(url_for('admin.login'))
+    return render_template('landing.html')
 
 
 @app.route('/ping')

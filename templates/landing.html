@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unitto — Plataforma de Gestão para Salões de Beleza</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}" />
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────── -->
+<header class="nav">
+  <div class="nav__inner">
+    <a href="#" class="nav__logo">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Unitto" />
+      <span class="nav__logo-name">Unitto</span>
+    </a>
+    <nav class="nav__links">
+      <a href="#funcionalidades" class="nav__link">Funcionalidades</a>
+      <a href="#planos" class="nav__link">Planos</a>
+    </nav>
+    <a href="{{ url_for('admin.login') }}" class="nav__cta">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      Acessar minha conta
+    </a>
+  </div>
+</header>
+
+<!-- ── Hero ────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero__badge">Plataforma SaaS para Beleza</div>
+  <h1 class="hero__title">
+    Gerencie seu salão com<br />
+    <span>inteligência e simplicidade</span>
+  </h1>
+  <p class="hero__sub">
+    Agenda, financeiro, clientes, comissões e muito mais — tudo em um único lugar para você focar no que realmente importa.
+  </p>
+  <div class="hero__actions">
+    <a href="{{ url_for('signup.index') }}" class="btn-hero-primary">Começar gratuitamente</a>
+    <a href="#planos" class="btn-hero-secondary">Ver planos →</a>
+  </div>
+  <div class="hero__logos">Utilizado por salões em todo o Brasil</div>
+</section>
+
+<!-- ── Funcionalidades ──────────────────────────────────────── -->
+<section class="section section--alt" id="funcionalidades">
+  <div class="container">
+    <div class="features-head">
+      <p class="section__label">Funcionalidades</p>
+      <h2 class="section__title">Tudo que seu salão precisa</h2>
+      <p class="section__sub">Ferramentas completas para gestão profissional, do agendamento ao fechamento do caixa.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Agenda Inteligente</h3>
+        <p class="feature-card__desc">Calendário visual por profissional, com controle de bloqueios, expedientes e agendamentos simultâneos.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Gestão de Clientes</h3>
+        <p class="feature-card__desc">CRM completo com histórico, anamnese, aniversariantes, importação em massa e controle de leads.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Financeiro Completo</h3>
+        <p class="feature-card__desc">Comandas, contas a pagar e receber, controle de caixa e relatórios financeiros detalhados.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Comissões de Profissionais</h3>
+        <p class="feature-card__desc">Calcule e gerencie comissões automaticamente por serviço, com controle de pagamento por profissional.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 12V22H4V12"/>
+            <path d="M22 7H2v5h20V7z"/>
+            <path d="M12 22V7"/>
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Pacotes de Serviços</h3>
+        <p class="feature-card__desc">Crie e venda pacotes personalizados, com controle de uso e validade por cliente.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Relatórios e Métricas</h3>
+        <p class="feature-card__desc">Dashboards com indicadores de performance, faturamento, ticket médio e muito mais.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Multi-unidades</h3>
+        <p class="feature-card__desc">Gerencie todas as suas unidades em um único painel, com dados separados por filial.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Personalização de Tema</h3>
+        <p class="feature-card__desc">Adapte a identidade visual do sistema às cores da sua marca com temas personalizáveis.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.38 2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/>
+          </svg>
+        </div>
+        <h3 class="feature-card__title">Integração com WhatsApp</h3>
+        <p class="feature-card__desc">Envie lembretes e confirmações de agendamento diretamente pelo WhatsApp para seus clientes.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Planos ────────────────────────────────────────────────── -->
+<section class="section" id="planos">
+  <div class="container">
+    <div class="pricing-head">
+      <p class="section__label">Planos</p>
+      <h2 class="section__title">Escolha o plano ideal</h2>
+      <p class="section__sub">Sem taxas ocultas. Cancele quando quiser.</p>
+    </div>
+
+    <div class="billing-toggle">
+      <span id="label-mensal" class="active">Mensal</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="billing-switch" onchange="toggleBilling()" />
+        <span class="toggle-switch__slider"></span>
+      </label>
+      <span id="label-anual">Anual</span>
+      <span class="badge-economy">Economize 20%</span>
+    </div>
+
+    <div class="plans-grid">
+
+      <!-- Lite -->
+      <div class="plan-card">
+        <p class="plan-card__name">Lite</p>
+        <div class="plan-card__price">
+          <span class="plan-card__currency">R$</span>
+          <span class="plan-card__amount" data-mensal="97" data-anual="77">97</span>
+          <span class="plan-card__period">/mês</span>
+        </div>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$924/ano" data-mensal="">&nbsp;</p>
+        <div class="plan-card__divider"></div>
+        <ul class="plan-card__features">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            1 profissional
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Agenda e agendamentos
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Gestão de clientes
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            100 mensagens WhatsApp/mês
+          </li>
+          <li class="disabled">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Relatórios avançados
+          </li>
+          <li class="disabled">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Multi-unidades
+          </li>
+        </ul>
+        <a href="{{ url_for('signup.index') }}" class="btn-plan btn-plan--outline">Começar agora</a>
+      </div>
+
+      <!-- Plus (popular) -->
+      <div class="plan-card plan-card--popular">
+        <div class="plan-card__badge">Mais popular</div>
+        <p class="plan-card__name">Plus</p>
+        <div class="plan-card__price">
+          <span class="plan-card__currency">R$</span>
+          <span class="plan-card__amount" data-mensal="197" data-anual="157">197</span>
+          <span class="plan-card__period">/mês</span>
+        </div>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$1.884/ano" data-mensal="">&nbsp;</p>
+        <div class="plan-card__divider"></div>
+        <ul class="plan-card__features">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Até 5 profissionais
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Agenda e agendamentos
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Financeiro completo
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            500 mensagens WhatsApp/mês
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Relatórios avançados
+          </li>
+          <li class="disabled">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Multi-unidades
+          </li>
+        </ul>
+        <a href="{{ url_for('signup.index') }}" class="btn-plan btn-plan--fill">Começar agora</a>
+      </div>
+
+      <!-- Pro -->
+      <div class="plan-card">
+        <p class="plan-card__name">Pro</p>
+        <div class="plan-card__price">
+          <span class="plan-card__currency">R$</span>
+          <span class="plan-card__amount" data-mensal="297" data-anual="237">297</span>
+          <span class="plan-card__period">/mês</span>
+        </div>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$2.844/ano" data-mensal="">&nbsp;</p>
+        <div class="plan-card__divider"></div>
+        <ul class="plan-card__features">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Até 15 profissionais
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Tudo do Plus
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Multi-unidades
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            2.000 mensagens WhatsApp/mês
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            10 agendamentos simultâneos
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Suporte prioritário
+          </li>
+        </ul>
+        <a href="{{ url_for('signup.index') }}" class="btn-plan btn-plan--outline">Começar agora</a>
+      </div>
+
+      <!-- Black -->
+      <div class="plan-card" style="border-color:#1E1610; background: linear-gradient(160deg, #1E1610 0%, #2C1F13 100%); color:#fff;">
+        <p class="plan-card__name" style="color:rgba(255,255,255,.5)">Black</p>
+        <div class="plan-card__price">
+          <span class="plan-card__currency" style="color:var(--gold)">R$</span>
+          <span class="plan-card__amount" data-mensal="497" data-anual="397" style="color:#fff">497</span>
+          <span class="plan-card__period" style="color:rgba(255,255,255,.5)">/mês</span>
+        </div>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$4.764/ano" data-mensal="" style="color:rgba(255,255,255,.4)">&nbsp;</p>
+        <div class="plan-card__divider" style="background:rgba(255,255,255,.1)"></div>
+        <ul class="plan-card__features">
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Até 50 profissionais
+          </li>
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Tudo do Pro
+          </li>
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            10.000 mensagens WhatsApp/mês
+          </li>
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            30 agendamentos simultâneos
+          </li>
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Gerente de conta dedicado
+          </li>
+          <li style="color:rgba(255,255,255,.85)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Integração personalizada
+          </li>
+        </ul>
+        <a href="{{ url_for('signup.index') }}" class="btn-plan btn-plan--fill">Começar agora</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Banner ───────────────────────────────────────────── -->
+<section class="cta-banner">
+  <div class="container">
+    <h2 class="cta-banner__title">Pronto para transformar sua gestão?</h2>
+    <p class="cta-banner__sub">Comece hoje e veja a diferença em poucos dias.</p>
+    <div class="cta-banner__actions">
+      <a href="{{ url_for('signup.index') }}" class="btn-hero-primary">Criar conta grátis</a>
+      <a href="{{ url_for('admin.login') }}" class="btn-hero-secondary">Já tenho uma conta</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ───────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__brand">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Unitto" />
+      <span class="footer__brand-name">Unitto</span>
+    </div>
+    <p class="footer__copy">© {{ 2025 }} Unitto. Todos os direitos reservados.</p>
+    <nav class="footer__links">
+      <a href="{{ url_for('admin.login') }}">Login</a>
+      <a href="#planos">Planos</a>
+      <a href="#funcionalidades">Funcionalidades</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+function toggleBilling() {
+  const isAnual = document.getElementById('billing-switch').checked;
+
+  document.getElementById('label-mensal').classList.toggle('active', !isAnual);
+  document.getElementById('label-anual').classList.toggle('active', isAnual);
+
+  document.querySelectorAll('.plan-card__amount').forEach(el => {
+    el.textContent = isAnual ? el.dataset.anual : el.dataset.mensal;
+  });
+
+  document.querySelectorAll('.billing-note').forEach(el => {
+    el.textContent = isAnual ? el.dataset.anual : ' ';
+  });
+}
+</script>
+
+</body>
+</html>
