@@ -35,7 +35,7 @@ img  { display: block; max-width: 100%; }
   overflow: visible;
 }
 .nav__logo { display: flex; align-items: flex-end; gap: .65rem; overflow: visible; }
-.nav__logo img { height: 130px; position: relative; z-index: 101; margin-bottom: -64px; }
+.nav__logo img { height: 150px; position: relative; z-index: 101; margin-bottom: -84px; }
 .nav__logo-name { font-weight: 700; font-size: 1.1rem; letter-spacing: -.02em; color: var(--navy); }
 .nav__links { display: flex; align-items: center; gap: 2rem; }
 .nav__link { font-size: .9rem; color: var(--muted); font-weight: 500; transition: color .2s; }
@@ -52,7 +52,7 @@ img  { display: block; max-width: 100%; }
 
 /* ── Hero ────────────────────────────────────────────────── */
 .hero {
-  background: linear-gradient(145deg, #0D1B4B 0%, #1B2D6E 50%, #1E3E9E 100%);
+  background: linear-gradient(145deg, #06080F 0%, #0D1220 50%, #111827 100%);
   color: #fff;
   padding: 6rem 2rem 5rem;
   text-align: center;
@@ -260,7 +260,7 @@ img  { display: block; max-width: 100%; }
 
 /* ── CTA Banner ──────────────────────────────────────────── */
 .cta-banner {
-  background: linear-gradient(135deg, #0D1B4B 0%, var(--navy) 50%, var(--navy-mid) 100%);
+  background: linear-gradient(135deg, #06080F 0%, #0D1220 50%, #111827 100%);
   color: #fff; text-align: center;
   padding: 5rem 2rem;
 }
@@ -273,7 +273,7 @@ img  { display: block; max-width: 100%; }
 
 /* ── Footer ──────────────────────────────────────────────── */
 .footer {
-  background: #0D1B4B;
+  background: #06080F;
   color: rgba(255,255,255,.5);
   padding: 3rem 2rem;
 }
