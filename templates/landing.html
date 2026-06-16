@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Unitto — Plataforma de Gestão para Salões de Beleza</title>
+  <title>Unitto — Plataforma de Gestão Unificada</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}" />
@@ -34,19 +34,19 @@
 
 <!-- ── Hero ────────────────────────────────────────────────── -->
 <section class="hero">
-  <div class="hero__badge">Plataforma SaaS para Beleza</div>
+  <div class="hero__badge">Plataforma de Gestão Unificada</div>
   <h1 class="hero__title">
-    Gerencie seu salão com<br />
+    Gerencie seu negócio com<br />
     <span>inteligência e simplicidade</span>
   </h1>
   <p class="hero__sub">
-    Agenda, financeiro, clientes, comissões e muito mais — tudo em um único lugar para você focar no que realmente importa.
+    CRM, agenda, financeiro, estoque, clientes e muito mais — tudo em um único lugar para você focar no que realmente importa.
   </p>
   <div class="hero__actions">
     <a href="{{ url_for('signup.signup') }}" class="btn-hero-primary">Começar gratuitamente</a>
     <a href="#planos" class="btn-hero-secondary">Ver planos →</a>
   </div>
-  <div class="hero__logos">Utilizado por salões em todo o Brasil</div>
+  <div class="hero__logos">Utilizado por empresas em todo o Brasil</div>
 </section>
 
 <!-- ── Funcionalidades ──────────────────────────────────────── -->
@@ -54,8 +54,8 @@
   <div class="container">
     <div class="features-head">
       <p class="section__label">Funcionalidades</p>
-      <h2 class="section__title">Tudo que seu salão precisa</h2>
-      <p class="section__sub">Ferramentas completas para gestão profissional, do agendamento ao fechamento do caixa.</p>
+      <h2 class="section__title">Tudo que seu negócio precisa</h2>
+      <p class="section__sub">Ferramentas completas para gestão profissional, do primeiro contato ao fechamento do caixa.</p>
     </div>
 
     <div class="features-grid">
@@ -350,8 +350,8 @@
 <!-- ── CTA Banner ───────────────────────────────────────────── -->
 <section class="cta-banner">
   <div class="container">
-    <h2 class="cta-banner__title">Pronto para transformar sua gestão?</h2>
-    <p class="cta-banner__sub">Comece hoje e veja a diferença em poucos dias.</p>
+    <h2 class="cta-banner__title">Pronto para centralizar sua gestão?</h2>
+    <p class="cta-banner__sub">Comece hoje e tenha controle total do seu negócio em um só lugar.</p>
     <div class="cta-banner__actions">
       <a href="{{ url_for('signup.signup') }}" class="btn-hero-primary">Criar conta grátis</a>
       <a href="{{ url_for('admin.login') }}" class="btn-hero-secondary">Já tenho uma conta</a>
