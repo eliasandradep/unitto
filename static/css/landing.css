@@ -33,7 +33,7 @@ img  { display: block; max-width: 100%; }
   padding: 0 2rem; height: 66px;
 }
 .nav__logo { display: flex; align-items: center; gap: .65rem; }
-.nav__logo img { height: 36px; }
+.nav__logo img { height: 56px; }
 .nav__logo-name { font-weight: 700; font-size: 1.1rem; letter-spacing: -.02em; color: var(--navy); }
 .nav__links { display: flex; align-items: center; gap: 2rem; }
 .nav__link { font-size: .9rem; color: var(--muted); font-weight: 500; transition: color .2s; }
