@@ -30,7 +30,7 @@ img  { display: block; max-width: 100%; }
 .nav__inner {
   max-width: 1160px; margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 2rem; height: 84px;
+  padding: 0 2rem; height: 66px;
 }
 .nav__logo { display: flex; align-items: center; gap: .65rem; }
 .nav__logo img { height: 72px; }
