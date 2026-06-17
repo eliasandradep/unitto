@@ -1,9 +1,261 @@
 {% extends 'admin/base.html' %}
-{% block title %}Configurações{% endblock %}
-{% block page_title %}Configurações{% endblock %}
+{% block title %}Empresa{% endblock %}
+{% block page_title %}Empresa{% endblock %}
 
 {% block content %}
 
+{# ── Perfil da Empresa ─────────────────────────────────────────────────────── #}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Perfil da Empresa</h3>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.configuracoes') }}">
+    <input type="hidden" name="section" value="empresa" />
+
+    <div class="form-group">
+      <label>Nome da empresa <span class="required">*</span></label>
+      <input type="text" name="nome" value="{{ empresa.nome if empresa else '' }}"
+             required placeholder="Nome exibido na plataforma" />
+    </div>
+
+    <div class="form-group">
+      <label>Endereço na plataforma</label>
+      {% if empresa %}
+      <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg-sidebar,#f8f5f3);
+                  border:1px solid var(--border);border-radius:var(--radius);
+                  padding:.55rem .8rem;font-size:.85rem;color:var(--text-muted)">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+             style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span>unitto.app/<strong style="color:var(--text)">{{ empresa.slug }}</strong></span>
+        <span style="margin-left:auto;font-size:.75rem;background:var(--border);
+                     padding:.15rem .45rem;border-radius:3px">slug: {{ empresa.slug }}</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+        Para usar domínio próprio, fale com o suporte.
+      </p>
+      {% else %}
+      <p style="font-size:.82rem;color:var(--text-muted)">Empresa não identificada.</p>
+      {% endif %}
+    </div>
+
+    {# Logo ── só visível para planos pagos #}
+    <div class="form-group">
+      <label>Logomarca</label>
+      {% if logo_habilitado %}
+        {% if empresa and empresa.logo_url %}
+        <div style="margin-bottom:.7rem">
+          {% if empresa.logo_url.startswith('http') %}
+          <img src="{{ empresa.logo_url }}"
+          {% else %}
+          <img src="{{ url_for('static', filename=empresa.logo_url) }}"
+          {% endif %}
+               alt="Logo atual" style="max-height:80px;max-width:240px;border-radius:4px;
+                                       border:1px solid var(--border);padding:4px;background:#fff" />
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Logo atual — envie uma nova para substituir.</p>
+        </div>
+        {% endif %}
+        <input type="file" name="logo" accept=".jpg,.jpeg,.png,.gif,.webp,.svg"
+               style="font-size:.85rem" />
+        <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+          JPG, PNG, WebP, GIF ou SVG. Recomendado: fundo transparente, até 1 MB.
+        </p>
+      {% else %}
+        <div style="display:flex;align-items:center;gap:.6rem;background:#FEF9E7;
+                    border:1px solid #F0CA4D;border-radius:var(--radius);
+                    padding:.6rem .9rem;font-size:.82rem;color:#7D6608">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+            <circle cx="12" cy="16" r=".5" fill="currentColor"/>
+          </svg>
+          Disponível nos planos pagos.
+          <a href="{{ url_for('billing.planos') }}" target="_blank"
+             style="color:#7D6608;font-weight:600;text-decoration:underline;margin-left:.2rem">Ver planos →</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="form-actions" style="margin-top:.8rem">
+      <button type="submit" class="btn-primary">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+             style="margin-right:.3rem"><polyline points="20 6 9 17 4 12"/></svg>
+        Salvar dados
+      </button>
+    </div>
+  </form>
+</div>
+
+
+{# ── Unidades ──────────────────────────────────────────────────────────────── #}
+<div style="margin-bottom:1.5rem">
+
+  <div class="toolbar" style="margin-bottom:.8rem">
+    <h3 style="font-size:.95rem;font-weight:600;margin:0">Unidades</h3>
+    <button type="button" class="btn-primary" onclick="openModal()">+ Nova Unidade</button>
+  </div>
+
+  {% if unidades %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem">
+    {% for u in unidades %}
+    <div class="card" style="padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.5rem;
+                              border-left:3px solid {{ 'var(--gold-dark)' if u.ativo else 'var(--border)' }}">
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+        <span style="font-weight:600;font-size:.92rem">{{ u.nome }}</span>
+        {% if u.ativo %}
+        <span class="badge badge--convertido" style="flex-shrink:0">Ativa</span>
+        {% else %}
+        <span class="badge badge--perdido" style="flex-shrink:0">Inativa</span>
+        {% endif %}
+      </div>
+
+      <div style="font-size:.8rem;color:var(--text-muted);display:flex;flex-direction:column;gap:.15rem">
+        {% if u.cidade or u.estado %}
+        <span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"
+               style="vertical-align:middle;margin-right:.2rem">
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          {{ [u.cidade, u.estado] | select | join(', ') }}
+        </span>
+        {% endif %}
+        {% if u.telefone %}
+        <span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"
+               style="vertical-align:middle;margin-right:.2rem">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12
+                     19.79 19.79 0 0 1 1.61 3.46 2 2 0 0 1 3.58 1.27h3a2 2 0 0 1 2 1.72
+                     12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91
+                     a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45
+                     12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          {{ u.telefone }}
+        </span>
+        {% endif %}
+        <span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"
+               style="vertical-align:middle;margin-right:.2rem">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          {{ u.profissionais | selectattr('ativo') | list | length }} profissional(is) ativo(s)
+        </span>
+      </div>
+
+      <div style="display:flex;gap:.35rem;margin-top:.3rem;padding-top:.6rem;border-top:1px solid var(--border)">
+        <button type="button" class="btn-icon btn-icon--edit" title="Editar"
+                data-id="{{ u.id }}"
+                data-nome="{{ u.nome }}"
+                data-cidade="{{ u.cidade or '' }}"
+                data-estado="{{ u.estado or '' }}"
+                data-telefone="{{ u.telefone or '' }}"
+                onclick="editUnidade(this)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <form method="POST" style="display:inline">
+          <input type="hidden" name="section" value="unidades" />
+          <input type="hidden" name="action" value="toggle" />
+          <input type="hidden" name="id" value="{{ u.id }}" />
+          {% if u.ativo %}
+          <button type="submit" class="btn-icon btn-icon--deact" title="Desativar">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          </button>
+          {% else %}
+          <button type="submit" class="btn-icon btn-icon--act" title="Ativar">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+          {% endif %}
+        </form>
+        <form method="POST" style="display:inline"
+              onsubmit="return confirm('Excluir esta unidade permanentemente?')">
+          <input type="hidden" name="section" value="unidades" />
+          <input type="hidden" name="action" value="delete" />
+          <input type="hidden" name="id" value="{{ u.id }}" />
+          <button type="submit" class="btn-icon btn-icon--danger" title="Excluir">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="card" style="padding:2.5rem;text-align:center;color:var(--text-muted)">
+    <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5"
+         style="margin-bottom:.8rem;opacity:.35">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    <p style="margin:0 0 .8rem">Nenhuma unidade cadastrada ainda.</p>
+    <button type="button" class="btn-primary" onclick="openModal()">Cadastrar primeira unidade</button>
+  </div>
+  {% endif %}
+
+</div>
+
+
+{# ── Modal Unidade ─────────────────────────────────────────────────────────── #}
+<div class="modal-backdrop" id="modalBackdrop" onclick="handleBackdropClick(event)">
+  <div class="modal" id="unidadeModal">
+    <div class="modal__header">
+      <h3 id="modalTitle">Nova Unidade</h3>
+      <button type="button" class="modal__close" onclick="closeModal()" title="Fechar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <form method="POST" id="unidadeForm">
+        <input type="hidden" name="section" value="unidades" />
+        <input type="hidden" name="action" value="save" />
+        <input type="hidden" name="id" id="fldId" value="" />
+
+        <div class="form-group">
+          <label>Nome <span class="required">*</span></label>
+          <input type="text" name="nome" id="fldNome" required placeholder="ex: Centro — Varginha" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cidade</label>
+            <input type="text" name="cidade" id="fldCidade" placeholder="ex: Varginha" />
+          </div>
+          <div class="form-group" style="max-width:90px">
+            <label>Estado</label>
+            <input type="text" name="estado" id="fldEstado" maxlength="2" placeholder="MG"
+                   style="text-transform:uppercase" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="tel" name="telefone" id="fldTelefone" placeholder="(00) 00000-0000" />
+        </div>
+        <div class="form-actions" style="margin-top:1.2rem">
+          <button type="submit" class="btn-primary">Salvar</button>
+          <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+{# ── Mensagem de Aniversário ───────────────────────────────────────────────── #}
 <div class="card" style="max-width:640px">
   <div class="card__header">
     <h3>Mensagem de Aniversário</h3>
@@ -11,10 +263,12 @@
   </div>
 
   <form method="POST" action="{{ url_for('admin.configuracoes') }}">
+    <input type="hidden" name="section" value="aniversario" />
+
     <div class="form-group" style="margin-bottom:1rem">
       <label style="font-size:.82rem;font-weight:500">
         Template da mensagem
-        <span style="font-weight:400;color:var(--text-muted)">— use <code>{nome}</code> para personalizar com o nome da cliente</span>
+        <span style="font-weight:400;color:var(--text-muted)">— use <code>{nome}</code> para personalizar</span>
       </label>
       <textarea name="birthday_message" rows="5" maxlength="200"
                 style="width:100%;margin-top:.4rem;font-size:.88rem"
@@ -24,31 +278,60 @@
       </div>
     </div>
 
-    <div style="background:var(--bg-sidebar,#f8f5f3);border:1px solid var(--border);border-radius:6px;padding:.7rem .9rem;font-size:.83rem;margin-bottom:1.2rem;color:var(--text-muted)">
+    <div style="background:var(--bg-sidebar,#f8f5f3);border:1px solid var(--border);border-radius:6px;
+                padding:.7rem .9rem;font-size:.83rem;margin-bottom:1.2rem;color:var(--text-muted)">
       <strong>Prévia:</strong>
       <span id="previewText" style="color:var(--text)"></span>
     </div>
 
     <div class="form-actions" style="margin-top:0">
       <button type="submit" class="btn-primary">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+             style="margin-right:.3rem"><polyline points="20 6 9 17 4 12"/></svg>
         Salvar
       </button>
     </div>
   </form>
 </div>
 
-<script>
-const ta      = document.getElementById('bdayMsg');
-const counter = document.getElementById('charCount');
-const preview = document.getElementById('previewText');
 
-function update() {
+<script>
+/* ── Modal Unidade ── */
+function openModal() {
+  document.getElementById('modalBackdrop').classList.add('open');
+  document.getElementById('fldNome').focus();
+}
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+  ['fldId','fldNome','fldCidade','fldEstado','fldTelefone'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('modalTitle').textContent = 'Nova Unidade';
+}
+function handleBackdropClick(e) {
+  if (e.target === document.getElementById('modalBackdrop')) closeModal();
+}
+function editUnidade(btn) {
+  document.getElementById('fldId').value       = btn.dataset.id;
+  document.getElementById('fldNome').value     = btn.dataset.nome;
+  document.getElementById('fldCidade').value   = btn.dataset.cidade;
+  document.getElementById('fldEstado').value   = btn.dataset.estado;
+  document.getElementById('fldTelefone').value = btn.dataset.telefone;
+  document.getElementById('modalTitle').textContent = 'Editar Unidade';
+  openModal();
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+/* ── Aniversário preview ── */
+var ta      = document.getElementById('bdayMsg');
+var counter = document.getElementById('charCount');
+var preview = document.getElementById('previewText');
+function updateBday() {
   counter.textContent = ta.value.length;
   preview.textContent = ta.value.replace(/{nome}/g, 'Maria');
 }
-ta.addEventListener('input', update);
-update();
+ta.addEventListener('input', updateBday);
+updateBday();
 </script>
 
 {% endblock %}

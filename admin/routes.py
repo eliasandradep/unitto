@@ -1,8 +1,10 @@
 import json
+import os
 from collections import defaultdict
-from flask import render_template, redirect, url_for, request, flash, jsonify, g
+from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename
 
 from . import admin_bp
 from .tenant import tq, get_setting, save_setting
@@ -475,18 +477,92 @@ def _save_setting(key, value):
 
 # ── Configurações ─────────────────────────────────────────────────────────────
 
+_LOGO_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'}
+
+
 @admin_bp.route('/configuracoes', methods=['GET', 'POST'])
 @login_required
 def configuracoes():
+    empresa = g.get('empresa')
+
     if request.method == 'POST':
-        msg = request.form.get('birthday_message', '').strip()
-        if msg:
-            _save_setting('birthday_message', msg[:200])
-        flash('Configurações salvas com sucesso.', 'success')
+        section = request.form.get('section', '')
+
+        if section == 'empresa' and empresa:
+            nome = request.form.get('nome', '').strip()
+            if nome:
+                empresa.nome = nome
+
+            logo_file = request.files.get('logo')
+            if logo_file and logo_file.filename:
+                if empresa.plano not in ('trial', 'free'):
+                    ext = os.path.splitext(secure_filename(logo_file.filename))[1].lower()
+                    if ext in _LOGO_EXTS:
+                        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'logos')
+                        os.makedirs(upload_dir, exist_ok=True)
+                        filename = f"{empresa.slug}{ext}"
+                        logo_file.save(os.path.join(upload_dir, filename))
+                        empresa.logo_url = f'uploads/logos/{filename}'
+                    else:
+                        flash('Formato não suportado. Use JPG, PNG, WebP, GIF ou SVG.', 'error')
+                        return redirect(url_for('admin.configuracoes'))
+                else:
+                    flash('Upload de logomarca disponível apenas nos planos pagos.', 'error')
+                    return redirect(url_for('admin.configuracoes'))
+
+            db.session.commit()
+            flash('Dados da empresa atualizados.', 'success')
+
+        elif section == 'aniversario':
+            msg = request.form.get('birthday_message', '').strip()
+            if msg:
+                _save_setting('birthday_message', msg[:200])
+            flash('Configurações salvas com sucesso.', 'success')
+
+        elif section == 'unidades':
+            action = request.form.get('action')
+            uid    = request.form.get('id', '')
+
+            if action == 'save':
+                nome     = request.form.get('nome', '').strip()
+                cidade   = request.form.get('cidade', '').strip() or None
+                estado   = request.form.get('estado', '').strip() or None
+                telefone = request.form.get('telefone', '').strip() or None
+                if not nome:
+                    flash('Nome da unidade é obrigatório.', 'error')
+                else:
+                    u = db.get_or_404(Unidade, int(uid)) if uid else Unidade()
+                    if not uid:
+                        db.session.add(u)
+                    u.nome     = nome
+                    u.cidade   = cidade
+                    u.estado   = estado
+                    u.telefone = telefone
+                    db.session.commit()
+                    flash('Unidade salva com sucesso.', 'success')
+
+            elif action == 'toggle' and uid:
+                u = db.get_or_404(Unidade, int(uid))
+                u.ativo = not u.ativo
+                db.session.commit()
+
+            elif action == 'delete' and uid:
+                u = db.get_or_404(Unidade, int(uid))
+                db.session.delete(u)
+                db.session.commit()
+                flash('Unidade excluída.', 'success')
+
         return redirect(url_for('admin.configuracoes'))
 
-    birthday_message = _get_setting('birthday_message', _DEFAULT_BIRTHDAY_MSG)
-    return render_template('admin/configuracoes.html', birthday_message=birthday_message)
+    birthday_message  = _get_setting('birthday_message', _DEFAULT_BIRTHDAY_MSG)
+    todas_unidades    = tq(Unidade).order_by(Unidade.nome).all()
+    logo_habilitado   = empresa and empresa.plano not in ('trial', 'free')
+
+    return render_template('admin/configuracoes.html',
+        birthday_message=birthday_message,
+        unidades=todas_unidades,
+        logo_habilitado=logo_habilitado,
+    )
 
 
 # ── Themes ────────────────────────────────────────────────────────────────────
@@ -921,50 +997,12 @@ def profissional_escala_delete(prof_id, escala_id):
     return jsonify({'ok': True})
 
 
-# ── Unidades ─────────────────────────────────────────────────────────────────
+# ── Unidades — redirecionado para Configurações da Empresa ───────────────────
 
 @admin_bp.route('/unidades', methods=['GET', 'POST'])
 @login_required
 def unidades():
-    if request.method == 'POST':
-        action = request.form.get('action')
-        uid    = request.form.get('id', '')
-
-        if action == 'save':
-            nome    = request.form.get('nome', '').strip()
-            cidade  = request.form.get('cidade', '').strip() or None
-            estado  = request.form.get('estado', '').strip() or None
-            telefone = request.form.get('telefone', '').strip() or None
-            if not nome:
-                flash('Nome da unidade é obrigatório.', 'error')
-            else:
-                if uid:
-                    u = db.get_or_404(Unidade, int(uid))
-                else:
-                    u = Unidade()
-                    db.session.add(u)
-                u.nome     = nome
-                u.cidade   = cidade
-                u.estado   = estado
-                u.telefone = telefone
-                db.session.commit()
-                flash('Unidade salva com sucesso.', 'success')
-
-        elif action == 'toggle' and uid:
-            u = db.get_or_404(Unidade, int(uid))
-            u.ativo = not u.ativo
-            db.session.commit()
-
-        elif action == 'delete' and uid:
-            u = db.get_or_404(Unidade, int(uid))
-            db.session.delete(u)
-            db.session.commit()
-            flash('Unidade excluída.', 'success')
-
-        return redirect(url_for('admin.unidades'))
-
-    todas = tq(Unidade).order_by(Unidade.nome).all()
-    return render_template('admin/unidades.html', unidades=todas)
+    return redirect(url_for('admin.configuracoes'))
 
 
 # ── Expedientes ───────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@
       {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' %}
       {% set in_relatorios = ep == 'admin.metrics' %}
       {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades'] %}
+      {# admin.unidades redireciona para configuracoes, mantido no set para compatibilidade #}
 
       <!-- Dashboard -->
       <a href="{{ url_for('admin.dashboard') }}"
@@ -175,10 +176,9 @@
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
         <div class="snav-group-items">
-          <a href="{{ url_for('admin.unidades') }}"     class="snav-sub {% if ep == 'admin.unidades' %}active{% endif %}">Unidades</a>
+          <a href="{{ url_for('admin.configuracoes') }}" class="snav-sub {% if ep in ['admin.configuracoes','admin.unidades'] %}active{% endif %}">Empresa</a>
           <a href="{{ url_for('admin.users') }}"        class="snav-sub {% if 'user' in ep %}active{% endif %}">Usuários</a>
           <a href="{{ url_for('admin.themes') }}"       class="snav-sub {% if 'theme' in ep %}active{% endif %}">Temas</a>
-          <a href="{{ url_for('admin.configuracoes') }}" class="snav-sub {% if ep == 'admin.configuracoes' %}active{% endif %}">Configurações</a>
         </div>
       </div>
 
