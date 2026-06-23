@@ -49,19 +49,13 @@
     {% endif %}
   </form>
 
-  {# ── Toolbar linha 2: ações ─────────────────────────────────────────────── #}
-  <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
-    <a href="{{ url_for('admin.cliente_novo') }}" class="btn-primary" style="display:flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
+  {# ── Toolbar linha 2: ações fixas ───────────────────────────────────────── #}
+  <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+    <a href="{{ url_for('admin.cliente_novo') }}" class="btn-primary" style="display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Novo Cliente
     </a>
-    <button type="button" id="btnRemoverSel" class="btn-danger"
-            style="display:none;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem"
-            onclick="confirmarRemocaoLote()">
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-      Remover selecionados (<span id="selCount">0</span>)
-    </button>
-    <a href="{{ url_for('admin.clientes_importar_csv') }}" class="btn-secondary" style="display:flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
+    <a href="{{ url_for('admin.clientes_importar_csv') }}" class="btn-secondary" style="display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
       Importar CSV
     </a>
@@ -70,6 +64,16 @@
       {{ pagination.total }} cliente(s) no total
     </span>
     {% endif %}
+  </div>
+
+  {# ── Linha de seleção: aparece só quando há checkboxes marcados ─────────── #}
+  <div id="selBar" style="display:none;align-items:center;gap:.6rem;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:.4rem .75rem">
+    <span style="font-size:.82rem;font-weight:500"><span id="selCount">0</span> cliente(s) selecionado(s)</span>
+    <button type="button" class="btn-danger" style="display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .75rem;font-size:.82rem" onclick="confirmarRemocaoLote()">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      Remover selecionados
+    </button>
+    <button type="button" class="btn-secondary" style="padding:.3rem .6rem;font-size:.82rem" onclick="desmarcarTodos()">Desmarcar</button>
   </div>
 </div>
 
@@ -80,13 +84,12 @@
     <colgroup>
       <col style="width:36px">       {# checkbox #}
       <col style="width:auto">       {# nome #}
-      <col style="width:130px">      {# telefone #}
-      <col style="width:80px">       {# nascimento #}
-      <col style="width:46px">       {# sexo #}
-      <col style="width:120px">      {# cidade/uf #}
-      <col style="width:72px">       {# cadastro #}
+      <col style="width:140px">      {# telefone #}
+      <col style="width:88px">       {# nascimento #}
+      <col style="width:145px">      {# cidade/uf #}
+      <col style="width:82px">       {# cadastro #}
       <col style="width:76px">       {# status #}
-      <col style="width:80px">       {# ações #}
+      <col style="width:90px">       {# ações #}
     </colgroup>
     <thead>
       <tr>
@@ -97,7 +100,6 @@
         <th>{{ sort_link('nome', 'Nome') }}</th>
         <th>Telefone</th>
         <th>{{ sort_link('aniversario', 'Nasc.') }}</th>
-        <th>Sexo</th>
         <th>{{ sort_link('cidade', 'Cidade / UF') }}</th>
         <th>{{ sort_link('created_at', 'Cadastro') }}</th>
         <th>Status</th>
@@ -124,11 +126,6 @@
         </td>
         <td style="font-size:.82rem;white-space:nowrap">
           {{ cli.aniversario.strftime('%d/%m/%Y') if cli.aniversario else '—' }}
-        </td>
-        <td style="font-size:.82rem;text-align:center">
-          {% if cli.sexo == 'F' %}<span title="Feminino" style="color:#c0392b">F</span>
-          {% elif cli.sexo == 'M' %}<span title="Masculino" style="color:#2980b9">M</span>
-          {% else %}—{% endif %}
         </td>
         <td style="font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           {% if cli.cidade %}{{ cli.cidade }}{% if cli.estado %}/{{ cli.estado }}{% endif %}{% else %}—{% endif %}
@@ -232,21 +229,23 @@ function excluirCliente(id, nome) {
 
 /* ── Checkboxes e remoção em lote ─────────────────────────── */
 var checkAll = document.getElementById('checkAll');
-var btnRem   = document.getElementById('btnRemoverSel');
+var selBar   = document.getElementById('selBar');
 var selCount = document.getElementById('selCount');
 
 function getChecked() {
   return Array.from(document.querySelectorAll('.row-check:checked'));
 }
 
-function updateBulkBtn() {
+function updateSelBar() {
   var checked = getChecked();
-  if (checked.length > 0) {
-    btnRem.style.display = 'flex';
-    selCount.textContent = checked.length;
-  } else {
-    btnRem.style.display = 'none';
-  }
+  selBar.style.display   = checked.length > 0 ? 'flex' : 'none';
+  selCount.textContent   = checked.length;
+}
+
+function desmarcarTodos() {
+  document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = false; });
+  if (checkAll) { checkAll.checked = false; checkAll.indeterminate = false; }
+  updateSelBar();
 }
 
 if (checkAll) {
@@ -254,17 +253,17 @@ if (checkAll) {
     document.querySelectorAll('.row-check').forEach(function(cb) {
       cb.checked = checkAll.checked;
     });
-    updateBulkBtn();
+    updateSelBar();
   });
 }
 
 document.querySelectorAll('.row-check').forEach(function(cb) {
   cb.addEventListener('change', function() {
-    var all  = document.querySelectorAll('.row-check');
-    var chk  = getChecked();
+    var all = document.querySelectorAll('.row-check');
+    var chk = getChecked();
     checkAll.indeterminate = chk.length > 0 && chk.length < all.length;
     checkAll.checked       = chk.length === all.length;
-    updateBulkBtn();
+    updateSelBar();
   });
 });
 

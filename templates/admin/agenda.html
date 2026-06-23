@@ -239,17 +239,33 @@
               {% endfor %}
             </select>
           </div>
-          <div class="form-group">
-            <label>Serviço</label>
-            <select name="servico_id" id="agFormServico">
-              <option value="">Selecione</option>
-              {% for s in servicos %}
-              <option value="{{ s.id }}"
-                      data-dur="{{ ((s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0)) }}">
-                {{ s.nome }}
-              </option>
-              {% endfor %}
-            </select>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Serviços</label>
+
+            {# Tags de serviços selecionados #}
+            <div id="svcTags" style="display:flex;flex-wrap:wrap;gap:.3rem;min-height:1.6rem;margin-bottom:.35rem"></div>
+
+            {# Dropdown + botão adicionar #}
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <select id="agFormServico" style="flex:1;padding:.42rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;background:var(--card-bg)">
+                <option value="">Selecione um serviço…</option>
+                {% for s in servicos %}
+                <option value="{{ s.id }}"
+                        data-dur="{{ ((s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0)) }}"
+                        data-nome="{{ s.nome | e }}"
+                        data-preco="{{ '%.2f'|format(s.preco or 0) }}">
+                  {{ s.nome }}{% if s.preco %} (R$ {{ '%.2f'|format(s.preco) }}){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <button type="button" onclick="svcAdicionar()"
+                      style="background:#0cb4b4;color:#fff;border:none;border-radius:4px;padding:.42rem .75rem;cursor:pointer;font-size:.82rem;white-space:nowrap;font-weight:500">
+                + Adicionar Serviço
+              </button>
+            </div>
+
+            {# Inputs ocultos gerados dinamicamente (servico_ids[]) #}
+            <div id="svcHiddenInputs"></div>
           </div>
         </div>
 
@@ -1428,11 +1444,11 @@ function resetAgForm() {
   document.getElementById('agFormData').value    = currentDate;
   document.getElementById('agFormHora').value    = '';
   document.getElementById('agFormProf').value    = '';
-  document.getElementById('agFormServico').value = '';
   document.getElementById('agFormDur').value     = '60';
   document.getElementById('agFormStatus').value  = 'agendado';
   document.getElementById('agFormUnidade').value = '';
   document.getElementById('agFormLembrete').checked = false;
+  _svcReset();
 }
 
 // Guarda o label original de cada option de unidade (para restaurar)
@@ -1530,8 +1546,11 @@ function openEditAg(ev) {
   document.getElementById('agFormClienteId').value  = ev.cliente_id ? String(ev.cliente_id) : '';
   document.getElementById('agFormTel').value         = ev.telefone || '';
   document.getElementById('agFormProf').value    = String(ev.profissional_id);
-  document.getElementById('agFormServico').value = ev.servico_id ? String(ev.servico_id) : '';
-  document.getElementById('agFormDur').value     = ev.duracao_min;
+  _svcPopular(ev.servicos || (ev.servico_id ? [{
+    id: ev.servico_id, nome: ev.servico_nome || '', preco: '0.00',
+    dur: ev.duracao_min
+  }] : []));
+  document.getElementById('agFormDur').value = ev.duracao_min;
   document.getElementById('agFormStatus').value  = ev.status;
   document.getElementById('agFormObs').value     = ev.observacoes || '';
   document.getElementById('agFormComo').value    = ev.como_conheceu || '';
@@ -1546,13 +1565,72 @@ function closeAgModal() {
   document.getElementById('agModalBg').classList.remove('open');
 }
 
-// Preenche duração automaticamente ao selecionar serviço
-document.getElementById('agFormServico').addEventListener('change', function() {
-  var opt = this.options[this.selectedIndex];
-  if (opt && opt.dataset.dur) {
-    document.getElementById('agFormDur').value = opt.dataset.dur;
+// ── Multi-serviços ──────────────────────────────────────────────────────────
+var _svcSel = []; // [{id, nome, preco, dur}]
+
+function svcAdicionar() {
+  var sel = document.getElementById('agFormServico');
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  var id = parseInt(opt.value);
+  if (_svcSel.some(function(s){ return s.id === id; })) { sel.value = ''; return; }
+  _svcSel.push({ id: id, nome: opt.dataset.nome, preco: opt.dataset.preco,
+                 dur: parseInt(opt.dataset.dur) || 60 });
+  sel.value = '';
+  _svcRender();
+}
+
+function svcRemover(id) {
+  _svcSel = _svcSel.filter(function(s){ return s.id !== id; });
+  _svcRender();
+}
+
+function _svcRender() {
+  var tags   = document.getElementById('svcTags');
+  var inputs = document.getElementById('svcHiddenInputs');
+  tags.innerHTML = '';
+  inputs.innerHTML = '';
+  var totalDur = 0;
+  _svcSel.forEach(function(s) {
+    totalDur += s.dur;
+    // tag visual
+    var tag = document.createElement('div');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;' +
+      'background:#0cb4b4;color:#fff;border-radius:4px;padding:.18rem .5rem;font-size:.8rem';
+    var label = document.createElement('span');
+    label.textContent = s.nome + ' (R$ ' + s.preco + ')';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.innerHTML = '&times;';
+    btn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;' +
+      'padding:0 0 0 .2rem;font-size:1rem;line-height:1';
+    btn.onclick = (function(sid){ return function(){ svcRemover(sid); }; })(s.id);
+    tag.appendChild(label);
+    tag.appendChild(btn);
+    tags.appendChild(tag);
+    // hidden input
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'servico_ids[]'; inp.value = s.id;
+    inputs.appendChild(inp);
+  });
+  // Atualiza duração total
+  if (totalDur > 0) {
+    document.getElementById('agFormDur').value = totalDur;
   }
-});
+}
+
+function _svcPopular(lista) {
+  // lista = [{id, nome, preco, dur}] vinda do JSON de evento
+  _svcSel = lista || [];
+  _svcRender();
+}
+
+function _svcReset() {
+  _svcSel = [];
+  document.getElementById('svcTags').innerHTML = '';
+  document.getElementById('svcHiddenInputs').innerHTML = '';
+  document.getElementById('agFormServico').value = '';
+}
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {

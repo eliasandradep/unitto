@@ -1370,7 +1370,13 @@ def agenda_dados():
             'servico_id':      a.servico_id,
             'servico_nome':    (', '.join(i.descricao for i in a.comanda.itens)
                                if a.comanda and a.comanda.itens
+                               else ', '.join(s.nome for s in a.servicos_lista)
+                               if a.servicos_lista
                                else (a.servico.nome if a.servico else '')),
+            'servicos': [{'id': s.id, 'nome': s.nome,
+                          'preco': float(s.preco or 0),
+                          'dur': (s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0)}
+                         for s in a.servicos_lista],
             'hora_inicio':     a.hora_inicio.strftime('%H:%M'),
             'duracao_min':     a.duracao_min,
             'hora_fim':        a.hora_fim.strftime('%H:%M'),
@@ -1409,22 +1415,35 @@ def _build_agendamento(a):
     except Exception:
         flash('Data ou hora inválida.', 'error')
         return None, data_str
-    svc_str    = request.form.get('servico_id', '')
-    dur_form   = request.form.get('duracao_min', '').strip()
-    duracao    = 60
-    if dur_form:
-        try: duracao = int(dur_form)
-        except ValueError: pass
-    elif svc_str:
-        s = db.session.get(Servico, int(svc_str))
+    # Suporte a múltiplos serviços (servico_ids[]) com fallback para servico_id legado
+    svc_ids_raw = request.form.getlist('servico_ids[]')
+    if not svc_ids_raw:
+        legacy = request.form.get('servico_id', '').strip()
+        svc_ids_raw = [legacy] if legacy else []
+    svc_ids = [int(x) for x in svc_ids_raw if x.strip().isdigit()]
+
+    dur_form = request.form.get('duracao_min', '').strip()
+    duracao  = 60
+
+    servicos_sel = []
+    for sid in svc_ids:
+        s = db.session.get(Servico, sid)
         if s:
-            duracao = (s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0)
+            servicos_sel.append(s)
+
+    if dur_form:
+        try: duracao = max(15, int(dur_form))
+        except ValueError: pass
+    elif servicos_sel:
+        duracao = sum((s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0) for s in servicos_sel)
+
     a.nome_cliente    = nome
     a.telefone        = request.form.get('telefone', '').strip() or None
     cid = request.form.get('cliente_id', '').strip()
     a.cliente_id      = int(cid) if cid else None
     a.profissional_id = int(prof_id)
-    a.servico_id      = int(svc_str) if svc_str else None
+    a.servico_id      = servicos_sel[0].id if servicos_sel else None
+    a.servicos_lista  = servicos_sel
     a.data            = data_val
     a.hora_inicio     = hora_val
     a.duracao_min     = max(15, duracao)

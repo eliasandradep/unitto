@@ -311,6 +311,13 @@ class Servico(db.Model):
     profissionais_adicionais = db.relationship('Profissional', secondary=servico_profissionais,
                                                backref='servicos_adicionais')
 
+agendamento_servicos = db.Table(
+    'agendamento_servicos',
+    db.Column('agendamento_id', db.Integer, db.ForeignKey('agendamentos.id'), primary_key=True),
+    db.Column('servico_id',     db.Integer, db.ForeignKey('servicos.id'),     primary_key=True),
+    db.Column('ordem',          db.Integer, default=0),
+)
+
 
 class Agendamento(db.Model):
     __tablename__ = 'agendamentos'
@@ -336,6 +343,8 @@ class Agendamento(db.Model):
     profissional = db.relationship('Profissional', backref='agendamentos')
     servico      = db.relationship('Servico',      backref='agendamentos')
     unidade      = db.relationship('Unidade',      backref='agendamentos')
+    servicos_lista = db.relationship('Servico', secondary=agendamento_servicos,
+                                     backref='agendamentos_lista')
 
     @property
     def hora_fim(self):
