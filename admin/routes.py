@@ -2841,12 +2841,25 @@ def api_cliente_pacotes_ativos(cliente_id):
 
 # ── Clientes ──────────────────────────────────────────────────────────────────
 
+_CLIENTES_PER_PAGE_OPTIONS = [50, 100, 150, 200, 300, 500, 1000, 5000]
+
 @admin_bp.route('/clientes')
 @login_required
 def clientes():
     q         = request.args.get('q', '').strip()
     bloqueado = request.args.get('bloqueado', '')
-    query     = tq(Cliente)
+    try:
+        per_page = int(request.args.get('per_page', 50))
+    except (ValueError, TypeError):
+        per_page = 50
+    if per_page not in _CLIENTES_PER_PAGE_OPTIONS:
+        per_page = 50
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+
+    query = tq(Cliente)
     if q:
         like  = f'%{q}%'
         query = query.filter(db.or_(
@@ -2859,9 +2872,18 @@ def clientes():
         query = query.filter_by(bloqueado=True)
     elif bloqueado == '0':
         query = query.filter_by(bloqueado=False)
-    all_clientes = query.order_by(Cliente.nome).all()
+
+    pagination = query.order_by(Cliente.nome).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     return render_template('admin/clientes.html',
-        clientes=all_clientes, q=q, bloqueado=bloqueado)
+        clientes=pagination.items,
+        pagination=pagination,
+        q=q,
+        bloqueado=bloqueado,
+        per_page=per_page,
+        per_page_options=_CLIENTES_PER_PAGE_OPTIONS,
+    )
 
 
 _MESES = {
