@@ -2842,12 +2842,22 @@ def api_cliente_pacotes_ativos(cliente_id):
 # ── Clientes ──────────────────────────────────────────────────────────────────
 
 _CLIENTES_PER_PAGE_OPTIONS = [50, 100, 150, 200, 300, 500, 1000, 5000]
+_CLIENTES_SORT_COLS = {
+    'nome':       Cliente.nome,
+    'telefone':   Cliente.telefone,
+    'aniversario':Cliente.aniversario,
+    'cidade':     Cliente.cidade,
+    'created_at': Cliente.created_at,
+}
 
 @admin_bp.route('/clientes')
 @login_required
 def clientes():
     q         = request.args.get('q', '').strip()
+    q_field   = request.args.get('q_field', 'todos')
     bloqueado = request.args.get('bloqueado', '')
+    sort      = request.args.get('sort', 'nome')
+    order     = request.args.get('order', 'asc')
     try:
         per_page = int(request.args.get('per_page', 50))
     except (ValueError, TypeError):
@@ -2861,29 +2871,54 @@ def clientes():
 
     query = tq(Cliente)
     if q:
-        like  = f'%{q}%'
-        query = query.filter(db.or_(
-            Cliente.nome.ilike(like),
-            Cliente.telefone.ilike(like),
-            Cliente.email.ilike(like),
-            Cliente.cidade.ilike(like),
-        ))
+        like = f'%{q}%'
+        if q_field == 'nome':
+            query = query.filter(Cliente.nome.ilike(like))
+        elif q_field == 'telefone':
+            query = query.filter(Cliente.telefone.ilike(like))
+        elif q_field == 'email':
+            query = query.filter(Cliente.email.ilike(like))
+        elif q_field == 'cidade':
+            query = query.filter(Cliente.cidade.ilike(like))
+        else:
+            query = query.filter(db.or_(
+                Cliente.nome.ilike(like),
+                Cliente.telefone.ilike(like),
+                Cliente.email.ilike(like),
+                Cliente.cidade.ilike(like),
+            ))
     if bloqueado == '1':
         query = query.filter_by(bloqueado=True)
     elif bloqueado == '0':
         query = query.filter_by(bloqueado=False)
 
-    pagination = query.order_by(Cliente.nome).paginate(
+    sort_col = _CLIENTES_SORT_COLS.get(sort, Cliente.nome)
+    sort_col = sort_col.desc() if order == 'desc' else sort_col.asc()
+
+    pagination = query.order_by(sort_col).paginate(
         page=page, per_page=per_page, error_out=False
     )
     return render_template('admin/clientes.html',
         clientes=pagination.items,
         pagination=pagination,
-        q=q,
+        q=q, q_field=q_field,
         bloqueado=bloqueado,
+        sort=sort, order=order,
         per_page=per_page,
         per_page_options=_CLIENTES_PER_PAGE_OPTIONS,
     )
+
+
+@admin_bp.route('/clientes/excluir-em-lote', methods=['POST'])
+@login_required
+def clientes_excluir_em_lote():
+    ids_raw = request.form.get('ids', '')
+    ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()]
+    if ids:
+        tq(Cliente).filter(Cliente.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+        flash(f'{len(ids)} cliente(s) excluído(s).', 'success')
+    return redirect(url_for('admin.clientes'))
 
 
 _MESES = {

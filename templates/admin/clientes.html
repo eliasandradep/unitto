@@ -4,9 +4,33 @@
 
 {% block content %}
 
-<div class="toolbar">
-  <form method="GET" action="{{ url_for('admin.clientes') }}" class="toolbar__filters">
-    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nome, telefone, e-mail ou cidade" class="toolbar__search" />
+{# ── Macro para link de ordenação ───────────────────────────────────────────── #}
+{% macro sort_link(col, label) %}
+  {% set new_order = 'desc' if (sort == col and order == 'asc') else 'asc' %}
+  <a href="{{ url_for('admin.clientes', q=q, q_field=q_field, bloqueado=bloqueado, per_page=per_page, sort=col, order=new_order, page=1) }}"
+     style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:.3rem;white-space:nowrap">
+    {{ label }}
+    <span style="font-size:.65rem;opacity:{{ '1' if sort == col else '0.3' }}">
+      {{ '▼' if (sort == col and order == 'desc') else '▲' }}
+    </span>
+  </a>
+{% endmacro %}
+
+{# ── Toolbar linha 1: filtros ────────────────────────────────────────────────── #}
+<div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem">
+  <form method="GET" action="{{ url_for('admin.clientes') }}" id="filterForm"
+        style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+    <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">Procurar por:</span>
+    <input type="text" name="q" value="{{ q }}"
+           placeholder="Digite para buscar…"
+           style="flex:1;min-width:160px;padding:.42rem .7rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem" />
+    <select name="q_field" class="toolbar__select">
+      <option value="todos"    {% if q_field == 'todos'    %}selected{% endif %}>Todos os campos</option>
+      <option value="nome"     {% if q_field == 'nome'     %}selected{% endif %}>Nome</option>
+      <option value="telefone" {% if q_field == 'telefone' %}selected{% endif %}>Telefone</option>
+      <option value="email"    {% if q_field == 'email'    %}selected{% endif %}>E-mail</option>
+      <option value="cidade"   {% if q_field == 'cidade'   %}selected{% endif %}>Cidade</option>
+    </select>
     <select name="bloqueado" class="toolbar__select">
       <option value="">Todos</option>
       <option value="0" {% if bloqueado == '0' %}selected{% endif %}>Ativos</option>
@@ -14,48 +38,104 @@
     </select>
     <select name="per_page" class="toolbar__select" onchange="this.form.submit()">
       {% for opt in per_page_options %}
-      <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }} por página</option>
+      <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }} por pág.</option>
       {% endfor %}
     </select>
-    <button type="submit" class="btn-primary">Filtrar</button>
+    <input type="hidden" name="sort"  value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
+    <button type="submit" class="btn-primary" style="padding:.42rem .9rem">Buscar</button>
     {% if q or bloqueado %}
-    <a href="{{ url_for('admin.clientes') }}" class="btn-secondary">Limpar</a>
+    <a href="{{ url_for('admin.clientes') }}" class="btn-secondary" style="padding:.42rem .9rem">Limpar</a>
     {% endif %}
   </form>
-  <a href="{{ url_for('admin.clientes_importar_csv') }}" class="btn-secondary">↑ Importar CSV</a>
-  <a href="{{ url_for('admin.cliente_novo') }}" class="btn-primary">+ Novo cliente</a>
+
+  {# ── Toolbar linha 2: ações ─────────────────────────────────────────────── #}
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+    <a href="{{ url_for('admin.cliente_novo') }}" class="btn-primary" style="display:flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Novo Cliente
+    </a>
+    <button type="button" id="btnRemoverSel" class="btn-danger"
+            style="display:none;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem"
+            onclick="confirmarRemocaoLote()">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      Remover selecionados (<span id="selCount">0</span>)
+    </button>
+    <a href="{{ url_for('admin.clientes_importar_csv') }}" class="btn-secondary" style="display:flex;align-items:center;gap:.35rem;padding:.42rem .9rem;font-size:.82rem">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      Importar CSV
+    </a>
+    {% if pagination.total %}
+    <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted)">
+      {{ pagination.total }} cliente(s) no total
+    </span>
+    {% endif %}
+  </div>
 </div>
 
+{# ── Tabela ──────────────────────────────────────────────────────────────────── #}
 {% if clientes %}
-<div class="card">
-  <table class="data-table">
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="data-table" style="table-layout:fixed;width:100%">
+    <colgroup>
+      <col style="width:36px">       {# checkbox #}
+      <col style="width:auto">       {# nome #}
+      <col style="width:130px">      {# telefone #}
+      <col style="width:80px">       {# nascimento #}
+      <col style="width:46px">       {# sexo #}
+      <col style="width:120px">      {# cidade/uf #}
+      <col style="width:72px">       {# cadastro #}
+      <col style="width:76px">       {# status #}
+      <col style="width:80px">       {# ações #}
+    </colgroup>
     <thead>
       <tr>
-        <th>Nome</th>
+        <th style="text-align:center;padding:.5rem .4rem">
+          <input type="checkbox" id="checkAll" title="Selecionar todos"
+                 style="cursor:pointer;accent-color:var(--gold-dark)">
+        </th>
+        <th>{{ sort_link('nome', 'Nome') }}</th>
         <th>Telefone</th>
-        <th>E-mail</th>
-        <th>Cidade / UF</th>
-        <th>Aniversário</th>
-        <th>Cadastro</th>
+        <th>{{ sort_link('aniversario', 'Nasc.') }}</th>
+        <th>Sexo</th>
+        <th>{{ sort_link('cidade', 'Cidade / UF') }}</th>
+        <th>{{ sort_link('created_at', 'Cadastro') }}</th>
         <th>Status</th>
         <th style="text-align:center">Ações</th>
       </tr>
     </thead>
     <tbody>
       {% for cli in clientes %}
-      <tr>
-        <td><strong>{{ cli.nome }}</strong></td>
-        <td>
-          {% set fone = cli.telefone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
-          <a href="https://wa.me/55{{ fone }}" target="_blank" rel="noopener" class="wa-link">{{ cli.telefone }}</a>
+      <tr data-id="{{ cli.id }}">
+        <td style="text-align:center;padding:.4rem">
+          <input type="checkbox" class="row-check" value="{{ cli.id }}"
+                 style="cursor:pointer;accent-color:var(--gold-dark)">
         </td>
-        <td>{{ cli.email or '—' }}</td>
-        <td>
-          {% if cli.cidade %}{{ cli.cidade }}{% if cli.estado %} / {{ cli.estado }}{% endif %}
+        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cli.id) }}"
+             style="font-weight:600;color:var(--gold-dark);text-decoration:none"
+             title="{{ cli.nome }}">{{ cli.nome }}</a>
+        </td>
+        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          {% set fone = cli.telefone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
+          <a href="https://wa.me/55{{ fone }}" target="_blank" rel="noopener"
+             style="color:#1A7A42;font-weight:500;text-decoration:none;font-size:.82rem"
+             title="{{ cli.telefone }}">{{ cli.telefone }}</a>
+        </td>
+        <td style="font-size:.82rem;white-space:nowrap">
+          {{ cli.aniversario.strftime('%d/%m/%Y') if cli.aniversario else '—' }}
+        </td>
+        <td style="font-size:.82rem;text-align:center">
+          {% if cli.sexo == 'F' %}<span title="Feminino" style="color:#c0392b">F</span>
+          {% elif cli.sexo == 'M' %}<span title="Masculino" style="color:#2980b9">M</span>
           {% else %}—{% endif %}
         </td>
-        <td>{{ cli.aniversario.strftime('%d/%m') if cli.aniversario else '—' }}</td>
-        <td>{{ cli.created_at.strftime('%d/%m/%Y') }}</td>
+        <td style="font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {% if cli.cidade %}{{ cli.cidade }}{% if cli.estado %}/{{ cli.estado }}{% endif %}{% else %}—{% endif %}
+        </td>
+        <td style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">
+          {{ cli.created_at.strftime('%d/%m/%Y') }}
+        </td>
         <td>
           {% if cli.bloqueado %}
           <span class="badge badge--perdido">Bloqueado</span>
@@ -64,18 +144,23 @@
           {% endif %}
         </td>
         <td>
-          <div style="display:flex;gap:.3rem;justify-content:center">
-            <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cli.id) }}"
-               class="btn-icon btn-icon--view" title="Visualizar">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div style="display:flex;gap:.25rem;justify-content:center;align-items:center">
+            {# WhatsApp #}
+            {% set fone2 = cli.telefone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') %}
+            <a href="https://wa.me/55{{ fone2 }}" target="_blank" rel="noopener"
+               class="btn-icon" title="WhatsApp"
+               style="color:#25D366;border-color:#b2dfdb">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
             </a>
+            {# Editar #}
             <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cli.id) }}"
                class="btn-icon btn-icon--edit" title="Editar">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </a>
+            {# Excluir #}
             <button type="button" class="btn-icon btn-icon--danger" title="Excluir"
                     onclick="excluirCliente({{ cli.id }}, '{{ cli.nome | e }}')">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             </button>
           </div>
         </td>
@@ -85,38 +170,34 @@
   </table>
 </div>
 
-{# Rodapé: contagem + paginação #}
+{# ── Rodapé: contagem + paginação ────────────────────────────────────────────── #}
 {% set p = pagination %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.5rem;flex-wrap:wrap;gap:.5rem">
-  <p style="font-size:.8rem;color:var(--text-muted);margin:0">
-    Exibindo {{ ((p.page - 1) * per_page + 1) }}–{{ ((p.page - 1) * per_page + clientes|length) }}
+  <p style="font-size:.78rem;color:var(--text-muted);margin:0">
+    Exibindo {{ (p.page - 1) * per_page + 1 }}–{{ (p.page - 1) * per_page + clientes|length }}
     de {{ p.total }} cliente(s)
   </p>
-
   {% if p.pages > 1 %}
   <nav style="display:flex;align-items:center;gap:.25rem;flex-wrap:wrap">
     {% if p.has_prev %}
-    <a href="{{ url_for('admin.clientes', q=q, bloqueado=bloqueado, per_page=per_page, page=p.prev_num) }}"
-       class="btn-secondary" style="padding:.25rem .6rem;font-size:.8rem">‹ Anterior</a>
+    <a href="{{ url_for('admin.clientes', q=q, q_field=q_field, bloqueado=bloqueado, per_page=per_page, sort=sort, order=order, page=p.prev_num) }}"
+       class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">‹</a>
     {% endif %}
-
     {% for pg in p.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
       {% if pg %}
         {% if pg == p.page %}
-        <span style="padding:.25rem .6rem;font-size:.8rem;font-weight:600;
-                     background:var(--gold);color:#fff;border-radius:4px;line-height:1.4">{{ pg }}</span>
+        <span style="padding:.22rem .55rem;font-size:.78rem;font-weight:600;background:var(--gold);color:#fff;border-radius:4px">{{ pg }}</span>
         {% else %}
-        <a href="{{ url_for('admin.clientes', q=q, bloqueado=bloqueado, per_page=per_page, page=pg) }}"
-           class="btn-secondary" style="padding:.25rem .6rem;font-size:.8rem">{{ pg }}</a>
+        <a href="{{ url_for('admin.clientes', q=q, q_field=q_field, bloqueado=bloqueado, per_page=per_page, sort=sort, order=order, page=pg) }}"
+           class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">{{ pg }}</a>
         {% endif %}
       {% else %}
-        <span style="padding:.25rem .2rem;font-size:.8rem;color:var(--text-muted)">…</span>
+        <span style="font-size:.78rem;color:var(--text-muted);padding:0 .1rem">…</span>
       {% endif %}
     {% endfor %}
-
     {% if p.has_next %}
-    <a href="{{ url_for('admin.clientes', q=q, bloqueado=bloqueado, per_page=per_page, page=p.next_num) }}"
-       class="btn-secondary" style="padding:.25rem .6rem;font-size:.8rem">Próximo ›</a>
+    <a href="{{ url_for('admin.clientes', q=q, q_field=q_field, bloqueado=bloqueado, per_page=per_page, sort=sort, order=order, page=p.next_num) }}"
+       class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">›</a>
     {% endif %}
   </nav>
   {% endif %}
@@ -130,16 +211,69 @@
 </div>
 {% endif %}
 
+{# ── Forms ocultos ───────────────────────────────────────────────────────────── #}
 <form id="deleteClienteForm" method="POST" style="display:none">
   <input type="hidden" name="action" value="excluir">
 </form>
 
+<form id="deleteLoteForm" method="POST"
+      action="{{ url_for('admin.clientes_excluir_em_lote') }}" style="display:none">
+  <input type="hidden" name="ids" id="deleteLoteIds">
+</form>
+
 <script>
+/* ── Exclusão individual ───────────────────────────────────── */
 function excluirCliente(id, nome) {
   if (!confirm('Excluir o cliente "' + nome + '"?\nEsta ação não pode ser desfeita.')) return;
   var f = document.getElementById('deleteClienteForm');
   f.action = '/admin/clientes/' + id;
   f.submit();
+}
+
+/* ── Checkboxes e remoção em lote ─────────────────────────── */
+var checkAll = document.getElementById('checkAll');
+var btnRem   = document.getElementById('btnRemoverSel');
+var selCount = document.getElementById('selCount');
+
+function getChecked() {
+  return Array.from(document.querySelectorAll('.row-check:checked'));
+}
+
+function updateBulkBtn() {
+  var checked = getChecked();
+  if (checked.length > 0) {
+    btnRem.style.display = 'flex';
+    selCount.textContent = checked.length;
+  } else {
+    btnRem.style.display = 'none';
+  }
+}
+
+if (checkAll) {
+  checkAll.addEventListener('change', function() {
+    document.querySelectorAll('.row-check').forEach(function(cb) {
+      cb.checked = checkAll.checked;
+    });
+    updateBulkBtn();
+  });
+}
+
+document.querySelectorAll('.row-check').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    var all  = document.querySelectorAll('.row-check');
+    var chk  = getChecked();
+    checkAll.indeterminate = chk.length > 0 && chk.length < all.length;
+    checkAll.checked       = chk.length === all.length;
+    updateBulkBtn();
+  });
+});
+
+function confirmarRemocaoLote() {
+  var checked = getChecked();
+  if (!checked.length) return;
+  if (!confirm('Excluir ' + checked.length + ' cliente(s) selecionado(s)?\nEsta ação não pode ser desfeita.')) return;
+  document.getElementById('deleteLoteIds').value = checked.map(function(cb){ return cb.value; }).join(',');
+  document.getElementById('deleteLoteForm').submit();
 }
 </script>
 
