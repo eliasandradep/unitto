@@ -179,21 +179,20 @@
         <input type="checkbox" id="billing-switch" onchange="toggleBilling()" />
         <span class="toggle-switch__slider"></span>
       </label>
-      <span id="label-anual">Anual</span>
-      <span class="badge-economy">Economize 20%</span>
+      <span id="label-anual">Anual <small style="font-size:.7rem;opacity:.7">(12x no cartão)</small></span>
     </div>
 
     <div class="plans-grid">
 
-      <!-- Lite -->
+      <!-- Básico -->
       <div class="plan-card">
-        <p class="plan-card__name">Lite</p>
+        <p class="plan-card__name">Básico</p>
         <div class="plan-card__price">
           <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="97" data-anual="77">97</span>
+          <span class="plan-card__amount" data-mensal="38" data-anual="38">38</span>
           <span class="plan-card__period">/mês</span>
         </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$924/ano" data-mensal="">&nbsp;</p>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$456/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
         <div class="plan-card__divider"></div>
         <ul class="plan-card__features">
           <li>
@@ -224,16 +223,16 @@
         <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--outline">Começar agora</a>
       </div>
 
-      <!-- Plus (popular) -->
+      <!-- Essencial (popular) -->
       <div class="plan-card plan-card--popular">
         <div class="plan-card__badge">Mais popular</div>
-        <p class="plan-card__name">Plus</p>
+        <p class="plan-card__name">Essencial</p>
         <div class="plan-card__price">
           <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="197" data-anual="157">197</span>
+          <span class="plan-card__amount" data-mensal="68" data-anual="68">68</span>
           <span class="plan-card__period">/mês</span>
         </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$1.884/ano" data-mensal="">&nbsp;</p>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$816/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
         <div class="plan-card__divider"></div>
         <ul class="plan-card__features">
           <li>
@@ -264,15 +263,15 @@
         <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--fill">Começar agora</a>
       </div>
 
-      <!-- Pro -->
+      <!-- Avançado -->
       <div class="plan-card">
-        <p class="plan-card__name">Pro</p>
+        <p class="plan-card__name">Avançado</p>
         <div class="plan-card__price">
           <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="297" data-anual="237">297</span>
+          <span class="plan-card__amount" data-mensal="120" data-anual="120">120</span>
           <span class="plan-card__period">/mês</span>
         </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$2.844/ano" data-mensal="">&nbsp;</p>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$1.440/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
         <div class="plan-card__divider"></div>
         <ul class="plan-card__features">
           <li>
@@ -281,7 +280,7 @@
           </li>
           <li>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Tudo do Plus
+            Tudo do Essencial
           </li>
           <li>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -303,15 +302,15 @@
         <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--outline">Começar agora</a>
       </div>
 
-      <!-- Black -->
+      <!-- Profissional -->
       <div class="plan-card" style="border-color:#1B2D6E; background: linear-gradient(160deg, #0D1B4B 0%, #1B2D6E 100%); color:#fff;">
-        <p class="plan-card__name" style="color:rgba(255,255,255,.5)">Black</p>
+        <p class="plan-card__name" style="color:rgba(255,255,255,.5)">Profissional</p>
         <div class="plan-card__price">
           <span class="plan-card__currency" style="color:#17C3D8">R$</span>
-          <span class="plan-card__amount" data-mensal="497" data-anual="397" style="color:#fff">497</span>
+          <span class="plan-card__amount" data-mensal="210" data-anual="210" style="color:#fff">210</span>
           <span class="plan-card__period" style="color:rgba(255,255,255,.5)">/mês</span>
         </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$4.764/ano" data-mensal="" style="color:rgba(255,255,255,.4)">&nbsp;</p>
+        <p class="plan-card__billing billing-note" data-anual="Cobrado R$2.520/ano em até 12x no cartão" data-mensal="" style="color:rgba(255,255,255,.4)">&nbsp;</p>
         <div class="plan-card__divider" style="background:rgba(255,255,255,.1)"></div>
         <ul class="plan-card__features">
           <li style="color:rgba(255,255,255,.85)">
@@ -320,7 +319,7 @@
           </li>
           <li style="color:rgba(255,255,255,.85)">
             <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Tudo do Pro
+            Tudo do Avançado
           </li>
           <li style="color:rgba(255,255,255,.85)">
             <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>

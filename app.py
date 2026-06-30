@@ -240,14 +240,20 @@ def _seed_planos():
     from models import Plano
     from decimal import Decimal
     planos_data = [
-        dict(slug='lite',  nome='Lite',  preco_mensal=Decimal('97'),  preco_anual_mensal=Decimal('77'),  max_profissionais=1,  max_wa_mes=100,  max_simultaneos=2,  tem_relatorios=False, ordem=1),
-        dict(slug='plus',  nome='Plus',  preco_mensal=Decimal('197'), preco_anual_mensal=Decimal('157'), max_profissionais=5,  max_wa_mes=500,  max_simultaneos=5,  tem_relatorios=True,  ordem=2),
-        dict(slug='pro',   nome='Pro',   preco_mensal=Decimal('297'), preco_anual_mensal=Decimal('237'), max_profissionais=15, max_wa_mes=2000, max_simultaneos=10, tem_relatorios=True,  ordem=3),
-        dict(slug='black', nome='Black', preco_mensal=Decimal('497'), preco_anual_mensal=Decimal('397'), max_profissionais=50, max_wa_mes=10000,max_simultaneos=30, tem_relatorios=True,  ordem=4),
+        dict(slug='lite',  nome='Básico',       preco_mensal=Decimal('38'),  preco_anual_mensal=Decimal('38'),  max_profissionais=1,  max_wa_mes=100,  max_simultaneos=2,  tem_relatorios=False, ordem=1),
+        dict(slug='plus',  nome='Essencial',     preco_mensal=Decimal('68'),  preco_anual_mensal=Decimal('68'),  max_profissionais=5,  max_wa_mes=500,  max_simultaneos=5,  tem_relatorios=True,  ordem=2),
+        dict(slug='pro',   nome='Avançado',      preco_mensal=Decimal('120'), preco_anual_mensal=Decimal('120'), max_profissionais=15, max_wa_mes=2000, max_simultaneos=10, tem_relatorios=True,  ordem=3),
+        dict(slug='black', nome='Profissional',  preco_mensal=Decimal('210'), preco_anual_mensal=Decimal('210'), max_profissionais=50, max_wa_mes=10000,max_simultaneos=30, tem_relatorios=True,  ordem=4),
     ]
     changed = False
     for pd in planos_data:
-        if not Plano.query.filter_by(slug=pd['slug']).first():
+        p = Plano.query.filter_by(slug=pd['slug']).first()
+        if p:
+            for k, v in pd.items():
+                if k != 'slug' and getattr(p, k) != v:
+                    setattr(p, k, v)
+                    changed = True
+        else:
             db.session.add(Plano(**pd, ativo=True))
             changed = True
     if changed:
