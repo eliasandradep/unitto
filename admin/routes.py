@@ -1596,6 +1596,25 @@ def agenda_status(ag_id):
     return jsonify({'ok': True, 'status': a.status})
 
 
+def _add_servicos_agendamento_comanda(comanda, agendamento):
+    """Adiciona itens na comanda para todos os serviços do agendamento."""
+    from decimal import Decimal
+    servicos = agendamento.servicos_lista or []
+    if not servicos and agendamento.servico:
+        servicos = [agendamento.servico]
+    for s in servicos:
+        db.session.add(ComandaItem(
+            comanda_id=comanda.id,
+            servico_id=s.id,
+            descricao=s.nome,
+            valor=s.preco or Decimal('0'),
+            quantidade=1,
+            profissional_id=agendamento.profissional_id,
+            comissao_valor=s.comissao_valor,
+            comissao_tipo=s.comissao_tipo or '%',
+        ))
+
+
 @admin_bp.route('/agenda/<int:ag_id>/faturar', methods=['POST'])
 @login_required
 def agenda_faturar(ag_id):
@@ -1613,12 +1632,7 @@ def agenda_faturar(ag_id):
     )
     db.session.add(c)
     db.session.flush()
-    if a.servico:
-        db.session.add(ComandaItem(
-            comanda_id=c.id, servico_id=a.servico_id,
-            descricao=a.servico.nome,
-            valor=a.servico.preco or 0, quantidade=1,
-        ))
+    _add_servicos_agendamento_comanda(c, a)
     a.status = 'concluido'
     db.session.commit()
     return redirect(url_for('admin.comanda_detalhe', comanda_id=c.id))
@@ -2487,15 +2501,7 @@ def api_ag_comanda(ag_id):
     )
     db.session.add(c)
     db.session.flush()
-    if a.servico:
-        db.session.add(ComandaItem(
-            comanda_id=c.id, servico_id=a.servico_id,
-            descricao=a.servico.nome,
-            valor=a.servico.preco or Decimal('0'), quantidade=1,
-            profissional_id=a.profissional_id,
-            comissao_valor=a.servico.comissao_valor,
-            comissao_tipo=a.servico.comissao_tipo or '%',
-        ))
+    _add_servicos_agendamento_comanda(c, a)
     db.session.commit()
     return jsonify(_comanda_to_json(c))
 
