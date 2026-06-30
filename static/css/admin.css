@@ -889,6 +889,42 @@ body.sidebar--collapsed .sidebar__nav {
 }
 .radio-item input[type=radio] { cursor: pointer; accent-color: var(--gold-dark); }
 
+/* ── Check group (profissionais adicionais, etc.) ────────── */
+.check-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .6rem;
+  padding: .4rem 0;
+}
+.check-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .87rem;
+  font-weight: 400;
+  cursor: pointer;
+  padding: .28rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  transition: border-color .15s, background .15s;
+  white-space: nowrap;
+}
+.check-item:hover { border-color: var(--gold); background: #fdf8f0; }
+.check-item input[type=checkbox] {
+  cursor: pointer;
+  accent-color: var(--gold-dark);
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.check-item:has(input:checked) {
+  border-color: var(--gold-dark);
+  background: #fdf3e3;
+  font-weight: 500;
+}
+
 /* ── Responsivo ──────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .cli-layout { grid-template-columns: 1fr; }

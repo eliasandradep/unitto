@@ -604,6 +604,140 @@ def servicos():
         servicos=all_servicos, categorias=cats, q=q, cat_id=cat_id)
 
 
+@admin_bp.route('/servicos/importar-csv', methods=['GET', 'POST'])
+@login_required
+def servicos_importar_csv():
+    import io, csv as csv_mod, re, unicodedata
+    from decimal import Decimal, InvalidOperation
+
+    if request.method == 'GET':
+        return render_template('admin/servicos_importar.html')
+
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash('Selecione um arquivo CSV.', 'error')
+        return render_template('admin/servicos_importar.html')
+
+    modo_duplicata = request.form.get('modo_duplicata', 'pular')
+
+    try:
+        raw = arquivo.read()
+        try:
+            texto = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            texto = raw.decode('latin-1')
+
+        sample = texto[:2048]
+        delimitador = ';' if sample.count(';') >= sample.count(',') else ','
+        reader = csv_mod.DictReader(io.StringIO(texto), delimiter=delimitador)
+        headers = reader.fieldnames or []
+
+        def _norm(s):
+            s = s.strip().strip('"').lower()
+            s = unicodedata.normalize('NFD', s)
+            return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+        norm_map = {_norm(h): h for h in headers}
+
+        def get_col(row, *keys):
+            for k in keys:
+                orig = norm_map.get(_norm(k))
+                if orig:
+                    val = (row.get(orig) or '').strip().strip('"')
+                    if val:
+                        return val
+            return ''
+
+        def parse_decimal(s):
+            s = s.strip().replace('.', '').replace(',', '.')
+            try:
+                return Decimal(s)
+            except InvalidOperation:
+                return Decimal('0')
+
+        def parse_tempo(s):
+            s = s.strip().lower()
+            h = m = 0
+            mh = re.search(r'(\d+)\s*h', s)
+            mm = re.search(r'h\s*(\d+)$', s) or re.search(r'(\d+)\s*min', s)
+            if mh:
+                h = int(mh.group(1))
+            if mm:
+                m = int(mm.group(1))
+            return max(0, h), min(59, max(0, m))
+
+        # Cache de categorias para evitar queries repetidas
+        cat_cache = {}
+
+        def get_or_create_cat(nome_cat):
+            if not nome_cat:
+                return None
+            key = nome_cat.strip().lower()
+            if key in cat_cache:
+                return cat_cache[key]
+            cat = tq(Categoria).filter(Categoria.nome.ilike(nome_cat.strip())).first()
+            if not cat:
+                cat = Categoria(nome=nome_cat.strip(), ativo=True)
+                db.session.add(cat)
+                db.session.flush()
+            cat_cache[key] = cat.id
+            return cat.id
+
+        criados = atualizados = pulados = 0
+        erros = []
+
+        for i, row in enumerate(reader, start=2):
+            nome = get_col(row, 'Nome', 'name', 'servico', 'serviço', 'descricao', 'descrição')
+            if not nome:
+                erros.append(f'Linha {i}: nome vazio (ignorada).')
+                continue
+
+            existente = tq(Servico).filter(Servico.nome.ilike(nome)).first()
+
+            if existente and modo_duplicata == 'pular':
+                pulados += 1
+                continue
+
+            s = existente or Servico()
+
+            cat_id   = get_or_create_cat(get_col(row, 'Categoria', 'category', 'cat'))
+            preco    = get_col(row, 'Preço', 'Preco', 'price', 'valor')
+            comissao = get_col(row, 'Comissão', 'Comissao', 'comission')
+            tempo    = get_col(row, 'Tempo', 'Duração', 'Duracao', 'duration', 'time')
+            h, m     = parse_tempo(tempo) if tempo else (1, 0)
+
+            s.nome            = nome[:100]
+            s.categoria_id    = cat_id
+            s.preco           = parse_decimal(preco) if preco else None
+            s.comissao_valor  = parse_decimal(comissao) if comissao else None
+            s.comissao_tipo   = '%'
+            s.duracao_horas   = h
+            s.duracao_minutos = m
+            s.ativo           = True
+
+            if not existente:
+                db.session.add(s)
+                criados += 1
+            else:
+                atualizados += 1
+
+        db.session.commit()
+
+        resumo = f'{criados} criado(s), {atualizados} atualizado(s), {pulados} pulado(s).'
+        flash(f'Importação concluída: {resumo}', 'success')
+        for e in erros[:10]:
+            flash(e, 'warning')
+        if len(erros) > 10:
+            flash(f'... e mais {len(erros) - 10} linha(s) com erro omitida(s).', 'warning')
+
+        return redirect(url_for('admin.servicos'))
+
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Erro ao processar o arquivo: {exc}', 'error')
+        return render_template('admin/servicos_importar.html')
+
+
 @admin_bp.route('/servicos/novo', methods=['GET', 'POST'])
 @login_required
 def servico_novo():
