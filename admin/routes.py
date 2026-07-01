@@ -2823,7 +2823,6 @@ def venda_pacote_nova():
     from decimal import Decimal
 
     pacotes_obj = tq(Pacote).filter_by(ativo=True).order_by(Pacote.nome).all()
-    clientes    = tq(Cliente).order_by(Cliente.nome).all()
     profs       = tq(Profissional).filter_by(ativo=True).order_by(Profissional.nome).all()
     unidades    = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     hoje        = date.today()
@@ -2855,7 +2854,7 @@ def venda_pacote_nova():
         if not pacote_id:
             flash('Selecione um pacote.', 'error')
             return render_template('admin/venda_pacote_form.html',
-                                   pacotes=pacotes, clientes=clientes,
+                                   pacotes=pacotes_obj, pacotes_json=pacotes_json,
                                    profs=profs, unidades=unidades, hoje=hoje.isoformat())
 
         pacote = db.get_or_404(Pacote, int(pacote_id))
@@ -2924,8 +2923,7 @@ def venda_pacote_nova():
 
     return render_template('admin/venda_pacote_form.html',
                            pacotes=pacotes_obj, pacotes_json=pacotes_json,
-                           clientes=clientes, profs=profs,
-                           unidades=unidades, hoje=hoje.isoformat())
+                           profs=profs, unidades=unidades, hoje=hoje.isoformat())
 
 
 @admin_bp.route('/financeiro/vendas-pacote/<int:venda_id>')

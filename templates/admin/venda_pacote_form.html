@@ -47,18 +47,16 @@
     <div class="card" style="padding:1.2rem 1.4rem">
       <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Cliente</div>
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" style="position:relative">
           <label>Nome do cliente</label>
-          <input type="text" name="nome_cliente" placeholder="Nome completo" />
+          <input type="text" name="nome_cliente" id="vpFormNome"
+                 placeholder="Digite para buscar..." autocomplete="off" />
+          <input type="hidden" name="cliente_id" id="vpFormClienteId" />
+          <ul id="vpNomeDropdown" class="ac-dropdown" style="display:none"></ul>
         </div>
         <div class="form-group">
-          <label>Cadastro</label>
-          <select name="cliente_id">
-            <option value="">Nenhum</option>
-            {% for cl in clientes %}
-            <option value="{{ cl.id }}">{{ cl.nome }} — {{ cl.telefone }}</option>
-            {% endfor %}
-          </select>
+          <label>Telefone / WhatsApp</label>
+          <input type="tel" name="telefone" id="vpFormTel" placeholder="(00) 00000-0000" />
         </div>
       </div>
 
@@ -159,5 +157,98 @@ function carregarPacote() {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Autocomplete cliente ───────────────────────────────────────────────────────
+(function() {
+  var input    = document.getElementById('vpFormNome');
+  var dropdown = document.getElementById('vpNomeDropdown');
+  var hiddenId = document.getElementById('vpFormClienteId');
+  var telInput = document.getElementById('vpFormTel');
+  var _timer   = null;
+  var _active  = -1;
+
+  function closeDropdown() {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    _active = -1;
+  }
+
+  function selectItem(item) {
+    input.value    = item.nome;
+    hiddenId.value = item.id;
+    if (telInput) telInput.value = item.telefone || '';
+    closeDropdown();
+  }
+
+  function renderItems(items) {
+    dropdown.innerHTML = '';
+    _active = -1;
+    if (!items.length) { closeDropdown(); return; }
+    items.forEach(function(item) {
+      var li = document.createElement('li');
+      li.className = 'ac-item';
+      li.innerHTML = '<strong>' + escHtml(item.nome) + '</strong>' +
+        (item.telefone ? '<span class="ac-tel"> ' + escHtml(item.telefone) + '</span>' : '');
+      li.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        selectItem(item);
+      });
+      dropdown.appendChild(li);
+    });
+    dropdown.style.display = 'block';
+  }
+
+  input.addEventListener('input', function() {
+    hiddenId.value = '';
+    var q = this.value.trim();
+    clearTimeout(_timer);
+    if (q.length < 2) { closeDropdown(); return; }
+    _timer = setTimeout(function() {
+      fetch('/admin/api/clientes/busca?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(renderItems)
+        .catch(function() { closeDropdown(); });
+    }, 220);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    var items = dropdown.querySelectorAll('.ac-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _active = Math.min(_active + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _active = Math.max(_active - 1, 0);
+    } else if (e.key === 'Enter' && _active >= 0) {
+      e.preventDefault();
+      items[_active].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      closeDropdown(); return;
+    } else { return; }
+    items.forEach(function(li, i) { li.classList.toggle('ac-active', i === _active); });
+    if (_active >= 0) items[_active].scrollIntoView({ block: 'nearest' });
+  });
+
+  input.addEventListener('blur', function() {
+    setTimeout(closeDropdown, 150);
+  });
+})();
 </script>
+
+<style>
+.ac-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); list-style: none;
+  margin: 2px 0 0; padding: 4px 0; max-height: 220px; overflow-y: auto;
+}
+.ac-item {
+  padding: 8px 12px; cursor: pointer; font-size: .875rem; line-height: 1.4;
+}
+.ac-item:hover, .ac-item.ac-active { background: var(--content-bg); }
+.ac-item strong { display: block; color: var(--dark); }
+.ac-tel { color: var(--text-muted); font-size: .8rem; }
+</style>
 {% endblock %}
