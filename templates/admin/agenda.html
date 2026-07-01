@@ -1549,7 +1549,7 @@ function openEditAg(ev) {
   _svcPopular(ev.servicos || (ev.servico_id ? [{
     id: ev.servico_id, nome: ev.servico_nome || '', preco: '0.00',
     dur: ev.duracao_min
-  }] : []));
+  }] : []), ev.vp_item_id || null);
   document.getElementById('agFormDur').value = ev.duracao_min;
   document.getElementById('agFormStatus').value  = ev.status;
   document.getElementById('agFormObs').value     = ev.observacoes || '';
@@ -1566,22 +1566,30 @@ function closeAgModal() {
 }
 
 // ── Multi-serviços ──────────────────────────────────────────────────────────
-var _svcSel = []; // [{id, nome, preco, dur}]
+var _svcSel    = []; // [{key, id, nome, preco, dur}]
+var _agVpItemId = null; // venda_pacote_item_id do agendamento atual
 
 function svcAdicionar() {
   var sel = document.getElementById('agFormServico');
   var opt = sel.options[sel.selectedIndex];
   if (!opt || !opt.value) return;
-  var id = parseInt(opt.value);
-  if (_svcSel.some(function(s){ return s.id === id; })) { sel.value = ''; return; }
-  _svcSel.push({ id: id, nome: opt.dataset.nome, preco: opt.dataset.preco,
-                 dur: parseInt(opt.dataset.dur) || 60 });
+  var id       = parseInt(opt.value);
+  var vpItemId = opt.dataset.vpItemId ? parseInt(opt.dataset.vpItemId) : null;
+  var key      = vpItemId
+    ? ('vp-' + vpItemId + '-' + (opt.dataset.sessaoNum || '0'))
+    : ('s-' + id);
+  if (_svcSel.some(function(s){ return s.key === key; })) { sel.value = ''; return; }
+  if (vpItemId) _agVpItemId = vpItemId;
+  _svcSel.push({ key: key, id: id, nome: opt.dataset.nome,
+                 preco: opt.dataset.preco, dur: parseInt(opt.dataset.dur) || 60 });
   sel.value = '';
   _svcRender();
 }
 
-function svcRemover(id) {
-  _svcSel = _svcSel.filter(function(s){ return s.id !== id; });
+function svcRemover(key) {
+  var rem = _svcSel.find(function(s){ return s.key === key; });
+  if (rem && rem.key.indexOf('vp-') === 0) _agVpItemId = null;
+  _svcSel = _svcSel.filter(function(s){ return s.key !== key; });
   _svcRender();
 }
 
@@ -1593,43 +1601,99 @@ function _svcRender() {
   var totalDur = 0;
   _svcSel.forEach(function(s) {
     totalDur += s.dur;
+    var isPkg = s.key.indexOf('vp-') === 0;
     // tag visual
     var tag = document.createElement('div');
     tag.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;' +
-      'background:#0cb4b4;color:#fff;border-radius:4px;padding:.18rem .5rem;font-size:.8rem';
+      (isPkg ? 'background:#1B2D6E' : 'background:#0cb4b4') +
+      ';color:#fff;border-radius:4px;padding:.18rem .5rem;font-size:.8rem';
     var label = document.createElement('span');
-    label.textContent = s.nome + ' (R$ ' + s.preco + ')';
+    var precoTxt = parseFloat(s.preco) > 0 ? ' (R$ ' + s.preco + ')' : '';
+    label.textContent = s.nome + precoTxt;
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.innerHTML = '&times;';
     btn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;' +
       'padding:0 0 0 .2rem;font-size:1rem;line-height:1';
-    btn.onclick = (function(sid){ return function(){ svcRemover(sid); }; })(s.id);
+    btn.onclick = (function(k){ return function(){ svcRemover(k); }; })(s.key);
     tag.appendChild(label);
     tag.appendChild(btn);
     tags.appendChild(tag);
-    // hidden input
+    // hidden input servico
     var inp = document.createElement('input');
     inp.type = 'hidden'; inp.name = 'servico_ids[]'; inp.value = s.id;
     inputs.appendChild(inp);
   });
-  // Atualiza duração total
+  // hidden vp_item_id (sessão de pacote)
+  if (_agVpItemId) {
+    var vpInp = document.createElement('input');
+    vpInp.type = 'hidden'; vpInp.name = 'vp_item_id'; vpInp.value = _agVpItemId;
+    inputs.appendChild(vpInp);
+  }
   if (totalDur > 0) {
     document.getElementById('agFormDur').value = totalDur;
   }
 }
 
-function _svcPopular(lista) {
-  // lista = [{id, nome, preco, dur}] vinda do JSON de evento
-  _svcSel = lista || [];
+function _svcPopular(lista, vpItemId) {
+  _agVpItemId = vpItemId || null;
+  _svcSel = (lista || []).map(function(s) {
+    return { key: 's-' + s.id, id: s.id, nome: s.nome,
+             preco: (s.preco || 0).toFixed ? (s.preco || 0).toFixed(2) : String(s.preco || '0'),
+             dur: s.dur || 60 };
+  });
   _svcRender();
 }
 
 function _svcReset() {
-  _svcSel = [];
-  document.getElementById('svcTags').innerHTML = '';
+  _svcSel    = [];
+  _agVpItemId = null;
+  document.getElementById('svcTags').innerHTML      = '';
   document.getElementById('svcHiddenInputs').innerHTML = '';
-  document.getElementById('agFormServico').value = '';
+  document.getElementById('agFormServico').value    = '';
+  var grp = document.getElementById('agPacoteGrp');
+  if (grp) grp.remove();
+}
+
+// ── Pacotes ativos do cliente ─────────────────────────────────────────────────
+function _ordinalSessao(n) {
+  return n + 'ª Sessão';
+}
+
+function carregarPacotesCliente(clienteId) {
+  var sel    = document.getElementById('agFormServico');
+  var oldGrp = document.getElementById('agPacoteGrp');
+  if (oldGrp) oldGrp.remove();
+  if (!clienteId) return;
+
+  fetch('/admin/api/clientes/' + clienteId + '/pacotes-ativos')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.length) return;
+      var grp = document.createElement('optgroup');
+      grp.id    = 'agPacoteGrp';
+      grp.label = '📦 Sessões de pacote disponíveis';
+      data.forEach(function(item) {
+        var inicio = item.usadas + item.agendadas + 1;
+        for (var i = 0; i < item.disponivel; i++) {
+          var num = inicio + i;
+          var opt = document.createElement('option');
+          opt.value = item.servico_id || '';
+          opt.dataset.nome      = _ordinalSessao(num) + ' — ' + item.pacote_nome;
+          opt.dataset.preco     = '0.00';
+          opt.dataset.dur       = item.dur_min || 60;
+          opt.dataset.vpItemId  = item.venda_pacote_item_id;
+          opt.dataset.sessaoNum = num;
+          opt.textContent       = opt.dataset.nome;
+          opt.style.fontWeight  = '600';
+          grp.appendChild(opt);
+        }
+      });
+      // Insere logo abaixo do placeholder
+      var placeholder = sel.options[0];
+      sel.insertBefore(grp, placeholder ? placeholder.nextSibling : null);
+    })
+    .catch(function() {});
 }
 
 document.addEventListener('keydown', function(e) {
@@ -1676,6 +1740,7 @@ document.addEventListener('DOMContentLoaded', function() {
     telInput.value = item.telefone || '';
     hiddenId.value = item.id;
     closeDropdown();
+    carregarPacotesCliente(item.id);
   }
 
   function renderItems(items) {
@@ -1707,7 +1772,7 @@ document.addEventListener('DOMContentLoaded', function() {
     hiddenId.value = '';
     var q = this.value.trim();
     clearTimeout(_timer);
-    if (q.length < 2) { closeDropdown(); return; }
+    if (q.length < 2) { closeDropdown(); carregarPacotesCliente(null); return; }
     _timer = setTimeout(function() { fetchSuggestions(q); }, 220);
   });
 

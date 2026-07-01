@@ -1511,6 +1511,7 @@ def agenda_dados():
                           'preco': float(s.preco or 0),
                           'dur': (s.duracao_horas or 1) * 60 + (s.duracao_minutos or 0)}
                          for s in a.servicos_lista],
+            'vp_item_id':      a.venda_pacote_item_id,
             'hora_inicio':     a.hora_inicio.strftime('%H:%M'),
             'duracao_min':     a.duracao_min,
             'hora_fim':        a.hora_fim.strftime('%H:%M'),
@@ -1587,6 +1588,8 @@ def _build_agendamento(a):
     a.lembrete_wa     = bool(request.form.get('lembrete_wa'))
     uid = request.form.get('unidade_id', '')
     a.unidade_id = int(uid) if uid else None
+    vpid = request.form.get('vp_item_id', '').strip()
+    a.venda_pacote_item_id = int(vpid) if vpid and vpid.isdigit() else None
     return a, data_str
 
 
@@ -1736,17 +1739,28 @@ def _add_servicos_agendamento_comanda(comanda, agendamento):
     servicos = agendamento.servicos_lista or []
     if not servicos and agendamento.servico:
         servicos = [agendamento.servico]
-    for s in servicos:
+    vp_item_id = agendamento.venda_pacote_item_id
+    for i, s in enumerate(servicos):
+        # Aplica venda_pacote_item_id apenas no primeiro serviço (o da sessão)
+        vp_id = vp_item_id if i == 0 else None
         db.session.add(ComandaItem(
             comanda_id=comanda.id,
             servico_id=s.id,
             descricao=s.nome,
-            valor=s.preco or Decimal('0'),
+            valor=Decimal('0') if vp_id else (s.preco or Decimal('0')),
             quantidade=1,
             profissional_id=agendamento.profissional_id,
             comissao_valor=s.comissao_valor,
             comissao_tipo=s.comissao_tipo or '%',
+            venda_pacote_item_id=vp_id,
         ))
+    # Incrementa sessão usada se veio de pacote (em agenda_faturar, que não passa pelo comanda_update)
+    if vp_item_id:
+        vpi = db.session.get(VendaPacoteItem, vp_item_id)
+        if vpi and vpi.quantidade_usada < vpi.quantidade_total:
+            vpi.quantidade_usada += 1
+            if vpi.venda.sessoes_restantes <= 0:
+                vpi.venda.status = 'concluido'
 
 
 @admin_bp.route('/agenda/<int:ag_id>/faturar', methods=['POST'])
@@ -2983,16 +2997,27 @@ def api_cliente_pacotes_ativos(cliente_id):
     result = []
     for v in vendas:
         for item in v.itens:
-            if item.quantidade_restante > 0:
-                result.append({
-                    'venda_id':            v.id,
-                    'venda_pacote_item_id': item.id,
-                    'servico_id':          item.servico_id,
-                    'servico_nome':        item.descricao,
-                    'pacote_nome':         v.nome_pacote,
-                    'restantes':           item.quantidade_restante,
-                    'total':               item.quantidade_total,
-                })
+            # Sessões já agendadas (não canceladas/faltou) mas ainda não concluídas via comanda
+            agendadas = (tq(Agendamento)
+                .filter_by(venda_pacote_item_id=item.id)
+                .filter(Agendamento.status.in_(['agendado', 'confirmado']))
+                .count())
+            disponivel = item.quantidade_restante - agendadas
+            if disponivel <= 0:
+                continue
+            dur_min = 60
+            if item.servico:
+                dur_min = (item.servico.duracao_horas or 1) * 60 + (item.servico.duracao_minutos or 0)
+            result.append({
+                'venda_pacote_item_id': item.id,
+                'servico_id':          item.servico_id,
+                'pacote_nome':         v.nome_pacote,
+                'total':               item.quantidade_total,
+                'usadas':              item.quantidade_usada,
+                'agendadas':           agendadas,
+                'disponivel':          disponivel,
+                'dur_min':             dur_min,
+            })
     return jsonify(result)
 
 

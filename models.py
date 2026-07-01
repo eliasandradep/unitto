@@ -339,12 +339,15 @@ class Agendamento(db.Model):
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id       = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
 
-    cliente      = db.relationship('Cliente',      backref='agendamentos')
-    profissional = db.relationship('Profissional', backref='agendamentos')
-    servico      = db.relationship('Servico',      backref='agendamentos')
-    unidade      = db.relationship('Unidade',      backref='agendamentos')
-    servicos_lista = db.relationship('Servico', secondary=agendamento_servicos,
-                                     backref='agendamentos_lista')
+    venda_pacote_item_id = db.Column(db.Integer, db.ForeignKey('venda_pacote_itens.id'), nullable=True)
+
+    cliente           = db.relationship('Cliente',          backref='agendamentos')
+    profissional      = db.relationship('Profissional',     backref='agendamentos')
+    servico           = db.relationship('Servico',          backref='agendamentos')
+    unidade           = db.relationship('Unidade',          backref='agendamentos')
+    venda_pacote_item = db.relationship('VendaPacoteItem',  backref='agendamentos_sessao', foreign_keys=[venda_pacote_item_id])
+    servicos_lista    = db.relationship('Servico', secondary=agendamento_servicos,
+                                        backref='agendamentos_lista')
 
     @property
     def hora_fim(self):
