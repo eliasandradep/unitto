@@ -1747,19 +1747,22 @@ def _add_servicos_agendamento_comanda(comanda, agendamento):
     if not servicos and vpi and vpi.servico:
         servicos = [vpi.servico]
 
+    total_pacote = Decimal('0')  # acumula valor das sessões de pacote para desconto automático
+
     for i, s in enumerate(servicos):
         # Aplica venda_pacote_item_id apenas no primeiro serviço (o da sessão)
         vp_id = vp_item_id if i == 0 else None
 
         if vp_id and vpi:
-            # Sessão de pacote: usa o valor unitário da sessão no pacote para base de comissão
-            # O cliente já pagou via comanda do pacote; o valor aqui é para comissão do profissional
+            # Valor real da sessão (base de comissão do profissional)
+            # O cliente já pagou via comanda do pacote, o desconto será aplicado abaixo
             valor_sessao = (
                 vpi.pacote_item.valor_unitario
                 if vpi.pacote_item and vpi.pacote_item.valor_unitario
                 else (s.preco or Decimal('0'))
             )
             descricao = f'Sessão de pacote: {s.nome}'
+            total_pacote += valor_sessao
         else:
             valor_sessao = s.preco or Decimal('0')
             descricao = s.nome
@@ -1775,6 +1778,12 @@ def _add_servicos_agendamento_comanda(comanda, agendamento):
             comissao_tipo=s.comissao_tipo or '%',
             venda_pacote_item_id=vp_id,
         ))
+
+    # Aplica desconto igual ao valor das sessões de pacote:
+    # garante Resta a Pagar = 0 (cliente pagou via comanda do pacote)
+    # sem afetar a base de comissão do profissional
+    if total_pacote > 0:
+        comanda.desconto = (comanda.desconto or Decimal('0')) + total_pacote
 
     # Incrementa sessão usada se veio de pacote (em agenda_faturar, que não passa pelo comanda_update)
     if vpi:
