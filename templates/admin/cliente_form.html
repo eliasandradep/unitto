@@ -262,17 +262,24 @@
       </div>
       <div class="cli-info-body">
         {% set saldo_val = c.saldo or 0 %}
-        <div class="cli-info-row cli-info-row--total">
-          <span>Saldo</span>
-          <strong style="color:{% if saldo_val > 0 %}#15803d{% else %}var(--text-muted){% endif %}">
-            R$ {{ '%.2f'|format([saldo_val, 0]|max)|replace('.', ',') }}
-          </strong>
-        </div>
-        <div class="cli-info-row cli-info-row--total" style="margin-top:-.1rem">
-          <span>Saldo devedor</span>
-          <strong style="color:{% if saldo_val < 0 %}#b91c1c{% else %}var(--text-muted){% endif %}">
-            R$ {{ '%.2f'|format([(-saldo_val), 0]|max)|replace('.', ',') }}
-          </strong>
+
+        <!-- Carteira da Cliente -->
+        <p class="cli-info-label" style="margin-bottom:.35rem">Carteira da Cliente</p>
+        <div style="background:{% if saldo_val > 0 %}#f0fdf4{% elif saldo_val < 0 %}#fef2f2{% else %}var(--content-bg){% endif %};
+                    border:1px solid {% if saldo_val > 0 %}#bbf7d0{% elif saldo_val < 0 %}#fecaca{% else %}var(--border){% endif %};
+                    border-radius:8px;padding:.55rem .75rem;margin-bottom:.6rem">
+          <div class="cli-info-row cli-info-row--total" style="margin-bottom:.25rem">
+            <span>Saldo</span>
+            <strong style="color:{% if saldo_val > 0 %}#15803d{% else %}var(--text-muted){% endif %}">
+              R$ {{ '%.2f'|format([saldo_val, 0]|max)|replace('.', ',') }}
+            </strong>
+          </div>
+          <div class="cli-info-row cli-info-row--total">
+            <span>Saldo devedor</span>
+            <strong style="color:{% if saldo_val < 0 %}#b91c1c{% else %}var(--text-muted){% endif %}">
+              R$ {{ '%.2f'|format([(-saldo_val), 0]|max)|replace('.', ',') }}
+            </strong>
+          </div>
         </div>
         <div class="cli-info-divider" style="margin:.4rem 0"></div>
         <div class="cli-info-row">

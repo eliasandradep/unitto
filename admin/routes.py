@@ -2982,8 +2982,8 @@ def venda_pacote_nova():
         db.session.add(venda)
 
         # Registrar pagamentos informados no formulário
-        formas_vals  = request.form.getlist('pagamento_forma[]')
-        valores_vals = request.form.getlist('pagamento_valor[]')
+        formas_vals   = request.form.getlist('pagamento_forma[]')
+        valores_vals  = request.form.getlist('pagamento_valor[]')
         parcelas_vals = request.form.getlist('pagamento_parcelas[]')
         total_pago = Decimal('0')
         for forma, valor_str, parc_str in zip(formas_vals, valores_vals, parcelas_vals):
@@ -3008,11 +3008,27 @@ def venda_pacote_nova():
             ))
             total_pago += v
 
-        if total_pago >= valor_venda:
-            comanda.status = 'paga'
+        # Validação servidor: pelo menos um pagamento obrigatório
+        if total_pago <= 0:
+            flash('Informe ao menos uma forma de pagamento antes de registrar a venda.', 'error')
+            return render_template('admin/venda_pacote_form.html',
+                                   pacotes=pacotes_obj, pacotes_json=pacotes_json,
+                                   profs=profs, unidades=unidades, hoje=hoje.isoformat(),
+                                   formas=FORMA_PAGAMENTO)
+
+        # Fecha a comanda e aplica diferença no saldo da cliente
+        # (excesso → crédito; déficit → dívida), replicando o comportamento de _fechar_comanda
+        _fechar_comanda(comanda)
 
         db.session.commit()
-        flash(f'Pacote "{pacote.nome}" vendido com sucesso! Comanda #{comanda.codigo} criada.', 'success')
+
+        saldo_diff = valor_venda - total_pago
+        if saldo_diff > 0:
+            flash(f'Pacote "{pacote.nome}" vendido! Saldo devedor de R$ {saldo_diff:.2f} registrado para a cliente.', 'success')
+        elif saldo_diff < 0:
+            flash(f'Pacote "{pacote.nome}" vendido! Crédito de R$ {abs(saldo_diff):.2f} adicionado à carteira da cliente.', 'success')
+        else:
+            flash(f'Pacote "{pacote.nome}" vendido e pago integralmente!', 'success')
         return redirect(url_for('admin.venda_pacote_detalhe', venda_id=venda.id))
 
     return render_template('admin/venda_pacote_form.html',
