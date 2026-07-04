@@ -1520,7 +1520,8 @@ def agenda_dados():
             'como_conheceu':   a.como_conheceu or '',
             'lembrete_wa':     a.lembrete_wa,
             'unidade_id':      a.unidade_id,
-            'comanda_id':      a.comanda.id if a.comanda else None,
+            'comanda_id':      a.comanda.id     if a.comanda else None,
+            'comanda_status':  a.comanda.status if a.comanda else None,
         } for a in ags],
         'bloqueios': [{
             'id':              b.id,

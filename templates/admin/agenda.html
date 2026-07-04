@@ -769,6 +769,7 @@
 .ag-event--concluido  { background:#f3f4f6; border-left-color:#9ca3af; color:#4b5563; }
 .ag-event--cancelado  { background:#fee2e2; border-left-color:#ef4444; color:#b91c1c; opacity:.75; }
 .ag-event--faltou     { background:#fef3c7; border-left-color:#f59e0b; color:#92400e; }
+.ag-event--pago       { background:#bbf7d0; border-left-color:#16a34a; color:#14532d; }
 
 /* Botão de excluir no modal */
 .btn-danger {
@@ -1326,7 +1327,8 @@ function renderEvents(events) {
     var col = document.getElementById('agCol-' + ev.profissional_id);
     if (!col) return;
     var div = document.createElement('div');
-    div.className = 'ag-event ag-event--' + ev.status;
+    var evClass = (ev.comanda_status === 'fechada') ? 'ag-event--pago' : ('ag-event--' + ev.status);
+    div.className = 'ag-event ' + evClass;
     div.style.top    = timeToTop(ev.hora_inicio) + 'px';
     div.style.height = durToH(ev.duracao_min) + 'px';
     div.dataset.id   = ev.id;
