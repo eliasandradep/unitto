@@ -9,9 +9,14 @@
   <button type="button" class="btn-icon ag-nav-btn" id="btnPrevDay" title="Dia anterior">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
-  <div class="ag-date-btn">
+  <div class="ag-date-btn" id="agDateBtn" title="Clique para escolher a data">
+    <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0;opacity:.65">
+      <rect x="2" y="4" width="16" height="14" rx="2"/>
+      <path d="M2 8h16M6 2v4M14 2v4"/>
+    </svg>
     <span id="agDateLabel">{{ data_sel.strftime('%d/%m/%Y') }}</span>
-    <input type="date" id="agDateInput" value="{{ data_sel.isoformat() }}" title="Escolher data" />
+    <input type="date" id="agDateInput" value="{{ data_sel.isoformat() }}" tabindex="-1"
+           style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none" />
   </div>
   <button type="button" class="btn-icon ag-nav-btn" id="btnNextDay" title="Próximo dia">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -641,15 +646,18 @@
   min-width: 130px;
   text-align: center;
   color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  transition: background .15s, border-color .15s;
 }
-.ag-date-btn input[type=date] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-  border: none;
+.ag-date-btn:hover {
+  background: var(--content-bg);
+  border-color: var(--accent);
+}
+.ag-date-btn:has(input:focus-visible) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .ag-today-btn { padding: .42rem .9rem; }
 
@@ -1227,6 +1235,16 @@ document.getElementById('btnToday').addEventListener('click', function() {
 
 document.getElementById('agDateInput').addEventListener('change', function() {
   if (this.value) gotoDate(this.value);
+});
+
+document.getElementById('agDateBtn').addEventListener('click', function(e) {
+  var inp = document.getElementById('agDateInput');
+  // showPicker() abre o calendário nativo de forma confiável nos navegadores modernos
+  if (typeof inp.showPicker === 'function') {
+    try { inp.showPicker(); } catch (_) {}
+  } else {
+    inp.focus();
+  }
 });
 
 // ── Carregar eventos via AJAX ──────────────────────────────────────────────

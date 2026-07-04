@@ -128,8 +128,8 @@
               <input type="text" name="item_descricao" value="{{ item.descricao }}"
                      placeholder="Nome do serviço/produto" required {% if readonly %}disabled{% endif %} />
               {% if item.venda_pacote_item_id %}
-              <span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:.1rem .4rem;border-radius:4px;display:inline-block;margin-top:.2rem">
-                🎁 Abatido do pacote
+              <span style="font-size:.72rem;background:#dbeafe;color:#1e40af;padding:.1rem .5rem;border-radius:4px;display:inline-block;margin-top:.2rem">
+                📦 Pago via pacote — valor exibido para base de comissão
               </span>
               {% endif %}
             </div>
@@ -602,7 +602,12 @@ function escHtml(s) {
 }
 
 function confirmarExclusao() {
-  if (!confirm('Excluir esta comanda permanentemente?\nO agendamento vinculado NÃO será excluído.')) return;
+  {% if c and c.venda_pacote %}
+  var msg = 'Excluir esta comanda?\n\nATENÇÃO: a venda do pacote "{{ c.venda_pacote.nome_pacote|e }}" e todas as suas sessões também serão excluídas permanentemente.';
+  {% else %}
+  var msg = 'Excluir esta comanda permanentemente?\nO agendamento vinculado NÃO será excluído.';
+  {% endif %}
+  if (!confirm(msg)) return;
   document.getElementById('deleteCmdForm').submit();
 }
 

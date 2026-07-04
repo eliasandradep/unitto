@@ -1736,28 +1736,49 @@ def agenda_status(ag_id):
 def _add_servicos_agendamento_comanda(comanda, agendamento):
     """Adiciona itens na comanda para todos os serviços do agendamento."""
     from decimal import Decimal
-    servicos = agendamento.servicos_lista or []
+    servicos = list(agendamento.servicos_lista or [])
     if not servicos and agendamento.servico:
         servicos = [agendamento.servico]
+
     vp_item_id = agendamento.venda_pacote_item_id
+    vpi = db.session.get(VendaPacoteItem, vp_item_id) if vp_item_id else None
+
+    # Fallback: se não há serviço vinculado mas há item de pacote, usa o serviço do pacote
+    if not servicos and vpi and vpi.servico:
+        servicos = [vpi.servico]
+
     for i, s in enumerate(servicos):
         # Aplica venda_pacote_item_id apenas no primeiro serviço (o da sessão)
         vp_id = vp_item_id if i == 0 else None
+
+        if vp_id and vpi:
+            # Sessão de pacote: usa o valor unitário da sessão no pacote para base de comissão
+            # O cliente já pagou via comanda do pacote; o valor aqui é para comissão do profissional
+            valor_sessao = (
+                vpi.pacote_item.valor_unitario
+                if vpi.pacote_item and vpi.pacote_item.valor_unitario
+                else (s.preco or Decimal('0'))
+            )
+            descricao = f'Sessão de pacote: {s.nome}'
+        else:
+            valor_sessao = s.preco or Decimal('0')
+            descricao = s.nome
+
         db.session.add(ComandaItem(
             comanda_id=comanda.id,
             servico_id=s.id,
-            descricao=s.nome,
-            valor=Decimal('0') if vp_id else (s.preco or Decimal('0')),
+            descricao=descricao,
+            valor=valor_sessao,
             quantidade=1,
             profissional_id=agendamento.profissional_id,
             comissao_valor=s.comissao_valor,
             comissao_tipo=s.comissao_tipo or '%',
             venda_pacote_item_id=vp_id,
         ))
+
     # Incrementa sessão usada se veio de pacote (em agenda_faturar, que não passa pelo comanda_update)
-    if vp_item_id:
-        vpi = db.session.get(VendaPacoteItem, vp_item_id)
-        if vpi and vpi.quantidade_usada < vpi.quantidade_total:
+    if vpi:
+        if vpi.quantidade_usada < vpi.quantidade_total:
             vpi.quantidade_usada += 1
             if vpi.venda.sessoes_restantes <= 0:
                 vpi.venda.status = 'concluido'
@@ -2245,12 +2266,30 @@ def comanda_excluir(comanda_id):
                 if p.forma_pagamento == 'saldo_cliente':
                     cl.saldo = (cl.saldo or Decimal('0')) + p.valor
 
+    # Se a comanda é de venda de pacote, exclui a venda e desvincula as sessões
+    venda = getattr(c, 'venda_pacote', None)
+    if venda:
+        for item in list(venda.itens):
+            # Desvincula agendamentos que referenciam esta sessão do pacote
+            for ag in list(item.agendamentos_sessao):
+                ag.venda_pacote_item_id = None
+            # Desvincula comanda_itens que referenciam esta sessão
+            for ci in list(item.comanda_usos):
+                ci.venda_pacote_item_id = None
+        db.session.flush()
+        db.session.delete(venda)
+        db.session.flush()
+
     # Desvincula o agendamento antes de excluir (agendamento NÃO é excluído)
     c.agendamento_id = None
     db.session.flush()
     db.session.delete(c)
     db.session.commit()
-    flash('Comanda excluída. O agendamento vinculado foi mantido.', 'success')
+
+    if venda:
+        flash('Comanda e venda de pacote vinculada excluídas.', 'success')
+    else:
+        flash('Comanda excluída. O agendamento vinculado foi mantido.', 'success')
     return redirect(url_for('admin.financeiro_comandas'))
 
 
