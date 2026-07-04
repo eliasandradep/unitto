@@ -314,6 +314,8 @@ with app.app_context():
     _safe_add_col('comanda_itens', 'comissao_forma_pag', 'VARCHAR(30)')
     _safe_add_col('agendamentos',  'lembrete_enviado',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('agendamentos',  'venda_pacote_item_id',
+                  'INTEGER REFERENCES venda_pacote_itens(id)' if _pg else 'INTEGER')
     _safe_add_col('users',         'is_admin',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('users',         'empresa_id',

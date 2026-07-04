@@ -89,91 +89,90 @@
 
   </div>
 
-  <!-- Coluna direita: resumo do valor + pagamentos -->
-  <div style="display:flex;flex-direction:column;gap:1rem;position:sticky;top:1rem;align-self:start">
-
-    <!-- Valor da venda -->
+  <!-- Coluna direita: tudo em um card -->
+  <div style="position:sticky;top:1rem;align-self:start">
     <div class="card" style="padding:1.2rem 1.4rem">
-      <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Valor da Venda</div>
 
+      <!-- Valor -->
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:.8rem;color:var(--text)">Valor da Venda</div>
       <div class="form-group" style="margin-bottom:.8rem">
         <label>Valor total (R$)</label>
         <input type="text" name="valor_total" id="inpValorTotal"
                placeholder="Preenchido automaticamente"
                style="font-size:1.1rem;font-weight:600"
                oninput="pgAtualizarSaldo()" />
-        <p style="font-size:.78rem;color:var(--text-muted);margin-top:.3rem">
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem">
           Você pode ajustar o valor antes de salvar.
         </p>
       </div>
 
-      <!-- Resumo pagamentos -->
-      <table style="width:100%;font-size:.85rem;border-collapse:collapse;margin-bottom:.8rem">
-        <tr>
-          <td style="padding:.25rem 0;color:var(--text-muted)">Total</td>
-          <td id="pgResTotal" style="text-align:right;font-variant-numeric:tabular-nums">R$ 0,00</td>
-        </tr>
-        <tr>
-          <td style="padding:.25rem 0;color:var(--text-muted)">Pago</td>
-          <td id="pgResPago" style="text-align:right;color:#15803d;font-variant-numeric:tabular-nums">R$ 0,00</td>
-        </tr>
-        <tr style="border-top:1px solid var(--border)">
-          <td style="padding:.35rem 0 0;font-weight:600">Saldo</td>
-          <td id="pgResSaldo" style="text-align:right;font-weight:600;padding-top:.35rem;font-variant-numeric:tabular-nums;color:#b45309">R$ 0,00</td>
-        </tr>
-      </table>
+      <!-- Divisor: Pagamentos -->
+      <div style="border-top:1px solid var(--border);margin-bottom:.8rem;padding-top:.9rem">
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:.6rem;color:var(--text)">Pagamentos <span style="font-weight:400;color:#e74c3c;font-size:.78rem" id="pgObrigMsg">— obrigatório</span></div>
 
-      <div style="display:flex;flex-direction:column;gap:.5rem">
-        <button type="submit" class="btn btn-primary" style="width:100%">Registrar Venda</button>
-        <a href="{{ url_for('admin.pacotes') }}" class="btn btn-outline" style="width:100%;text-align:center">Cancelar</a>
+        <!-- Lista de pagamentos adicionados -->
+        <div id="pgLista"></div>
+        <div id="pgVazio" style="font-size:.83rem;color:var(--text-muted);margin-bottom:.6rem">Nenhum pagamento adicionado.</div>
+
+        <!-- Adicionar pagamento -->
+        <div style="background:var(--content-bg);border-radius:8px;padding:.75rem;margin-bottom:.6rem">
+          <div class="form-group" style="margin-bottom:.4rem">
+            <label style="font-size:.75rem">Forma</label>
+            <select id="pgForma" onchange="pgFormaChanged()">
+              <option value="">Selecione</option>
+              {% for val, label in formas %}
+              {% if val != 'saldo_cliente' %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;margin-bottom:.4rem">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:.75rem;display:flex;justify-content:space-between;align-items:center">
+                Valor (R$)
+                <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--accent-dark);cursor:pointer;padding:0"
+                        onclick="pgUsarSaldo()">↙ saldo restante</button>
+              </label>
+              <input type="text" id="pgValor" placeholder="0,00" />
+            </div>
+            <div class="form-group" style="margin:0;display:none" id="pgParcelasGrp">
+              <label style="font-size:.75rem">Parcelas</label>
+              <input type="number" id="pgParcelas" value="1" min="1" max="24" style="width:70px" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline" style="width:100%;font-size:.83rem" onclick="pgAdicionar()">
+            + Adicionar pagamento
+          </button>
+        </div>
+
+        <!-- Resumo -->
+        <table style="width:100%;font-size:.85rem;border-collapse:collapse;margin-bottom:.8rem">
+          <tr>
+            <td style="padding:.2rem 0;color:var(--text-muted)">Total</td>
+            <td id="pgResTotal" style="text-align:right;font-variant-numeric:tabular-nums">R$ 0,00</td>
+          </tr>
+          <tr>
+            <td style="padding:.2rem 0;color:var(--text-muted)">Pago</td>
+            <td id="pgResPago" style="text-align:right;color:#15803d;font-variant-numeric:tabular-nums">R$ 0,00</td>
+          </tr>
+          <tr style="border-top:1px solid var(--border)">
+            <td style="padding:.3rem 0 0;font-weight:600">Saldo</td>
+            <td id="pgResSaldo" style="text-align:right;font-weight:600;padding-top:.3rem;font-variant-numeric:tabular-nums;color:#b45309">R$ 0,00</td>
+          </tr>
+        </table>
       </div>
-    </div>
 
-    <!-- Pagamentos -->
-    <div class="card" style="padding:1.2rem 1.4rem">
-      <div style="font-size:.85rem;font-weight:600;margin-bottom:.8rem;color:var(--text)">Pagamentos</div>
-
-      <!-- Lista de pagamentos adicionados -->
-      <div id="pgLista" style="margin-bottom:.8rem"></div>
-      <div id="pgVazio" style="font-size:.83rem;color:var(--text-muted);margin-bottom:.8rem">Nenhum pagamento adicionado.</div>
-
-      <!-- Formulário para adicionar -->
-      <div style="border-top:1px solid var(--border);padding-top:.8rem">
-        <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">Adicionar pagamento</div>
-        <div class="form-group" style="margin-bottom:.45rem">
-          <label style="font-size:.75rem">Forma</label>
-          <select id="pgForma" onchange="pgFormaChanged()">
-            <option value="">Selecione</option>
-            {% for val, label in formas %}
-            {% if val != 'saldo_cliente' %}
-            <option value="{{ val }}">{{ label }}</option>
-            {% endif %}
-            {% endfor %}
-          </select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;margin-bottom:.45rem">
-          <div class="form-group" style="margin:0">
-            <label style="font-size:.75rem;display:flex;justify-content:space-between;align-items:center">
-              Valor (R$)
-              <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--accent-dark);cursor:pointer;padding:0"
-                      onclick="pgUsarSaldo()">↙ usar saldo</button>
-            </label>
-            <input type="text" id="pgValor" placeholder="0,00" />
-          </div>
-          <div class="form-group" style="margin:0" id="pgParcelasGrp">
-            <label style="font-size:.75rem">Parcelas</label>
-            <input type="number" id="pgParcelas" value="1" min="1" max="24" style="width:70px" />
-          </div>
-        </div>
-        <button type="button" class="btn btn-outline" style="width:100%;font-size:.83rem" onclick="pgAdicionar()">
-          + Adicionar
-        </button>
+      <!-- Botões -->
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <button type="submit" id="btnRegistrar" class="btn btn-primary" style="width:100%" onclick="return pgValidar()">Registrar Venda</button>
+        <a href="{{ url_for('admin.pacotes') }}" class="btn btn-outline" style="width:100%;text-align:center">Cancelar</a>
       </div>
 
       <!-- Hidden inputs dinâmicos -->
       <div id="pgHiddenInputs"></div>
-    </div>
 
+    </div>
   </div>
 
 </div>
@@ -270,27 +269,46 @@ function pgRender() {
   var lista   = document.getElementById('pgLista');
   var vazio   = document.getElementById('pgVazio');
   var hidden  = document.getElementById('pgHiddenInputs');
+  var obrig   = document.getElementById('pgObrigMsg');
   lista.innerHTML  = '';
   hidden.innerHTML = '';
-  if (!_pgLista.length) { vazio.style.display = ''; pgAtualizarSaldo(); return; }
+  if (!_pgLista.length) {
+    vazio.style.display = '';
+    obrig.style.display = '';
+    pgAtualizarSaldo();
+    return;
+  }
   vazio.style.display = 'none';
+  obrig.style.display = 'none';
   _pgLista.forEach(function(p, i) {
     var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--border)';
+    row.style.cssText = 'display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--border);margin-bottom:.1rem';
     row.innerHTML =
       '<div style="flex:1">' +
         '<div style="font-size:.83rem;font-weight:500">' + escHtml(p.formaLabel) + (p.parcelas > 1 ? ' · ' + p.parcelas + 'x' : '') + '</div>' +
       '</div>' +
       '<div style="font-weight:600;font-variant-numeric:tabular-nums;font-size:.88rem">R$ ' + p.valor.toFixed(2).replace('.', ',') + '</div>' +
-      '<button type="button" onclick="pgRemover(' + i + ')" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:1rem;padding:0 .2rem">×</button>';
+      '<button type="button" onclick="pgRemover(' + i + ')" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:1rem;line-height:1;padding:0 .2rem">×</button>';
     lista.appendChild(row);
-    // hidden inputs
     hidden.innerHTML +=
       '<input type="hidden" name="pagamento_forma[]"    value="' + escHtml(p.forma) + '">' +
       '<input type="hidden" name="pagamento_valor[]"    value="' + p.valor.toFixed(2) + '">' +
       '<input type="hidden" name="pagamento_parcelas[]" value="' + p.parcelas + '">';
   });
   pgAtualizarSaldo();
+}
+
+function pgValidar() {
+  if (!_pgLista.length) {
+    var obrig = document.getElementById('pgObrigMsg');
+    obrig.style.display = '';
+    obrig.style.color = '#e74c3c';
+    obrig.textContent = '— adicione ao menos um pagamento';
+    obrig.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('pgForma').focus();
+    return false;
+  }
+  return true;
 }
 
 function pgAtualizarSaldo() {
