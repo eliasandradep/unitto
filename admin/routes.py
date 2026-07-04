@@ -2869,7 +2869,8 @@ def venda_pacote_nova():
             flash('Selecione um pacote.', 'error')
             return render_template('admin/venda_pacote_form.html',
                                    pacotes=pacotes_obj, pacotes_json=pacotes_json,
-                                   profs=profs, unidades=unidades, hoje=hoje.isoformat())
+                                   profs=profs, unidades=unidades, hoje=hoje.isoformat(),
+                                   formas=FORMA_PAGAMENTO)
 
         pacote = db.get_or_404(Pacote, int(pacote_id))
         try:
@@ -2931,13 +2932,45 @@ def venda_pacote_nova():
             ))
 
         db.session.add(venda)
+
+        # Registrar pagamentos informados no formulário
+        formas_vals  = request.form.getlist('pagamento_forma[]')
+        valores_vals = request.form.getlist('pagamento_valor[]')
+        parcelas_vals = request.form.getlist('pagamento_parcelas[]')
+        total_pago = Decimal('0')
+        for forma, valor_str, parc_str in zip(formas_vals, valores_vals, parcelas_vals):
+            forma = forma.strip()
+            if not forma:
+                continue
+            try:
+                v = Decimal(valor_str.replace(',', '.'))
+            except Exception:
+                continue
+            if v <= 0:
+                continue
+            try:
+                parc = max(1, int(parc_str))
+            except (ValueError, TypeError):
+                parc = 1
+            comanda.pagamentos.append(PagamentoComanda(
+                forma_pagamento = forma,
+                valor           = v,
+                parcelas        = parc,
+                data_pagamento  = data_venda,
+            ))
+            total_pago += v
+
+        if total_pago >= valor_venda:
+            comanda.status = 'paga'
+
         db.session.commit()
         flash(f'Pacote "{pacote.nome}" vendido com sucesso! Comanda #{comanda.codigo} criada.', 'success')
         return redirect(url_for('admin.venda_pacote_detalhe', venda_id=venda.id))
 
     return render_template('admin/venda_pacote_form.html',
                            pacotes=pacotes_obj, pacotes_json=pacotes_json,
-                           profs=profs, unidades=unidades, hoje=hoje.isoformat())
+                           profs=profs, unidades=unidades, hoje=hoje.isoformat(),
+                           formas=FORMA_PAGAMENTO)
 
 
 @admin_bp.route('/financeiro/vendas-pacote/<int:venda_id>')

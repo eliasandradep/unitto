@@ -89,29 +89,91 @@
 
   </div>
 
-  <!-- Coluna direita: resumo do valor -->
-  <div>
-    <div class="card" style="padding:1.2rem 1.4rem;position:sticky;top:1rem">
+  <!-- Coluna direita: resumo do valor + pagamentos -->
+  <div style="display:flex;flex-direction:column;gap:1rem;position:sticky;top:1rem;align-self:start">
+
+    <!-- Valor da venda -->
+    <div class="card" style="padding:1.2rem 1.4rem">
       <div style="font-size:.85rem;font-weight:600;margin-bottom:1rem;color:var(--text)">Valor da Venda</div>
 
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:.8rem">
         <label>Valor total (R$)</label>
         <input type="text" name="valor_total" id="inpValorTotal"
-               placeholder="Preenchido automaticamente" style="font-size:1.1rem;font-weight:600" />
+               placeholder="Preenchido automaticamente"
+               style="font-size:1.1rem;font-weight:600"
+               oninput="pgAtualizarSaldo()" />
         <p style="font-size:.78rem;color:var(--text-muted);margin-top:.3rem">
           Você pode ajustar o valor antes de salvar.
         </p>
       </div>
 
-      <div style="background:var(--surface2);border-radius:8px;padding:.8rem;margin-bottom:1rem;font-size:.82rem;color:var(--text-muted)">
-        Uma comanda será criada automaticamente com este valor. O pagamento é registrado na comanda normalmente.
-      </div>
+      <!-- Resumo pagamentos -->
+      <table style="width:100%;font-size:.85rem;border-collapse:collapse;margin-bottom:.8rem">
+        <tr>
+          <td style="padding:.25rem 0;color:var(--text-muted)">Total</td>
+          <td id="pgResTotal" style="text-align:right;font-variant-numeric:tabular-nums">R$ 0,00</td>
+        </tr>
+        <tr>
+          <td style="padding:.25rem 0;color:var(--text-muted)">Pago</td>
+          <td id="pgResPago" style="text-align:right;color:#15803d;font-variant-numeric:tabular-nums">R$ 0,00</td>
+        </tr>
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:.35rem 0 0;font-weight:600">Saldo</td>
+          <td id="pgResSaldo" style="text-align:right;font-weight:600;padding-top:.35rem;font-variant-numeric:tabular-nums;color:#b45309">R$ 0,00</td>
+        </tr>
+      </table>
 
       <div style="display:flex;flex-direction:column;gap:.5rem">
         <button type="submit" class="btn btn-primary" style="width:100%">Registrar Venda</button>
         <a href="{{ url_for('admin.pacotes') }}" class="btn btn-outline" style="width:100%;text-align:center">Cancelar</a>
       </div>
     </div>
+
+    <!-- Pagamentos -->
+    <div class="card" style="padding:1.2rem 1.4rem">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:.8rem;color:var(--text)">Pagamentos</div>
+
+      <!-- Lista de pagamentos adicionados -->
+      <div id="pgLista" style="margin-bottom:.8rem"></div>
+      <div id="pgVazio" style="font-size:.83rem;color:var(--text-muted);margin-bottom:.8rem">Nenhum pagamento adicionado.</div>
+
+      <!-- Formulário para adicionar -->
+      <div style="border-top:1px solid var(--border);padding-top:.8rem">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">Adicionar pagamento</div>
+        <div class="form-group" style="margin-bottom:.45rem">
+          <label style="font-size:.75rem">Forma</label>
+          <select id="pgForma" onchange="pgFormaChanged()">
+            <option value="">Selecione</option>
+            {% for val, label in formas %}
+            {% if val != 'saldo_cliente' %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;margin-bottom:.45rem">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:.75rem;display:flex;justify-content:space-between;align-items:center">
+              Valor (R$)
+              <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--accent-dark);cursor:pointer;padding:0"
+                      onclick="pgUsarSaldo()">↙ usar saldo</button>
+            </label>
+            <input type="text" id="pgValor" placeholder="0,00" />
+          </div>
+          <div class="form-group" style="margin:0" id="pgParcelasGrp">
+            <label style="font-size:.75rem">Parcelas</label>
+            <input type="number" id="pgParcelas" value="1" min="1" max="24" style="width:70px" />
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline" style="width:100%;font-size:.83rem" onclick="pgAdicionar()">
+          + Adicionar
+        </button>
+      </div>
+
+      <!-- Hidden inputs dinâmicos -->
+      <div id="pgHiddenInputs"></div>
+    </div>
+
   </div>
 
 </div>
@@ -127,6 +189,7 @@ function carregarPacote() {
   if (!sel.value) {
     prev.style.display = 'none';
     document.getElementById('inpValorTotal').value = '';
+    pgAtualizarSaldo();
     return;
   }
 
@@ -134,6 +197,7 @@ function carregarPacote() {
   if (!pdata) { prev.style.display = 'none'; return; }
 
   document.getElementById('inpValorTotal').value = pdata.valor_total.toFixed(2).replace('.', ',');
+  pgAtualizarSaldo();
 
   const tbody = document.getElementById('tblItens');
   tbody.innerHTML = '';
@@ -157,6 +221,94 @@ function carregarPacote() {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Pagamentos ────────────────────────────────────────────────────────────────
+var _pgLista = []; // [{forma, formaLabel, valor, parcelas}]
+var _pgFormasMap = {};
+(function() {
+  {% for val, label in formas %}
+  {% if val != 'saldo_cliente' %}
+  _pgFormasMap['{{ val }}'] = '{{ label }}';
+  {% endif %}
+  {% endfor %}
+})();
+
+function pgFormaChanged() {
+  var forma = document.getElementById('pgForma').value;
+  var grp   = document.getElementById('pgParcelasGrp');
+  grp.style.display = (forma === 'cartao_credito') ? '' : 'none';
+  if (forma !== 'cartao_credito') document.getElementById('pgParcelas').value = '1';
+}
+
+function pgUsarSaldo() {
+  var total = parseFloat((document.getElementById('inpValorTotal').value || '0').replace(',', '.')) || 0;
+  var pago  = _pgLista.reduce(function(s, p){ return s + p.valor; }, 0);
+  var saldo = Math.max(0, total - pago);
+  document.getElementById('pgValor').value = saldo.toFixed(2).replace('.', ',');
+}
+
+function pgAdicionar() {
+  var forma  = document.getElementById('pgForma').value;
+  var valStr = document.getElementById('pgValor').value.replace(',', '.').trim();
+  var parc   = parseInt(document.getElementById('pgParcelas').value) || 1;
+  if (!forma) { alert('Selecione a forma de pagamento.'); return; }
+  var valor  = parseFloat(valStr);
+  if (!valor || valor <= 0) { alert('Informe um valor válido.'); return; }
+  _pgLista.push({ forma: forma, formaLabel: _pgFormasMap[forma] || forma, valor: valor, parcelas: parc });
+  document.getElementById('pgForma').value  = '';
+  document.getElementById('pgValor').value  = '';
+  document.getElementById('pgParcelas').value = '1';
+  pgRender();
+}
+
+function pgRemover(idx) {
+  _pgLista.splice(idx, 1);
+  pgRender();
+}
+
+function pgRender() {
+  var lista   = document.getElementById('pgLista');
+  var vazio   = document.getElementById('pgVazio');
+  var hidden  = document.getElementById('pgHiddenInputs');
+  lista.innerHTML  = '';
+  hidden.innerHTML = '';
+  if (!_pgLista.length) { vazio.style.display = ''; pgAtualizarSaldo(); return; }
+  vazio.style.display = 'none';
+  _pgLista.forEach(function(p, i) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--border)';
+    row.innerHTML =
+      '<div style="flex:1">' +
+        '<div style="font-size:.83rem;font-weight:500">' + escHtml(p.formaLabel) + (p.parcelas > 1 ? ' · ' + p.parcelas + 'x' : '') + '</div>' +
+      '</div>' +
+      '<div style="font-weight:600;font-variant-numeric:tabular-nums;font-size:.88rem">R$ ' + p.valor.toFixed(2).replace('.', ',') + '</div>' +
+      '<button type="button" onclick="pgRemover(' + i + ')" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:1rem;padding:0 .2rem">×</button>';
+    lista.appendChild(row);
+    // hidden inputs
+    hidden.innerHTML +=
+      '<input type="hidden" name="pagamento_forma[]"    value="' + escHtml(p.forma) + '">' +
+      '<input type="hidden" name="pagamento_valor[]"    value="' + p.valor.toFixed(2) + '">' +
+      '<input type="hidden" name="pagamento_parcelas[]" value="' + p.parcelas + '">';
+  });
+  pgAtualizarSaldo();
+}
+
+function pgAtualizarSaldo() {
+  var total = parseFloat((document.getElementById('inpValorTotal').value || '0').replace(',', '.')) || 0;
+  var pago  = _pgLista.reduce(function(s, p){ return s + p.valor; }, 0);
+  var saldo = total - pago;
+  document.getElementById('pgResTotal').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  document.getElementById('pgResPago').textContent  = 'R$ ' + pago.toFixed(2).replace('.', ',');
+  var elSaldo = document.getElementById('pgResSaldo');
+  elSaldo.textContent = 'R$ ' + saldo.toFixed(2).replace('.', ',');
+  elSaldo.style.color = saldo <= 0 ? '#15803d' : '#b45309';
+}
+
+// Inicializa ocultar parcelas e saldo
+document.addEventListener('DOMContentLoaded', function() {
+  pgFormaChanged();
+  pgAtualizarSaldo();
+});
 
 // ── Autocomplete cliente ───────────────────────────────────────────────────────
 (function() {
