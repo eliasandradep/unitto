@@ -38,6 +38,10 @@
   <div class="saas-header">
     <span class="saas-badge">SaaS Admin</span>
     <strong>Unitto — Admin</strong>
+    <a href="{{ url_for('saas_admin.dashboard') }}"
+       style="{{ 'font-weight:600;color:#fff' if request.endpoint == 'saas_admin.dashboard' else '' }}">Empresas</a>
+    <a href="{{ url_for('saas_admin.metrics') }}"
+       style="{{ 'font-weight:600;color:#fff' if request.endpoint == 'saas_admin.metrics' else '' }}">Métricas</a>
     <span style="margin-left:auto;display:flex;gap:1rem;align-items:center">
       {{ current_user.name }}
       <a href="{{ url_for('admin.logout') }}">Sair</a>

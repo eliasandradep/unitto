@@ -1,0 +1,142 @@
+{% extends 'saas_admin/base.html' %}
+{% block title %}Métricas{% endblock %}
+
+{% block content %}
+<h2 style="margin:0 0 1.2rem;font-size:1.3rem">Métricas da plataforma</h2>
+
+<!-- KPI Cards -->
+<div class="stats-grid stats-grid--6">
+  <div class="stat-card stat-card--total">
+    <div class="stat-card__value">{{ total_empresas }}</div>
+    <div class="stat-card__label">Empresas cadastradas</div>
+  </div>
+  <div class="stat-card stat-card--convertido">
+    <div class="stat-card__value">{{ status_counts.get('ativa', 0) }}</div>
+    <div class="stat-card__label">Ativas</div>
+  </div>
+  <div class="stat-card stat-card--novo">
+    <div class="stat-card__value">{{ trial_count }}</div>
+    <div class="stat-card__label">Em trial</div>
+  </div>
+  <div class="stat-card stat-card--perdido">
+    <div class="stat-card__value">{{ status_counts.get('suspensa', 0) + status_counts.get('cancelada', 0) }}</div>
+    <div class="stat-card__label">Suspensas/Canceladas</div>
+  </div>
+  <div class="stat-card stat-card--teal">
+    <div class="stat-card__value">R$ {{ '%.2f'|format(mrr)|replace('.', ',') }}</div>
+    <div class="stat-card__label">MRR (assinaturas ativas)</div>
+  </div>
+  <div class="stat-card stat-card--blue">
+    <div class="stat-card__value">{{ trials_expirando|length }}</div>
+    <div class="stat-card__label">Trials expirando (7 dias)</div>
+  </div>
+</div>
+<p class="page-description" style="margin-top:-.6rem">
+  MRR calculado a partir de assinaturas ativas via Stripe (tabela de Assinatura + Plano). O campo de plano livre da empresa (trial/free/basic/pro) não entra nesse cálculo.
+</p>
+
+<!-- Daily chart -->
+<div class="card">
+  <div class="card__header">
+    <h3>Novas empresas — últimos 30 dias</h3>
+  </div>
+  <canvas id="dailyChart" height="75"></canvas>
+</div>
+
+<!-- Row: Distribuição por plano | Trials expirando -->
+<div class="metrics-row">
+  <div class="card">
+    <div class="card__header"><h3>Empresas por plano (assinaturas ativas)</h3></div>
+    {% if plano_counts %}
+    <canvas id="planoChart" height="200"></canvas>
+    {% else %}
+    <p class="empty-state">Nenhuma assinatura ativa ainda.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="overflow:hidden">
+    <div class="card__header"><h3>Trials expirando</h3></div>
+    {% if trials_expirando %}
+    <table class="data-table">
+      <thead><tr><th>Empresa</th><th>E-mail</th><th class="col-num">Dias restantes</th></tr></thead>
+      <tbody>
+        {% for emp in trials_expirando %}
+        <tr>
+          <td>{{ emp.nome }}</td>
+          <td>{{ emp.email or '—' }}</td>
+          <td class="col-num muted">{{ emp.dias_trial_restantes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Nenhum trial expirando nos próximos 7 dias.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Uso por empresa -->
+<div class="card" style="overflow:hidden;margin-top:1rem">
+  <div class="card__header"><h3>Uso por empresa</h3></div>
+  {% if uso_por_empresa %}
+  <table class="data-table">
+    <thead><tr><th>Empresa</th><th>Plano</th><th class="col-num">Profissionais</th><th class="col-num">Usuários</th></tr></thead>
+    <tbody>
+      {% for row in uso_por_empresa %}
+      <tr>
+        <td>{{ row.empresa.nome }}</td>
+        <td>{{ row.empresa.plano }}</td>
+        <td class="col-num muted">{{ row.profissionais }}</td>
+        <td class="col-num muted">{{ row.usuarios }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">Nenhuma empresa cadastrada.</p>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const NAVY   = '#1B2D6E';
+const TEAL   = '#17C3D8';
+const BLUE   = '#2980B9';
+const GREEN  = '#27AE60';
+const GREY   = '#95A5A6';
+
+Chart.defaults.font.family = "'Jost', system-ui, sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#111827';
+
+new Chart(document.getElementById('dailyChart'), {
+  type: 'line',
+  data: {
+    labels: {{ daily_labels | safe }},
+    datasets: [{
+      label: 'Novas empresas',
+      data: {{ daily_novas | safe }},
+      borderColor: NAVY,
+      backgroundColor: 'rgba(27,45,110,.08)',
+      fill: true, tension: .4, pointRadius: 2, borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+
+{% if plano_counts %}
+new Chart(document.getElementById('planoChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ plano_counts.keys() | list | tojson }},
+    datasets: [{ data: {{ plano_counts.values() | list | tojson }}, backgroundColor: [NAVY, TEAL, BLUE, GREEN, GREY], borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+{% endif %}
+</script>
+{% endblock %}

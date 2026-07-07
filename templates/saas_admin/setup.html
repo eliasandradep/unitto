@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuração do Superadmin — Unitto</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+</head>
+<body class="admin-body admin-body--auth">
+
+  <div class="auth-card">
+    <div class="auth-card__logo" style="width:72px;height:72px;background:#1B2D6E;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.8rem;font-weight:700;color:#17C3D8;font-family:'Jost',sans-serif;letter-spacing:-.02em">U</div>
+    <h2 style="margin:.2rem 0 .1rem;font-size:1.3rem;font-weight:700">Configurar Superadmin</h2>
+    <p class="auth-card__subtitle">Nenhum superadmin cadastrado ainda. Crie o primeiro acesso da plataforma.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert--{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('saas_admin.setup') }}">
+      <div class="form-group">
+        <label>Nome completo <span class="required">*</span></label>
+        <input type="text" name="name" required />
+      </div>
+      <div class="form-group">
+        <label>Nome de usuário <span class="required">*</span></label>
+        <input type="text" name="username" required />
+      </div>
+      <div class="form-group">
+        <label>E-mail <span class="required">*</span></label>
+        <input type="email" name="email" required />
+      </div>
+      <div class="form-group">
+        <label>Telefone</label>
+        <input type="tel" name="phone" />
+      </div>
+      <div class="form-group">
+        <label>Senha <span class="required">*</span></label>
+        <input type="password" name="password" required minlength="6" />
+      </div>
+      <div class="form-group">
+        <label>Confirmar senha <span class="required">*</span></label>
+        <input type="password" name="confirm" required />
+      </div>
+      <button type="submit" class="btn-primary btn-full">Criar superadmin</button>
+    </form>
+  </div>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 import json
 import os
 from collections import defaultdict
-from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app
+from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
@@ -276,6 +276,9 @@ def users():
 @admin_bp.route('/users/new', methods=['GET', 'POST'])
 @login_required
 def user_new():
+    if not current_user.has_role('empresa_admin', 'saas_admin'):
+        abort(403)
+
     if request.method == 'POST':
         name     = request.form.get('name', '').strip()
         username = request.form.get('username', '').strip()
@@ -283,6 +286,11 @@ def user_new():
         phone    = request.form.get('phone', '').strip()
         password = request.form.get('password', '')
         confirm  = request.form.get('confirm', '')
+
+        requested_role = request.form.get('role', 'empresa_admin')
+        if requested_role == 'saas_admin' and current_user.role != 'saas_admin':
+            flash('Você não tem permissão para atribuir o papel SaaS Admin.', 'error')
+            return render_template('admin/user_form.html', user=None, roles=ROLES)
 
         error = _validate_user(name, username, email, password, confirm)
         if error:
@@ -293,7 +301,7 @@ def user_new():
             flash('E-mail já cadastrado.', 'error')
         else:
             user = User(name=name, username=username, email=email, phone=phone)
-            user.role = request.form.get('role', 'empresa_admin')
+            user.role = requested_role
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
@@ -326,12 +334,17 @@ def user_edit(user_id):
         elif dup_e:
             flash('E-mail já cadastrado.', 'error')
         else:
+            requested_role = request.form.get('role', user.role)
+            if requested_role == 'saas_admin' and current_user.role != 'saas_admin':
+                flash('Você não tem permissão para atribuir o papel SaaS Admin.', 'error')
+                return render_template('admin/user_form.html', user=user, roles=ROLES)
+
             user.name     = name
             user.username = username
             user.email    = email
             user.phone    = phone
             if current_user.has_role('empresa_admin', 'saas_admin'):
-                user.role = request.form.get('role', user.role)
+                user.role = requested_role
             if password:
                 if password != confirm:
                     flash('As senhas não coincidem.', 'error')
