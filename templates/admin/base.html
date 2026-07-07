@@ -26,7 +26,7 @@
       {% set in_servicos   = ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe','admin.categorias','admin.pacotes'] %}
       {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
       {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' or 'forma_pagamento' in ep %}
-      {% set in_relatorios = ep == 'admin.metrics' %}
+      {% set in_relatorios = ep == 'admin.metrics' or ep == 'admin.relatorio_comissoes' %}
       {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades'] %}
       {# admin.unidades redireciona para configuracoes, mantido no set para compatibilidade #}
 
@@ -109,6 +109,7 @@
         </a>
         <div class="snav-group-items">
           <a href="{{ url_for('admin.metrics') }}" class="snav-sub {% if ep == 'admin.metrics' %}active{% endif %}">Métricas</a>
+          <a href="{{ url_for('admin.relatorio_comissoes') }}" class="snav-sub {% if ep == 'admin.relatorio_comissoes' %}active{% endif %}">Comissões</a>
         </div>
       </div>
 

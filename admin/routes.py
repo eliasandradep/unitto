@@ -2719,6 +2719,150 @@ def comissoes():
         total_com=total_com, total_pago_com=total_pago_com, total_pend=total_pend)
 
 
+@admin_bp.route('/relatorios/comissoes')
+@login_required
+def relatorio_comissoes():
+    from datetime import date as _date
+    import calendar as _cal
+    from decimal import Decimal
+
+    hoje = _date.today()
+    dt_ini_s     = request.args.get('dt_ini', '')
+    dt_fim_s     = request.args.get('dt_fim', '')
+    unidade_id_s = request.args.get('unidade_id', '')
+    prof_id_s    = request.args.get('profissional_id', '')
+
+    try:
+        dt_ini = _date.fromisoformat(dt_ini_s) if dt_ini_s else hoje.replace(day=1)
+    except ValueError:
+        dt_ini = hoje.replace(day=1)
+    try:
+        dt_fim = _date.fromisoformat(dt_fim_s) if dt_fim_s else hoje.replace(day=_cal.monthrange(hoje.year, hoje.month)[1])
+    except ValueError:
+        dt_fim = hoje.replace(day=_cal.monthrange(hoje.year, hoje.month)[1])
+
+    unidade_id = int(unidade_id_s) if unidade_id_s.isdigit() else None
+    prof_id    = int(prof_id_s) if (prof_id_s.isdigit() and unidade_id) else None
+
+    _eid_c = g.get('empresa_id')
+
+    def _base_query():
+        return (tq(ComandaItem)
+                .join(Comanda, Comanda.id == ComandaItem.comanda_id)
+                .filter(
+                    Comanda.status == 'fechada',
+                    Comanda.data >= dt_ini,
+                    Comanda.data <= dt_fim,
+                    ComandaItem.comissao_valor.isnot(None),
+                    ComandaItem.comissao_valor != 0,
+                    *((Comanda.empresa_id == _eid_c,) if _eid_c else ()),
+                ))
+
+    q = _base_query()
+    if unidade_id:
+        q = q.filter(Comanda.unidade_id == unidade_id)
+    if prof_id:
+        q = q.filter(ComandaItem.profissional_id == prof_id)
+    items = q.all()
+
+    profissionais_disponiveis = []
+    if unidade_id:
+        prof_ids = {i.profissional_id for i in _base_query().filter(Comanda.unidade_id == unidade_id).all()
+                    if i.profissional_id}
+        if prof_ids:
+            profissionais_disponiveis = (tq(Profissional)
+                                         .filter(Profissional.id.in_(prof_ids))
+                                         .order_by(Profissional.nome).all())
+
+    unidades = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
+
+    # ── Agregação: unidade -> profissional -> serviço ──
+    def _novo_leaf():
+        return {'nome': '', 'quantidade': 0, 'valor_total_servico': Decimal('0'),
+                'valor_total_comissao': Decimal('0'), 'comissao_paga': Decimal('0'),
+                'comissao_pendente': Decimal('0'), 'tipos': set()}
+
+    grupos = defaultdict(lambda: defaultdict(lambda: defaultdict(_novo_leaf)))
+    unidade_nomes = {}
+    profissional_nomes = {}
+
+    for item in items:
+        u_id = item.comanda.unidade_id
+        p_id = item.profissional_id
+        s_key = item.servico_id if item.servico_id else ('desc', item.descricao)
+        nome_servico = item.servico.nome if item.servico else item.descricao
+
+        unidade_nomes.setdefault(u_id, item.comanda.unidade.label() if item.comanda.unidade else 'Sem unidade')
+        profissional_nomes.setdefault(p_id, item.profissional.nome if item.profissional else 'Sem profissional')
+
+        leaf = grupos[u_id][p_id][s_key]
+        leaf['nome'] = nome_servico
+        leaf['quantidade'] += item.quantidade or 1
+        leaf['valor_total_servico'] += (item.valor or 0) * (item.quantidade or 1)
+        comissao = item.comissao_calculada
+        leaf['valor_total_comissao'] += comissao
+        if item.comissao_paga:
+            leaf['comissao_paga'] += comissao
+        else:
+            leaf['comissao_pendente'] += comissao
+        leaf['tipos'].add((item.comissao_tipo, item.comissao_valor))
+
+    def _pct_label(tipos, valor_total_servico, valor_total_comissao):
+        tipos_grupo = {t for t, _ in tipos}
+        if tipos_grupo == {'R'}:
+            return 'R$ fixo'
+        if tipos_grupo == {'%'}:
+            if len(tipos) == 1:
+                (_, v), = tipos
+                return f"{v:.2f}".replace('.', ',') + '%'
+            if valor_total_servico:
+                pct = (valor_total_comissao / valor_total_servico) * 100
+                return f"{pct:.2f}".replace('.', ',') + '%'
+            return '—'
+        return 'misto'
+
+    def _somar(filhos):
+        out = {'valor_total_servico': Decimal('0'), 'valor_total_comissao': Decimal('0'),
+               'comissao_paga': Decimal('0'), 'comissao_pendente': Decimal('0')}
+        for f in filhos:
+            out['valor_total_servico']  += f['valor_total_servico']
+            out['valor_total_comissao'] += f['valor_total_comissao']
+            out['comissao_paga']        += f['comissao_paga']
+            out['comissao_pendente']    += f['comissao_pendente']
+        return out
+
+    relatorio = []
+    for u_id in sorted(grupos.keys(), key=lambda k: unidade_nomes[k].lower()):
+        profissionais = []
+        for p_id in sorted(grupos[u_id].keys(), key=lambda k: profissional_nomes[k].lower()):
+            servicos = []
+            for s_key in sorted(grupos[u_id][p_id].keys(), key=lambda k: grupos[u_id][p_id][k]['nome'].lower()):
+                s = grupos[u_id][p_id][s_key]
+                servicos.append({
+                    'nome': s['nome'],
+                    'valor_unitario': (s['valor_total_servico'] / s['quantidade']) if s['quantidade'] else Decimal('0'),
+                    'pct_label': _pct_label(s['tipos'], s['valor_total_servico'], s['valor_total_comissao']),
+                    'valor_total_servico': s['valor_total_servico'],
+                    'valor_total_comissao': s['valor_total_comissao'],
+                    'comissao_paga': s['comissao_paga'],
+                    'comissao_pendente': s['comissao_pendente'],
+                })
+            subtotal_prof = _somar(servicos)
+            profissionais.append({'id': p_id, 'nome': profissional_nomes[p_id],
+                                  'servicos': servicos, 'subtotal': subtotal_prof})
+        subtotal_unidade = _somar([p['subtotal'] for p in profissionais])
+        relatorio.append({'id': u_id, 'nome': unidade_nomes[u_id],
+                          'profissionais': profissionais, 'subtotal': subtotal_unidade})
+
+    total_geral = _somar([u['subtotal'] for u in relatorio])
+
+    return render_template('admin/relatorio_comissoes.html',
+        relatorio=relatorio, total_geral=total_geral,
+        unidades=unidades, profissionais_disponiveis=profissionais_disponiveis,
+        unidade_id=unidade_id, prof_id=prof_id,
+        dt_ini=dt_ini.isoformat(), dt_fim=dt_fim.isoformat())
+
+
 # ── API JSON — modal de comanda na agenda ─────────────────────────────────────
 
 def _comanda_to_json(c):

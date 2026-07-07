@@ -1,0 +1,131 @@
+{% extends 'admin/base.html' %}
+{% block title %}Relatório de Comissões{% endblock %}
+{% block page_title %}Relatórios / Comissões{% endblock %}
+
+{% block content %}
+
+<!-- Totalizadores -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.2rem">
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Total Serviços</div>
+    <div style="font-size:1.5rem;font-weight:600">R$ {{ '%.2f'|format(total_geral.valor_total_servico)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Total Comissões</div>
+    <div style="font-size:1.5rem;font-weight:600;color:var(--gold)">R$ {{ '%.2f'|format(total_geral.valor_total_comissao)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Comissão Paga</div>
+    <div style="font-size:1.5rem;font-weight:600;color:#27ae60">R$ {{ '%.2f'|format(total_geral.comissao_paga)|replace('.', ',') }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.2rem">
+    <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Comissão Pendente</div>
+    <div style="font-size:1.5rem;font-weight:600;color:#e74c3c">R$ {{ '%.2f'|format(total_geral.comissao_pendente)|replace('.', ',') }}</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">De</label>
+      <input type="date" name="dt_ini" value="{{ dt_ini }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Até</label>
+      <input type="date" name="dt_fim" value="{{ dt_fim }}" />
+    </div>
+
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Unidade</label>
+      <select name="unidade_id" onchange="this.form.submit()">
+        <option value="">— Todas —</option>
+        {% for u in unidades %}
+        <option value="{{ u.id }}" {% if unidade_id == u.id %}selected{% endif %}>{{ u.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Profissional</label>
+      <select name="profissional_id" onchange="this.form.submit()" {% if not unidade_id %}disabled{% endif %}>
+        <option value="">— Todos —</option>
+        {% for p in profissionais_disponiveis %}
+        <option value="{{ p.id }}" {% if prof_id == p.id %}selected{% endif %}>{{ p.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn-primary">Buscar</button>
+  </form>
+  <div style="font-size:.78rem;color:var(--text-muted);margin-top:.5rem">
+    Período: {{ dt_ini[8:10] }}/{{ dt_ini[5:7] }}/{{ dt_ini[0:4] }} até {{ dt_fim[8:10] }}/{{ dt_fim[5:7] }}/{{ dt_fim[0:4] }}
+  </div>
+</div>
+
+<!-- Relatório -->
+{% if relatorio %}
+  {% for u in relatorio %}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
+    <div style="padding:.8rem 1.2rem;background:var(--content-bg);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+      <h3 style="margin:0;font-size:1.05rem">{{ u.nome }}</h3>
+      <div style="font-size:.85rem;color:var(--text-muted)">
+        Total serviços: <strong>R$ {{ '%.2f'|format(u.subtotal.valor_total_servico)|replace('.', ',') }}</strong>
+        &nbsp;·&nbsp;
+        Total comissões: <strong style="color:var(--gold)">R$ {{ '%.2f'|format(u.subtotal.valor_total_comissao)|replace('.', ',') }}</strong>
+      </div>
+    </div>
+
+    {% for p in u.profissionais %}
+    <div style="border-top:1px solid var(--border-color)">
+      <div style="padding:.6rem 1.2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <strong style="font-size:.92rem">{{ p.nome }}</strong>
+        <div style="font-size:.82rem;color:var(--text-muted)">
+          Subtotal: R$ {{ '%.2f'|format(p.subtotal.valor_total_servico)|replace('.', ',') }} serviços
+          &nbsp;·&nbsp;
+          R$ {{ '%.2f'|format(p.subtotal.valor_total_comissao)|replace('.', ',') }} comissão
+          &nbsp;·&nbsp;
+          <span style="color:#27ae60">R$ {{ '%.2f'|format(p.subtotal.comissao_paga)|replace('.', ',') }} paga</span>
+          &nbsp;·&nbsp;
+          <span style="color:#e74c3c">R$ {{ '%.2f'|format(p.subtotal.comissao_pendente)|replace('.', ',') }} pendente</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Serviço</th>
+            <th style="text-align:right">Valor do Serviço</th>
+            <th>% Comissão</th>
+            <th style="text-align:right">Valor Total do Serviço</th>
+            <th style="text-align:right">Valor Total da Comissão</th>
+            <th style="text-align:right">Comissão Paga</th>
+            <th style="text-align:right">Comissão Pendente</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in p.servicos %}
+          <tr>
+            <td>{{ s.nome }}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">R$ {{ '%.2f'|format(s.valor_unitario)|replace('.', ',') }}</td>
+            <td style="font-size:.82rem;color:var(--text-muted)">{{ s.pct_label }}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">R$ {{ '%.2f'|format(s.valor_total_servico)|replace('.', ',') }}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--gold)">R$ {{ '%.2f'|format(s.valor_total_comissao)|replace('.', ',') }}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;color:#27ae60">R$ {{ '%.2f'|format(s.comissao_paga)|replace('.', ',') }}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;color:#e74c3c">R$ {{ '%.2f'|format(s.comissao_pendente)|replace('.', ',') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% else %}
+<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted)">
+  Nenhuma comissão encontrada para o período/filtro selecionado.
+</div>
+{% endif %}
+
+{% endblock %}
