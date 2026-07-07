@@ -167,6 +167,18 @@ def _seed_unidades():
         db.session.rollback()
 
 
+def _seed_formas_pagamento():
+    from models import FormaPagamento, FORMA_PAGAMENTO
+    if db.session.query(FormaPagamento.id).first():
+        return
+    for codigo, _label in FORMA_PAGAMENTO:
+        db.session.add(FormaPagamento(codigo=codigo, ativo=True))
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 def _seed_servicos():
     from models import Categoria, Servico
     if db.session.query(Servico.id).first():
@@ -272,6 +284,7 @@ def _backfill_empresa_id():
         'leads', 'categorias', 'unidades', 'expedientes', 'profissionais',
         'servicos', 'agendamentos', 'bloqueios_agenda', 'clientes', 'comandas',
         'pacotes', 'vendas_pacote', 'recebimentos_clientes', 'contas_pagar', 'contas_receber',
+        'formas_pagamento',
     ]
     try:
         with db.engine.begin() as conn:
@@ -339,6 +352,7 @@ with app.app_context():
     _safe_add_col('contas_pagar',         'empresa_id', _fk_emp)
     _safe_add_col('contas_receber',       'empresa_id', _fk_emp)
     _seed_unidades()
+    _seed_formas_pagamento()
     _seed_empresa()
     _backfill_empresa_id()
     _seed_servicos()
