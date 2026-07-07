@@ -16,7 +16,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     Expediente, ExpedienteDia, Comanda, ComandaItem, PagamentoComanda,
                     Pacote, PacoteItem, VendaPacote, VendaPacoteItem,
                     EscalaProfissionalUnidade, RecebimentoCliente,
-                    ContaPagar, ContaReceber,
+                    ContaPagar, ContaReceber, FormaPagamento,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA)
 from themes import THEMES
 
@@ -2526,6 +2526,80 @@ def boas_vindas():
     feitos    = sum(checklist.values())
     return render_template('admin/boas_vindas.html',
                            checklist=checklist, feitos=feitos, total=total)
+
+
+# ── Formas de Pagamento ────────────────────────────────────────────────────────
+
+@admin_bp.route('/financeiro/formas-pagamento', methods=['GET', 'POST'])
+@login_required
+def formas_pagamento():
+    from decimal import Decimal, InvalidOperation
+
+    if request.method == 'POST':
+        action    = request.form.get('action')
+        forma_id  = request.form.get('id', '')
+
+        def _dec(field, default='0'):
+            try:
+                return Decimal(request.form.get(field, default).strip().replace(',', '.') or default)
+            except (InvalidOperation, AttributeError):
+                return Decimal(default)
+
+        def _int(field, default=0):
+            try:
+                return int(request.form.get(field, default))
+            except (ValueError, TypeError):
+                return default
+
+        if action == 'save':
+            codigo = request.form.get('codigo', '').strip()
+            if not codigo or codigo not in dict(FORMA_PAGAMENTO):
+                flash('Selecione uma forma de pagamento válida.', 'error')
+                return redirect(url_for('admin.formas_pagamento'))
+
+            dup = tq(FormaPagamento).filter(FormaPagamento.codigo == codigo)
+            if forma_id:
+                dup = dup.filter(FormaPagamento.id != int(forma_id))
+            if dup.first():
+                flash('Já existe uma configuração cadastrada para essa forma de pagamento.', 'error')
+                return redirect(url_for('admin.formas_pagamento'))
+
+            f = db.get_or_404(FormaPagamento, int(forma_id)) if forma_id else FormaPagamento()
+            f.codigo               = codigo
+            f.observacao           = request.form.get('observacao', '').strip() or None
+            f.taxa_administracao   = _dec('taxa_administracao')
+            f.taxa_fixa            = _dec('taxa_fixa')
+            f.impostos             = _dec('impostos')
+            f.juros_antecipacao    = _dec('juros_antecipacao')
+            f.prazo_liberacao      = _int('prazo_liberacao', 0)
+            f.permite_parcelamento = bool(request.form.get('permite_parcelamento'))
+            f.max_parcelas         = _int('max_parcelas', 1)
+            f.liberacao_automatica = bool(request.form.get('liberacao_automatica'))
+            f.descontar_taxas      = bool(request.form.get('descontar_taxas'))
+            f.controle_caixa       = bool(request.form.get('controle_caixa'))
+            f.ativo                = bool(request.form.get('ativo'))
+            f.updated_at           = datetime.utcnow()
+            if not forma_id:
+                db.session.add(f)
+            db.session.commit()
+            flash('Forma de pagamento salva.', 'success')
+
+        elif action == 'delete' and forma_id:
+            f = db.get_or_404(FormaPagamento, int(forma_id))
+            db.session.delete(f)
+            db.session.commit()
+            flash('Forma de pagamento excluída.', 'success')
+
+        elif action == 'toggle' and forma_id:
+            f = db.get_or_404(FormaPagamento, int(forma_id))
+            f.ativo = not f.ativo
+            db.session.commit()
+
+        return redirect(url_for('admin.formas_pagamento'))
+
+    formas = tq(FormaPagamento).all()
+    formas.sort(key=lambda f: f.nome)
+    return render_template('admin/formas_pagamento.html', formas=formas, opcoes=FORMA_PAGAMENTO)
 
 
 # ── Comissões ─────────────────────────────────────────────────────────────────

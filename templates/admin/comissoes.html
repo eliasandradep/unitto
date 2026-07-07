@@ -140,6 +140,12 @@
           </td>
           <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--gold)">
             R$ {{ '%.2f'|format(com_calc)|replace('.', ',') }}
+            {% set taxa_desc = item.taxa_descontada %}
+            {% if taxa_desc > 0 %}
+            <div style="font-size:.72rem;font-weight:400;color:var(--text-muted)">
+              Taxa descontada: R$ {{ '%.2f'|format(taxa_desc)|replace('.', ',') }}
+            </div>
+            {% endif %}
           </td>
           <td style="font-size:.82rem;color:var(--text-muted)">
             {% if item.comissao_tipo == 'R' %}

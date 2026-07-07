@@ -441,6 +441,36 @@ FORMA_PAGAMENTO = [
 ]
 
 
+class FormaPagamento(db.Model):
+    """Configuração de taxas por forma de pagamento (código em FORMA_PAGAMENTO)."""
+    __tablename__ = 'formas_pagamento'
+    id                   = db.Column(db.Integer, primary_key=True)
+    empresa_id           = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    codigo               = db.Column(db.String(20), nullable=False)
+    observacao           = db.Column(db.String(250))
+    taxa_administracao   = db.Column(db.Numeric(8, 5), default=0)
+    taxa_fixa            = db.Column(db.Numeric(10, 2), default=0)
+    impostos             = db.Column(db.Numeric(8, 5), default=0)
+    juros_antecipacao    = db.Column(db.Numeric(8, 5), default=0)
+    prazo_liberacao      = db.Column(db.Integer, default=0)
+    permite_parcelamento = db.Column(db.Boolean, default=True)
+    max_parcelas         = db.Column(db.Integer, default=1)
+    liberacao_automatica = db.Column(db.Boolean, default=False)
+    descontar_taxas      = db.Column(db.Boolean, default=False)
+    controle_caixa       = db.Column(db.Boolean, default=False)
+    ativo                = db.Column(db.Boolean, default=True)
+    created_at           = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at           = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('empresa_id', 'codigo', name='uq_forma_pag_empresa_codigo'),
+    )
+
+    @property
+    def nome(self):
+        return dict(FORMA_PAGAMENTO).get(self.codigo, self.codigo)
+
+
 class Comanda(db.Model):
     __tablename__ = 'comandas'
     id              = db.Column(db.Integer, primary_key=True)
@@ -500,13 +530,45 @@ class ComandaItem(db.Model):
     profissional         = db.relationship('Profissional', backref='comanda_itens')
 
     @property
+    def taxa_descontada(self):
+        """Parcela da taxa das formas de pagamento (com 'Descontar Taxas' ativo) atribuída
+        a este item, rateada proporcionalmente ao valor do item dentro da comanda."""
+        from decimal import Decimal
+        comanda = self.comanda
+        if not comanda or not comanda.pagamentos:
+            return Decimal('0')
+        subtotal = comanda.valor_total
+        if not subtotal:
+            return Decimal('0')
+
+        total_taxa = Decimal('0')
+        for pag in comanda.pagamentos:
+            forma_cfg = FormaPagamento.query.filter_by(
+                empresa_id=comanda.empresa_id,
+                codigo=pag.forma_pagamento,
+                descontar_taxas=True,
+            ).first()
+            if not forma_cfg:
+                continue
+            pct = (forma_cfg.taxa_administracao or 0) + (forma_cfg.impostos or 0) + (forma_cfg.juros_antecipacao or 0)
+            total_taxa += (pag.valor or 0) * pct / 100 + (forma_cfg.taxa_fixa or 0)
+
+        if total_taxa <= 0:
+            return Decimal('0')
+        item_valor = (self.valor or 0) * (self.quantidade or 1)
+        return total_taxa * item_valor / subtotal
+
+    @property
     def comissao_calculada(self):
         from decimal import Decimal
         if not self.comissao_valor:
             return Decimal('0')
         if self.comissao_tipo == 'R':
             return self.comissao_valor
-        return (self.valor or 0) * (self.quantidade or 1) * self.comissao_valor / 100
+        base = (self.valor or 0) * (self.quantidade or 1) - self.taxa_descontada
+        if base < 0:
+            base = Decimal('0')
+        return base * self.comissao_valor / 100
 
 
 class PagamentoComanda(db.Model):

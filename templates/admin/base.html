@@ -25,7 +25,7 @@
       {% set in_clientes   = 'lead' in ep or 'cliente' in ep or ep == 'admin.aniversariantes' %}
       {% set in_servicos   = ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe','admin.categorias','admin.pacotes'] %}
       {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
-      {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' %}
+      {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' or 'forma_pagamento' in ep %}
       {% set in_relatorios = ep == 'admin.metrics' %}
       {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades'] %}
       {# admin.unidades redireciona para configuracoes, mantido no set para compatibilidade #}
@@ -72,6 +72,7 @@
           <a href="{{ url_for('admin.financeiro') }}"          class="snav-sub {% if ep == 'admin.financeiro' %}active{% endif %}">Dashboard</a>
           <a href="{{ url_for('admin.financeiro_comandas') }}" class="snav-sub {% if 'comanda' in ep and 'venda_pacote' not in ep %}active{% endif %}">Comandas</a>
           <a href="{{ url_for('admin.comissoes') }}"            class="snav-sub {% if ep == 'admin.comissoes' %}active{% endif %}">Comissões</a>
+          <a href="{{ url_for('admin.formas_pagamento') }}"     class="snav-sub {% if 'forma_pagamento' in ep %}active{% endif %}">Formas de Pagamento</a>
           <a href="{{ url_for('admin.contas_pagar') }}"        class="snav-sub {% if 'conta_pagar' in ep %}active{% endif %}">Contas a Pagar</a>
           <a href="{{ url_for('admin.contas_receber') }}"      class="snav-sub {% if 'conta_receber' in ep %}active{% endif %}">Contas a Receber</a>
           <a href="{{ url_for('admin.vendas_pacote') }}"       class="snav-sub {% if 'venda_pacote' in ep %}active{% endif %}">Vendas de Pacote</a>
