@@ -2767,12 +2767,9 @@ def relatorio_comissoes():
 
     profissionais_disponiveis = []
     if unidade_id:
-        prof_ids = {i.profissional_id for i in _base_query().filter(Comanda.unidade_id == unidade_id).all()
-                    if i.profissional_id}
-        if prof_ids:
-            profissionais_disponiveis = (tq(Profissional)
-                                         .filter(Profissional.id.in_(prof_ids))
-                                         .order_by(Profissional.nome).all())
+        profissionais_disponiveis = (tq(Profissional)
+                                     .filter_by(unidade_id=unidade_id, ativo=True)
+                                     .order_by(Profissional.nome).all())
 
     unidades = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
 
