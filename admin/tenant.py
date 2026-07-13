@@ -8,8 +8,11 @@ tq(model):            query helper que injeta o filtro de tenant
                       nas tabelas de negócio).
 """
 
+import os
 from functools import wraps
 from flask import g, abort, request
+
+BASE_DOMAIN = os.getenv('BASE_DOMAIN', 'unitto.com.br')
 
 
 # ── Settings por tenant ───────────────────────────────────────────────────────
@@ -52,14 +55,17 @@ def set_tenant_context():
     g.empresa_id = None
 
     # 1. Subdomínio: slug.dominio.tld
-    host  = request.host.split(':')[0]
-    parts = host.split('.')
-    if len(parts) >= 3 and parts[0] not in ('www', 'api', 'mail', 'static'):
-        emp = Empresa.query.filter_by(slug=parts[0], status='ativa').first()
-        if emp:
-            g.empresa    = emp
-            g.empresa_id = emp.id
-            return
+    #    Comparação por sufixo contra BASE_DOMAIN (não por contagem de labels,
+    #    já que domínios como unitto.com.br já têm 3 labels no ápice).
+    host = request.host.split(':')[0]
+    if host != BASE_DOMAIN and host.endswith('.' + BASE_DOMAIN):
+        slug = host[:-(len(BASE_DOMAIN) + 1)]
+        if slug not in ('www', 'api', 'mail', 'static'):
+            emp = Empresa.query.filter_by(slug=slug, status='ativa').first()
+            if emp:
+                g.empresa    = emp
+                g.empresa_id = emp.id
+                return
 
     # 2. Prefixo de path: /t/{slug}/...
     path_parts = request.path.strip('/').split('/')
