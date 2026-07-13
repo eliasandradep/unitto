@@ -144,6 +144,21 @@ class User(db.Model, UserMixin):
         return self.role in roles
 
 
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token      = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used       = db.Column(db.Boolean, default=False)
+
+    user = db.relationship('User')
+
+    def is_valid(self):
+        return not self.used and self.expires_at > datetime.utcnow()
+
+
 class Lead(db.Model):
     __tablename__ = 'leads'
     id         = db.Column(db.Integer, primary_key=True)

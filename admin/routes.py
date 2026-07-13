@@ -55,6 +55,74 @@ def logout():
     return redirect(url_for('admin.login'))
 
 
+@admin_bp.route('/esqueci-senha', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin.dashboard'))
+
+    if request.method == 'POST':
+        import secrets
+        from datetime import timedelta
+        from models import PasswordResetToken
+        from .mail import send_email
+
+        email = request.form.get('email', '').strip().lower()
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if user:
+            token = secrets.token_urlsafe(32)
+            db.session.add(PasswordResetToken(
+                user_id=user.id, token=token,
+                expires_at=datetime.utcnow() + timedelta(hours=1),
+            ))
+            db.session.commit()
+            link = url_for('admin.reset_password', token=token, _external=True)
+            try:
+                send_email(
+                    user.email,
+                    'Redefinição de senha — Unitto',
+                    f'Olá, {user.name}.\n\n'
+                    f'Recebemos uma solicitação para redefinir sua senha no Unitto.\n'
+                    f'Clique no link abaixo para criar uma nova senha (válido por 1 hora):\n\n'
+                    f'{link}\n\n'
+                    f'Se você não solicitou isso, ignore este e-mail.',
+                )
+            except Exception:
+                current_app.logger.exception('Falha ao enviar e-mail de reset de senha')
+
+        flash('Se o e-mail informado estiver cadastrado, enviamos um link de redefinição de senha.', 'success')
+        return redirect(url_for('admin.login'))
+
+    return render_template('admin/forgot_password.html')
+
+
+@admin_bp.route('/resetar-senha/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('admin.dashboard'))
+
+    from models import PasswordResetToken
+    reset = PasswordResetToken.query.filter_by(token=token).first()
+    if not reset or not reset.is_valid():
+        flash('Link de redefinição inválido ou expirado. Solicite um novo.', 'error')
+        return redirect(url_for('admin.forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        password_confirm = request.form.get('password_confirm', '')
+        if len(password) < 6:
+            flash('A senha deve ter pelo menos 6 caracteres.', 'error')
+        elif password != password_confirm:
+            flash('As senhas não coincidem.', 'error')
+        else:
+            reset.user.set_password(password)
+            reset.used = True
+            db.session.commit()
+            flash('Senha redefinida com sucesso. Faça login com a nova senha.', 'success')
+            return redirect(url_for('admin.login'))
+
+    return render_template('admin/reset_password.html', token=token)
+
+
 @admin_bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if User.query.first():
