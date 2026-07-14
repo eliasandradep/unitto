@@ -1,36 +1,38 @@
 """
-Envio de e-mail via SMTP — usado hoje só para reset de senha.
+Envio de e-mail via Resend (API HTTPS) — usado hoje só para reset de senha.
+
+SMTP puro é bloqueado/instável em muitos PaaS (inclusive Railway), então
+usamos a API HTTP do Resend em vez de smtplib.
 
 Variáveis de ambiente:
-    SMTP_HOST      (default: smtp.gmail.com)
-    SMTP_PORT      (default: 587)
-    SMTP_USER      conta que autentica e envia (ex: contato@gmail.com)
-    SMTP_PASSWORD  senha de app do Gmail (não a senha normal da conta)
-    MAIL_FROM      remetente exibido (default: SMTP_USER)
+    RESEND_API_KEY  chave da conta Resend (resend.com/api-keys)
+    MAIL_FROM       remetente exibido (precisa ser de um domínio verificado
+                     no Resend, ou onboarding@resend.dev para testes)
 """
 
 import os
-import smtplib
-from email.mime.text import MIMEText
+import requests
+
+RESEND_API_URL = 'https://api.resend.com/emails'
 
 
 def send_email(to_addr: str, subject: str, body: str) -> bool:
-    smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-    smtp_port = int(os.getenv('SMTP_PORT', '587'))
-    smtp_user = os.getenv('SMTP_USER')
-    smtp_password = os.getenv('SMTP_PASSWORD')
-    mail_from = os.getenv('MAIL_FROM', smtp_user)
+    api_key = os.getenv('RESEND_API_KEY')
+    mail_from = os.getenv('MAIL_FROM')
 
-    if not smtp_user or not smtp_password:
-        raise RuntimeError('SMTP_USER/SMTP_PASSWORD não configurados.')
+    if not api_key or not mail_from:
+        raise RuntimeError('RESEND_API_KEY/MAIL_FROM não configurados.')
 
-    msg = MIMEText(body, 'plain', 'utf-8')
-    msg['Subject'] = subject
-    msg['From'] = mail_from
-    msg['To'] = to_addr
-
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(mail_from, [to_addr], msg.as_string())
+    resp = requests.post(
+        RESEND_API_URL,
+        headers={'Authorization': f'Bearer {api_key}'},
+        json={
+            'from': mail_from,
+            'to': [to_addr],
+            'subject': subject,
+            'text': body,
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
     return True
