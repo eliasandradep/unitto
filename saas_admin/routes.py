@@ -116,11 +116,11 @@ def planos_lista():
     return render_template('saas_admin/planos.html', planos=planos, assinantes=assinantes)
 
 
-def _salvar_itens(plano, textos):
+def _salvar_itens(plano, itens_texto):
     PlanoItem.query.filter_by(plano_id=plano.id).delete()
-    for i, texto in enumerate(t.strip() for t in textos):
-        if texto:
-            db.session.add(PlanoItem(plano_id=plano.id, texto=texto, ordem=i))
+    linhas = (t.strip() for t in itens_texto.splitlines())
+    for i, texto in enumerate(t for t in linhas if t):
+        db.session.add(PlanoItem(plano_id=plano.id, texto=texto, ordem=i))
 
 
 @saas_bp.route('/planos/novo', methods=['GET', 'POST'])
@@ -149,7 +149,7 @@ def plano_novo():
             )
             db.session.add(plano)
             db.session.flush()
-            _salvar_itens(plano, request.form.getlist('itens[]'))
+            _salvar_itens(plano, request.form.get('itens_texto', ''))
             db.session.commit()
             flash(f'Plano "{nome}" criado.', 'success')
             return redirect(url_for('saas_admin.planos_lista'))
@@ -180,7 +180,7 @@ def plano_edit(plano_id):
             plano.destaque          = 'destaque' in request.form
             plano.ordem             = request.form.get('ordem', type=int) or 0
             plano.ativo             = 'ativo' in request.form
-            _salvar_itens(plano, request.form.getlist('itens[]'))
+            _salvar_itens(plano, request.form.get('itens_texto', ''))
             db.session.commit()
             flash('Plano atualizado.', 'success')
             return redirect(url_for('saas_admin.planos_lista'))

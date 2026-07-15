@@ -70,15 +70,11 @@
 
       <div class="form-group">
         <label>Itens inclusos (exibidos na página de planos)</label>
-        <div id="itens-list">
-          {% for item in (plano.itens if plano else []) %}
-          <div class="item-row" style="display:flex;gap:.4rem;margin-bottom:.4rem">
-            <input type="text" name="itens[]" value="{{ item.texto }}" style="flex:1" />
-            <button type="button" class="btn-icon btn-icon--danger" onclick="this.parentElement.remove()">×</button>
-          </div>
-          {% endfor %}
-        </div>
-        <button type="button" class="btn-secondary" style="font-size:.8rem;padding:.3rem .7rem" onclick="addItem()">+ Adicionar item</button>
+        <textarea name="itens_texto" rows="8"
+                  placeholder="Um item por linha, exatamente como deve aparecer na página de planos"
+                  style="width:100%;font-family:inherit;resize:vertical">{% for item in (plano.itens if plano else []) %}{{ item.texto }}
+{% endfor %}</textarea>
+        <small style="color:#888">Cada linha vira um item, exibido um abaixo do outro na página de planos.</small>
       </div>
 
       <div class="form-actions">
@@ -88,17 +84,4 @@
     </form>
   </div>
 </div>
-
-<script>
-function addItem() {
-  var list = document.getElementById('itens-list');
-  var row = document.createElement('div');
-  row.className = 'item-row';
-  row.style.cssText = 'display:flex;gap:.4rem;margin-bottom:.4rem';
-  row.innerHTML = '<input type="text" name="itens[]" style="flex:1" />' +
-                  '<button type="button" class="btn-icon btn-icon--danger" onclick="this.parentElement.remove()">×</button>';
-  list.appendChild(row);
-  row.querySelector('input').focus();
-}
-</script>
 {% endblock %}
