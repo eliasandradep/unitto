@@ -31,6 +31,8 @@ def index():
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
+        if current_user.role == 'saas_admin':
+            return redirect(url_for('saas_admin.dashboard'))
         return redirect(url_for('admin.dashboard'))
 
     if not User.query.first():
@@ -42,6 +44,8 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
+            if user.role == 'saas_admin':
+                return redirect(url_for('saas_admin.dashboard'))
             return redirect(url_for('admin.dashboard'))
         flash('Usuário ou senha incorretos.', 'error')
 
