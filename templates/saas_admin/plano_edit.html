@@ -1,0 +1,104 @@
+{% extends 'saas_admin/base.html' %}
+{% block title %}{{ 'Editar plano' if plano else 'Novo plano' }}{% endblock %}
+
+{% block content %}
+<div style="max-width:560px">
+  <h2 style="margin:0 0 1.2rem;font-size:1.2rem">
+    {{ 'Editar plano: ' + plano.nome if plano else 'Novo plano' }}
+  </h2>
+  <div class="card">
+    <form method="POST">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome <span class="required">*</span></label>
+          <input type="text" name="nome" value="{{ plano.nome if plano else '' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Slug (identificador único) <span class="required">*</span></label>
+          <input type="text" name="slug" value="{{ plano.slug if plano else '' }}"
+                 pattern="[a-z0-9\-]+" title="Apenas letras minúsculas, números e hífens" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select name="tipo">
+            <option value="mensal" {{ 'selected' if not plano or plano.tipo == 'mensal' else '' }}>Mensal</option>
+            <option value="anual" {{ 'selected' if plano and plano.tipo == 'anual' else '' }}>Anual</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Preço (R$/mês) <span class="required">*</span></label>
+          <input type="number" step="0.01" min="0" name="preco"
+                 value="{{ plano.preco if plano and plano.preco is not none else '' }}" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Stripe Price ID</label>
+        <input type="text" name="stripe_price_id" value="{{ plano.stripe_price_id if plano else '' }}"
+               placeholder="price_..." />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Máx. profissionais</label>
+          <input type="number" min="1" name="max_profissionais" value="{{ plano.max_profissionais if plano else 1 }}" />
+        </div>
+        <div class="form-group">
+          <label>WhatsApp/mês</label>
+          <input type="number" min="0" name="max_wa_mes" value="{{ plano.max_wa_mes if plano else 0 }}" />
+        </div>
+        <div class="form-group">
+          <label>Agendamentos simultâneos</label>
+          <input type="number" min="1" name="max_simultaneos" value="{{ plano.max_simultaneos if plano else 2 }}" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ordem de exibição</label>
+          <input type="number" name="ordem" value="{{ plano.ordem if plano else 0 }}" />
+        </div>
+        <div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end;gap:.4rem">
+          <label><input type="checkbox" name="tem_relatorios" {{ 'checked' if not plano or plano.tem_relatorios }} /> Tem relatórios</label>
+          <label><input type="checkbox" name="destaque" {{ 'checked' if plano and plano.destaque }} /> Destaque ("Mais popular")</label>
+          <label><input type="checkbox" name="ativo" {{ 'checked' if not plano or plano.ativo }} /> Ativo (disponível para compra)</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Itens inclusos (exibidos na página de planos)</label>
+        <div id="itens-list">
+          {% for item in (plano.itens if plano else []) %}
+          <div class="item-row" style="display:flex;gap:.4rem;margin-bottom:.4rem">
+            <input type="text" name="itens[]" value="{{ item.texto }}" style="flex:1" />
+            <button type="button" class="btn-icon btn-icon--danger" onclick="this.parentElement.remove()">×</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" class="btn-secondary" style="font-size:.8rem;padding:.3rem .7rem" onclick="addItem()">+ Adicionar item</button>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">{{ 'Salvar' if plano else 'Criar plano' }}</button>
+        <a href="{{ url_for('saas_admin.planos_lista') }}" class="btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function addItem() {
+  var list = document.getElementById('itens-list');
+  var row = document.createElement('div');
+  row.className = 'item-row';
+  row.style.cssText = 'display:flex;gap:.4rem;margin-bottom:.4rem';
+  row.innerHTML = '<input type="text" name="itens[]" style="flex:1" />' +
+                  '<button type="button" class="btn-icon btn-icon--danger" onclick="this.parentElement.remove()">×</button>';
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+</script>
+{% endblock %}

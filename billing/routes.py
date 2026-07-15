@@ -79,10 +79,10 @@ def checkout():
 
     _stripe_api_key()
     plano_id = request.form.get('plano_id', type=int)
-    periodo  = request.form.get('periodo', 'mensal')
 
     plano = db.get_or_404(Plano, plano_id)
-    price_id = plano.stripe_price_anual if periodo == 'anual' else plano.stripe_price_mensal
+    periodo  = plano.tipo or 'mensal'
+    price_id = plano.stripe_price_id
 
     if not price_id:
         flash('Este plano ainda não está disponível para pagamento online.', 'error')
@@ -172,12 +172,14 @@ def _handle_event(event):
         meta       = obj.get('metadata', {})
         empresa_id = int(meta.get('empresa_id') or 0)
         plano_id   = int(meta.get('plano_id')   or 0)
-        periodo    = meta.get('periodo', 'mensal')
         customer_id    = obj.get('customer')
         subscription_id = obj.get('subscription')
 
         if not empresa_id:
             return
+
+        pl_meta = db.session.get(Plano, plano_id)
+        periodo = pl_meta.tipo if pl_meta else 'mensal'
 
         assin = Assinatura.query.filter_by(empresa_id=empresa_id).first()
         if assin:
@@ -195,9 +197,8 @@ def _handle_event(event):
 
         emp = db.session.get(Empresa, empresa_id)
         if emp:
-            pl = db.session.get(Plano, plano_id)
-            if pl:
-                emp.plano = pl.slug
+            if pl_meta:
+                emp.plano = pl_meta.slug
             emp.status = 'ativa'
         db.session.commit()
 

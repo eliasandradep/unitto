@@ -73,23 +73,42 @@ class Plano(db.Model):
     """Plano de assinatura disponível no SaaS."""
     __tablename__ = 'planos'
     id                  = db.Column(db.Integer, primary_key=True)
-    slug                = db.Column(db.String(20), unique=True, nullable=False)  # lite|plus|pro|black
+    slug                = db.Column(db.String(20), unique=True, nullable=False)  # identificador único do plano
     nome                = db.Column(db.String(50), nullable=False)
-    preco_mensal        = db.Column(db.Numeric(10, 2))  # preço cheio mês a mês
-    preco_anual_mensal  = db.Column(db.Numeric(10, 2))  # equivalente mensal no anual
+    preco_mensal        = db.Column(db.Numeric(10, 2))  # legado, não usado — ver `preco`
+    preco_anual_mensal  = db.Column(db.Numeric(10, 2))  # legado, não usado — ver `preco`
     max_profissionais   = db.Column(db.Integer, default=1)
     max_wa_mes          = db.Column(db.Integer, default=0)
     max_simultaneos     = db.Column(db.Integer, default=2)
     tem_relatorios      = db.Column(db.Boolean, default=True)
-    stripe_price_mensal = db.Column(db.String(100))  # Stripe Price ID mensal
-    stripe_price_anual  = db.Column(db.String(100))  # Stripe Price ID anual
+    stripe_price_mensal = db.Column(db.String(100))  # legado, não usado — ver `stripe_price_id`
+    stripe_price_anual  = db.Column(db.String(100))  # legado, não usado — ver `stripe_price_id`
     ordem               = db.Column(db.Integer, default=0)
     ativo               = db.Column(db.Boolean, default=True)
+
+    tipo                = db.Column(db.String(10), default='mensal')  # mensal|anual — cada linha é um plano independente
+    preco               = db.Column(db.Numeric(10, 2))  # preço da linha (mensal: cobrança cheia; anual: equivalente mensal)
+    stripe_price_id     = db.Column(db.String(100))
+    destaque            = db.Column(db.Boolean, default=False)  # exibido como "Mais popular"
 
     @property
     def preco_anual_total(self):
         from decimal import Decimal
-        return (self.preco_anual_mensal or Decimal('0')) * 12
+        if self.tipo != 'anual':
+            return None
+        return (self.preco or Decimal('0')) * 12
+
+
+class PlanoItem(db.Model):
+    """Item incluso exibido na listagem de um plano (ex: 'Link com seu logo')."""
+    __tablename__ = 'plano_itens'
+    id       = db.Column(db.Integer, primary_key=True)
+    plano_id = db.Column(db.Integer, db.ForeignKey('planos.id'), nullable=False)
+    texto    = db.Column(db.String(200), nullable=False)
+    ordem    = db.Column(db.Integer, default=0)
+
+    plano = db.relationship('Plano', backref=db.backref(
+        'itens', order_by='PlanoItem.ordem', cascade='all, delete-orphan'))
 
 
 class Assinatura(db.Model):

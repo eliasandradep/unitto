@@ -42,6 +42,8 @@
        style="{{ 'font-weight:600;color:#fff' if request.endpoint == 'saas_admin.dashboard' else '' }}">Empresas</a>
     <a href="{{ url_for('saas_admin.metrics') }}"
        style="{{ 'font-weight:600;color:#fff' if request.endpoint == 'saas_admin.metrics' else '' }}">Métricas</a>
+    <a href="{{ url_for('saas_admin.planos_lista') }}"
+       style="{{ 'font-weight:600;color:#fff' if request.endpoint and request.endpoint.startswith('saas_admin.plano') else '' }}">Planos</a>
     <span style="margin-left:auto;display:flex;gap:1rem;align-items:center">
       {{ current_user.name }}
       <a href="{{ url_for('admin.logout') }}">Sair</a>

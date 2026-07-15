@@ -14,27 +14,33 @@
   <p style="color:#666;margin:0 0 1.5rem">
     Para continuar usando o sistema, escolha um plano e ative sua assinatura.
   </p>
-  <a href="{{ url_for('billing.planos') }}" class="btn-primary"
-     style="font-size:1rem;padding:.7rem 2rem">
-    Ver planos e assinar
-  </a>
-  <div style="margin-top:1rem">
-    <a href="{{ url_for('admin.login') }}" style="font-size:.82rem;color:#888">
-      Já tem assinatura? Entre na sua conta
-    </a>
-  </div>
+</div>
+
+<!-- Toggle mensal / anual -->
+<div class="periodo-toggle">
+  <span class="toggle-label" id="lblMensal" onclick="setTipo('mensal')">Mensal</span>
+  <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+    <input type="checkbox" id="tipoToggle" onchange="setTipo(this.checked?'anual':'mensal')"
+           style="opacity:0;width:0;height:0">
+    <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#ddd;border-radius:99px;transition:.2s" id="toggleTrack"></span>
+    <span style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)" id="toggleThumb"></span>
+  </label>
+  <span class="toggle-label" id="lblAnual" onclick="setTipo('anual')">
+    Anual <span class="economia-badge">economize</span>
+  </span>
 </div>
 
 <!-- Tabela resumida -->
-<div class="plan-grid" style="margin-top:2.5rem">
+<div class="plan-grid" style="margin-top:1.5rem">
   {% for plano in planos %}
-  <div class="plan-card {{ 'plan-card--destaque' if plano.slug == 'pro' }}">
-    {% if plano.slug == 'pro' %}<span class="plan-badge">Mais popular</span>{% endif %}
+  <div class="plan-card {{ 'plan-card--destaque' if plano.destaque }}" data-tipo="{{ plano.tipo }}"
+       style="{{ '' if plano.tipo == 'anual' else 'display:none' }}">
+    {% if plano.destaque %}<span class="plan-badge">Mais popular</span>{% endif %}
     <div class="plan-nome">{{ plano.nome }}</div>
     <div class="plan-preco-anual">
-      R${{ '%g' % plano.preco_anual_mensal }}<span style="font-size:.9rem;font-weight:400">/mês</span>
+      R${{ '%g' % plano.preco }}<span style="font-size:.9rem;font-weight:400">/mês</span>
     </div>
-    <div class="plan-preco-sub">no plano anual</div>
+    <div class="plan-preco-sub">{{ 'no plano anual' if plano.tipo == 'anual' else 'no plano mensal' }}</div>
     <hr class="plan-divider" />
     <div class="plan-feature">{{ plano.max_profissionais }} profissional(is)</div>
     <div class="plan-feature">{{ plano.max_wa_mes }} WA/mês</div>
@@ -42,17 +48,37 @@
       {% if current_user.is_authenticated %}
       <form method="POST" action="{{ url_for('billing.checkout') }}">
         <input type="hidden" name="plano_id" value="{{ plano.id }}" />
-        <input type="hidden" name="periodo" value="anual" />
-        <button type="submit" class="{{ 'btn-primary' if plano.slug == 'pro' else 'btn-secondary' }}"
+        <button type="submit" class="{{ 'btn-primary' if plano.destaque else 'btn-secondary' }}"
                 style="width:100%;padding:.5rem">Assinar</button>
       </form>
       {% else %}
       <a href="{{ url_for('signup.signup') }}"
-         class="{{ 'btn-primary' if plano.slug == 'pro' else 'btn-secondary' }}"
+         class="{{ 'btn-primary' if plano.destaque else 'btn-secondary' }}"
          style="display:block;text-align:center;padding:.5rem">Assinar</a>
       {% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
+
+<div style="text-align:center;margin-top:1rem">
+  <a href="{{ url_for('admin.login') }}" style="font-size:.82rem;color:#888">
+    Já tem assinatura? Entre na sua conta
+  </a>
+</div>
+
+<script>
+function setTipo(tipo) {
+  var isAnual = (tipo === 'anual');
+  document.getElementById('tipoToggle').checked = isAnual;
+  document.getElementById('toggleTrack').style.background = isAnual ? '#c1904f' : '#ddd';
+  document.getElementById('toggleThumb').style.left = isAnual ? '23px' : '3px';
+  document.getElementById('lblMensal').className = 'toggle-label' + (isAnual ? '' : ' toggle-label--active');
+  document.getElementById('lblAnual').className  = 'toggle-label' + (isAnual ? ' toggle-label--active' : '');
+  document.querySelectorAll('.plan-card').forEach(function(el){
+    el.style.display = (el.dataset.tipo === tipo) ? '' : 'none';
+  });
+}
+setTipo('anual');
+</script>
 {% endblock %}

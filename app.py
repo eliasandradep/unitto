@@ -259,15 +259,29 @@ def _seed_planos():
     ]
     changed = False
     for pd in planos_data:
-        p = Plano.query.filter_by(slug=pd['slug']).first()
-        if p:
-            for k, v in pd.items():
-                if k != 'slug' and getattr(p, k) != v:
-                    setattr(p, k, v)
-                    changed = True
-        else:
+        if not Plano.query.filter_by(slug=pd['slug']).first():
             db.session.add(Plano(**pd, ativo=True))
             changed = True
+    if changed:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+def _migrate_planos_tipo():
+    """Backfill único: linhas antigas de Plano (dois preços numa linha só)
+    viram a variante 'mensal' independente. Só toca linhas ainda não
+    migradas (preco IS NULL) — nunca sobrescreve edições feitas depois
+    pelo superadmin."""
+    from models import Plano
+    changed = False
+    for p in Plano.query.filter(Plano.preco.is_(None)).all():
+        p.tipo            = 'mensal'
+        p.preco           = p.preco_mensal
+        p.stripe_price_id = p.stripe_price_mensal
+        p.destaque        = (p.slug == 'pro')
+        changed = True
     if changed:
         try:
             db.session.commit()
@@ -351,12 +365,18 @@ with app.app_context():
     _safe_add_col('recebimentos_clientes','empresa_id', _fk_emp)
     _safe_add_col('contas_pagar',         'empresa_id', _fk_emp)
     _safe_add_col('contas_receber',       'empresa_id', _fk_emp)
+    _safe_add_col('planos', 'tipo',            "VARCHAR(10) DEFAULT 'mensal'")
+    _safe_add_col('planos', 'preco',           'NUMERIC(10,2)')
+    _safe_add_col('planos', 'stripe_price_id', 'VARCHAR(100)')
+    _safe_add_col('planos', 'destaque',
+                  'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _seed_unidades()
     _seed_formas_pagamento()
     _seed_empresa()
     _backfill_empresa_id()
     _seed_servicos()
     _seed_planos()
+    _migrate_planos_tipo()
     try:
         first = User.query.order_by(User.id).first()
         if first and not first.is_admin:

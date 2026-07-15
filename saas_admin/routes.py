@@ -5,7 +5,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from . import saas_bp
-from models import db, Empresa, User, Assinatura, Plano, Profissional
+from models import db, Empresa, User, Assinatura, Plano, PlanoItem, Profissional
 
 
 @saas_bp.route('/setup', methods=['GET', 'POST'])
@@ -107,6 +107,108 @@ def empresa_nova():
     return render_template('saas_admin/empresa_edit.html', emp=None)
 
 
+@saas_bp.route('/planos')
+def planos_lista():
+    planos = Plano.query.order_by(Plano.ordem, Plano.id).all()
+    assinantes = defaultdict(int)
+    for assin in Assinatura.query.filter_by(status='ativa').all():
+        assinantes[assin.plano_id] += 1
+    return render_template('saas_admin/planos.html', planos=planos, assinantes=assinantes)
+
+
+def _salvar_itens(plano, textos):
+    PlanoItem.query.filter_by(plano_id=plano.id).delete()
+    for i, texto in enumerate(t.strip() for t in textos):
+        if texto:
+            db.session.add(PlanoItem(plano_id=plano.id, texto=texto, ordem=i))
+
+
+@saas_bp.route('/planos/novo', methods=['GET', 'POST'])
+def plano_novo():
+    if request.method == 'POST':
+        slug = request.form.get('slug', '').strip()
+        nome = request.form.get('nome', '').strip()
+        if not slug or not nome:
+            flash('Nome e slug são obrigatórios.', 'error')
+        elif Plano.query.filter_by(slug=slug).first():
+            flash('Slug já em uso.', 'error')
+        else:
+            preco_s = request.form.get('preco', '').strip()
+            plano = Plano(
+                slug=slug, nome=nome,
+                tipo=request.form.get('tipo', 'mensal'),
+                preco=Decimal(preco_s) if preco_s else None,
+                stripe_price_id=request.form.get('stripe_price_id', '').strip() or None,
+                max_profissionais=request.form.get('max_profissionais', type=int) or 1,
+                max_wa_mes=request.form.get('max_wa_mes', type=int) or 0,
+                max_simultaneos=request.form.get('max_simultaneos', type=int) or 2,
+                tem_relatorios='tem_relatorios' in request.form,
+                destaque='destaque' in request.form,
+                ordem=request.form.get('ordem', type=int) or 0,
+                ativo='ativo' in request.form,
+            )
+            db.session.add(plano)
+            db.session.flush()
+            _salvar_itens(plano, request.form.getlist('itens[]'))
+            db.session.commit()
+            flash(f'Plano "{nome}" criado.', 'success')
+            return redirect(url_for('saas_admin.planos_lista'))
+    return render_template('saas_admin/plano_edit.html', plano=None)
+
+
+@saas_bp.route('/planos/<int:plano_id>/edit', methods=['GET', 'POST'])
+def plano_edit(plano_id):
+    plano = db.get_or_404(Plano, plano_id)
+    if request.method == 'POST':
+        novo_slug = request.form.get('slug', '').strip()
+        nome      = request.form.get('nome', '').strip()
+        if not novo_slug or not nome:
+            flash('Nome e slug são obrigatórios.', 'error')
+        elif novo_slug != plano.slug and Plano.query.filter_by(slug=novo_slug).first():
+            flash('Slug já em uso.', 'error')
+        else:
+            preco_s = request.form.get('preco', '').strip()
+            plano.slug              = novo_slug
+            plano.nome              = nome
+            plano.tipo              = request.form.get('tipo', 'mensal')
+            plano.preco             = Decimal(preco_s) if preco_s else None
+            plano.stripe_price_id   = request.form.get('stripe_price_id', '').strip() or None
+            plano.max_profissionais = request.form.get('max_profissionais', type=int) or 1
+            plano.max_wa_mes        = request.form.get('max_wa_mes', type=int) or 0
+            plano.max_simultaneos   = request.form.get('max_simultaneos', type=int) or 2
+            plano.tem_relatorios    = 'tem_relatorios' in request.form
+            plano.destaque          = 'destaque' in request.form
+            plano.ordem             = request.form.get('ordem', type=int) or 0
+            plano.ativo             = 'ativo' in request.form
+            _salvar_itens(plano, request.form.getlist('itens[]'))
+            db.session.commit()
+            flash('Plano atualizado.', 'success')
+            return redirect(url_for('saas_admin.planos_lista'))
+    return render_template('saas_admin/plano_edit.html', plano=plano)
+
+
+@saas_bp.route('/planos/<int:plano_id>/toggle-ativo', methods=['POST'])
+def plano_toggle_ativo(plano_id):
+    plano = db.get_or_404(Plano, plano_id)
+    plano.ativo = not plano.ativo
+    db.session.commit()
+    flash(f'Plano "{plano.nome}" agora está {"ativo" if plano.ativo else "inativo"}.', 'success')
+    return redirect(url_for('saas_admin.planos_lista'))
+
+
+@saas_bp.route('/planos/<int:plano_id>/excluir', methods=['POST'])
+def plano_excluir(plano_id):
+    plano = db.get_or_404(Plano, plano_id)
+    if Assinatura.query.filter_by(plano_id=plano_id).count() > 0:
+        flash(f'Plano "{plano.nome}" tem assinaturas vinculadas e não pode ser excluído. Desative-o em vez disso.', 'error')
+        return redirect(url_for('saas_admin.planos_lista'))
+    PlanoItem.query.filter_by(plano_id=plano_id).delete()
+    db.session.delete(plano)
+    db.session.commit()
+    flash(f'Plano "{plano.nome}" excluído.', 'success')
+    return redirect(url_for('saas_admin.planos_lista'))
+
+
 @saas_bp.route('/metrics')
 def metrics():
     today = datetime.utcnow().date()
@@ -136,8 +238,7 @@ def metrics():
     mrr = Decimal('0')
     plano_counts = defaultdict(int)
     for assin in assinaturas_ativas:
-        preco = assin.plano.preco_anual_mensal if assin.periodo == 'anual' else assin.plano.preco_mensal
-        mrr += preco or Decimal('0')
+        mrr += assin.plano.preco or Decimal('0')
         plano_counts[assin.plano.nome] += 1
 
     # Trials expirando nos próximos 7 dias
