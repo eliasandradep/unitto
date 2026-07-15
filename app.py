@@ -289,6 +289,42 @@ def _migrate_planos_tipo():
             db.session.rollback()
 
 
+def _duplicate_planos_anual():
+    """One-time: duplica cada plano mensal existente numa variante anual
+    independente (mesmo preço/limites/itens, editável depois pelo
+    superadmin). Idempotente — só cria a variante '-anual' se ainda não
+    existir, então não recria nem sobrescreve edições feitas depois."""
+    from models import Plano, PlanoItem
+    changed = False
+    for p in Plano.query.filter_by(tipo='mensal').all():
+        anual_slug = f'{p.slug}-anual'
+        if Plano.query.filter_by(slug=anual_slug).first():
+            continue
+        novo = Plano(
+            slug=anual_slug,
+            nome=f'{p.nome} Anual',
+            tipo='anual',
+            preco=p.preco,
+            max_profissionais=p.max_profissionais,
+            max_wa_mes=p.max_wa_mes,
+            max_simultaneos=p.max_simultaneos,
+            tem_relatorios=p.tem_relatorios,
+            destaque=p.destaque,
+            ordem=p.ordem,
+            ativo=p.ativo,
+        )
+        db.session.add(novo)
+        db.session.flush()
+        for item in p.itens:
+            db.session.add(PlanoItem(plano_id=novo.id, texto=item.texto, ordem=item.ordem))
+        changed = True
+    if changed:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
 def _backfill_empresa_id():
     from sqlalchemy import text
     emp = Empresa.query.order_by(Empresa.id).first()
@@ -377,6 +413,7 @@ with app.app_context():
     _seed_servicos()
     _seed_planos()
     _migrate_planos_tipo()
+    _duplicate_planos_anual()
     try:
         first = User.query.order_by(User.id).first()
         if first and not first.is_admin:
