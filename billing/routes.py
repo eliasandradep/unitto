@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from flask import render_template, redirect, url_for, request, flash, jsonify, g
+from flask import render_template, redirect, url_for, request, flash, jsonify, g, make_response
 from flask_login import login_required, current_user
 
 from . import billing_bp
@@ -26,7 +26,9 @@ def planos():
     assinatura = None
     if current_user.is_authenticated and g.get('empresa'):
         assinatura = Assinatura.query.filter_by(empresa_id=g.empresa.id).first()
-    return render_template('billing/planos.html', planos=todos, assinatura=assinatura)
+    resp = make_response(render_template('billing/planos.html', planos=todos, assinatura=assinatura))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # ── Painel do assinante ───────────────────────────────────────────────────────
@@ -134,7 +136,9 @@ def checkout_sucesso():
 def renovar():
     todos = Plano.query.filter_by(ativo=True).order_by(Plano.ordem).all()
     empresa = g.get('empresa')
-    return render_template('billing/renovar.html', planos=todos, empresa=empresa)
+    resp = make_response(render_template('billing/renovar.html', planos=todos, empresa=empresa))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # ── Webhook Stripe ────────────────────────────────────────────────────────────
