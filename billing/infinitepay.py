@@ -9,6 +9,7 @@ e uma a cada renovação (ver rota `billing.renovar`), cada uma rastreada em
 Docs: https://www.infinitepay.io/checkout-documentacao
 """
 import os
+import re
 import requests
 
 CHECKOUT_URL = 'https://api.checkout.infinitepay.io/links'
@@ -21,6 +22,22 @@ def handle():
 
 def configurado():
     return bool(handle())
+
+
+def _customer_payload(empresa):
+    """Monta o objeto customer só com campos válidos — a InfinitePay rejeita
+    (422) valores mal formatados, então preferimos omitir a enviar algo errado."""
+    customer = {'name': empresa.nome or ''}
+    if empresa.email:
+        customer['email'] = empresa.email.strip()
+
+    digits = re.sub(r'\D', '', empresa.telefone or '')
+    if len(digits) >= 10:
+        if not digits.startswith('55'):
+            digits = '55' + digits
+        customer['phone_number'] = '+' + digits
+
+    return customer
 
 
 def criar_checkout_link(empresa, plano, order_nsu, redirect_url, webhook_url):
@@ -42,14 +59,11 @@ def criar_checkout_link(empresa, plano, order_nsu, redirect_url, webhook_url):
             'price': valor_centavos,
             'description': f'Plano {plano.nome} ({periodo_label}) - Unitto',
         }],
-        'customer': {
-            'name': empresa.nome,
-            'email': empresa.email or '',
-            'phone_number': empresa.telefone or '',
-        },
+        'customer': _customer_payload(empresa),
     }
     resp = requests.post(CHECKOUT_URL, json=payload, timeout=15)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
     data = resp.json()
     return data['url'], valor_centavos
 
@@ -65,5 +79,6 @@ def verificar_pagamento(order_nsu, transaction_nsu, invoice_slug):
         'transaction_nsu': transaction_nsu,
         'slug': invoice_slug,
     }, timeout=15)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
     return resp.json()
