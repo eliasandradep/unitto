@@ -406,6 +406,7 @@ with app.app_context():
     _safe_add_col('planos', 'stripe_price_id', 'VARCHAR(100)')
     _safe_add_col('planos', 'destaque',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('assinaturas', 'provider', "VARCHAR(20) DEFAULT 'stripe'")
     _seed_unidades()
     _seed_formas_pagamento()
     _seed_empresa()

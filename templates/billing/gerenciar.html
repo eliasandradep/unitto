@@ -30,11 +30,18 @@
         {{ assinatura.plano.max_wa_mes }} WA/mês ·
         {{ assinatura.plano.max_simultaneos }} simultâneos
       </div>
+      {% if assinatura.provider == 'infinitepay' %}
+        <a href="{{ url_for('billing.renovar') }}" class="btn-secondary"
+           style="display:block;text-align:center;padding:.55rem">
+          Renovar / pagar próxima cobrança →
+        </a>
+      {% else %}
       <form method="POST" action="{{ url_for('billing.portal') }}">
         <button type="submit" class="btn-secondary" style="width:100%">
           Gerenciar no Stripe (faturas, cancelar, trocar cartão) →
         </button>
       </form>
+      {% endif %}
     {% elif empresa and empresa.plano == 'trial' %}
       <div style="font-size:1.2rem;font-weight:700;margin-bottom:.3rem">Trial gratuito</div>
       {% if empresa.dias_trial_restantes is not none %}

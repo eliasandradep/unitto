@@ -1,10 +1,12 @@
 import os
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta, date
 from flask import render_template, redirect, url_for, request, flash, jsonify, g, make_response
 from flask_login import login_required, current_user
 
 from . import billing_bp
-from models import db, Plano, Assinatura, Empresa
+from . import infinitepay as ip
+from models import db, Plano, Assinatura, Empresa, CobrancaInfinitePay
 
 try:
     import stripe
@@ -16,6 +18,10 @@ except ImportError:
 def _stripe_api_key():
     if STRIPE_OK:
         stripe.api_key = os.getenv('STRIPE_SECRET_KEY', '')
+
+
+def _payment_provider():
+    return os.getenv('PAYMENT_PROVIDER', 'stripe').strip().lower()
 
 
 # ── Tabela de planos (pública) ────────────────────────────────────────────────
@@ -75,14 +81,47 @@ def portal():
 @billing_bp.route('/checkout', methods=['POST'])
 @login_required
 def checkout():
+    plano_id = request.form.get('plano_id', type=int)
+    plano = db.get_or_404(Plano, plano_id)
+
+    if _payment_provider() == 'infinitepay':
+        return _checkout_infinitepay(plano)
+    return _checkout_stripe(plano)
+
+
+def _checkout_infinitepay(plano):
+    if not ip.configurado():
+        flash('Integração InfinitePay não configurada. Entre em contato para assinar.', 'error')
+        return redirect(url_for('billing.planos'))
+
+    empresa = g.get('empresa') or current_user.empresa
+    order_nsu = f'unitto-{empresa.id}-{plano.id}-{uuid.uuid4().hex[:10]}'
+
+    try:
+        checkout_url, valor_centavos = ip.criar_checkout_link(
+            empresa, plano, order_nsu,
+            redirect_url=url_for('billing.checkout_sucesso', _external=True),
+            webhook_url=url_for('billing.webhook_infinitepay', _external=True),
+        )
+    except Exception as e:
+        flash(f'Erro ao gerar link de pagamento InfinitePay: {e}', 'error')
+        return redirect(url_for('billing.planos'))
+
+    db.session.add(CobrancaInfinitePay(
+        empresa_id=empresa.id, plano_id=plano.id, order_nsu=order_nsu,
+        checkout_url=checkout_url, valor_centavos=valor_centavos, status='pendente',
+    ))
+    db.session.commit()
+    return redirect(checkout_url, code=303)
+
+
+def _checkout_stripe(plano):
     if not STRIPE_OK or not os.getenv('STRIPE_SECRET_KEY'):
         flash('Integração Stripe não configurada. Entre em contato para assinar.', 'error')
         return redirect(url_for('billing.planos'))
 
     _stripe_api_key()
-    plano_id = request.form.get('plano_id', type=int)
-
-    plano = db.get_or_404(Plano, plano_id)
+    plano_id = plano.id
     periodo  = plano.tipo or 'mensal'
     price_id = plano.stripe_price_id
 
@@ -239,3 +278,49 @@ def _handle_event(event):
         if assin:
             assin.status = 'vencida'
             db.session.commit()
+
+
+# ── Webhook InfinitePay ───────────────────────────────────────────────────────
+
+@billing_bp.route('/webhook/infinitepay', methods=['POST'])
+def webhook_infinitepay():
+    data = request.get_json(silent=True) or {}
+    order_nsu = data.get('order_nsu')
+
+    cobranca = CobrancaInfinitePay.query.filter_by(order_nsu=order_nsu).first()
+    if not cobranca:
+        return jsonify({'success': False, 'message': 'order_nsu não encontrado'}), 200
+
+    if cobranca.status != 'paga':
+        cobranca.status          = 'paga'
+        cobranca.invoice_slug    = data.get('invoice_slug')
+        cobranca.transaction_nsu = data.get('transaction_nsu')
+        cobranca.paid_at         = datetime.utcnow()
+        _ativar_assinatura_infinitepay(cobranca)
+        db.session.commit()
+
+    return jsonify({'success': True, 'message': None}), 200
+
+
+def _ativar_assinatura_infinitepay(cobranca):
+    plano   = cobranca.plano
+    empresa = cobranca.empresa
+    dias    = 365 if plano.tipo == 'anual' else 30
+    vencimento = date.today() + timedelta(days=dias)
+
+    assin = Assinatura.query.filter_by(empresa_id=empresa.id).first()
+    if assin:
+        assin.plano_id           = plano.id
+        assin.status             = 'ativa'
+        assin.periodo            = plano.tipo
+        assin.provider           = 'infinitepay'
+        assin.proximo_vencimento = vencimento
+    else:
+        db.session.add(Assinatura(
+            empresa_id=empresa.id, plano_id=plano.id, status='ativa',
+            periodo=plano.tipo, provider='infinitepay',
+            proximo_vencimento=vencimento,
+        ))
+
+    empresa.plano  = plano.slug
+    empresa.status = 'ativa'

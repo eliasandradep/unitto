@@ -119,6 +119,7 @@ class Assinatura(db.Model):
     plano_id               = db.Column(db.Integer, db.ForeignKey('planos.id'), nullable=False)
     status                 = db.Column(db.String(20), default='trial')  # trial|ativa|vencida|cancelada
     periodo                = db.Column(db.String(10), default='mensal')  # mensal|anual
+    provider               = db.Column(db.String(20), default='stripe')  # stripe|infinitepay
     stripe_subscription_id = db.Column(db.String(100))
     stripe_customer_id     = db.Column(db.String(100))
     proximo_vencimento     = db.Column(db.Date)
@@ -126,6 +127,24 @@ class Assinatura(db.Model):
     updated_at             = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     empresa                = db.relationship('Empresa', backref=db.backref('assinatura', uselist=False))
     plano                  = db.relationship('Plano')
+
+
+class CobrancaInfinitePay(db.Model):
+    """Cobrança avulsa gerada via Checkout Integrado da InfinitePay (assinatura nova ou renovação)."""
+    __tablename__ = 'cobrancas_infinitepay'
+    id              = db.Column(db.Integer, primary_key=True)
+    empresa_id      = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    plano_id        = db.Column(db.Integer, db.ForeignKey('planos.id'), nullable=False)
+    order_nsu       = db.Column(db.String(64), unique=True, nullable=False)
+    checkout_url    = db.Column(db.String(300))
+    valor_centavos  = db.Column(db.Integer)
+    status          = db.Column(db.String(20), default='pendente')  # pendente|paga|expirada
+    invoice_slug    = db.Column(db.String(100))
+    transaction_nsu = db.Column(db.String(100))
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    paid_at         = db.Column(db.DateTime)
+    empresa         = db.relationship('Empresa')
+    plano           = db.relationship('Plano')
 
 
 ROLES = [
