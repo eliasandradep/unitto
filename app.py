@@ -16,7 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI']        = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ── DB + Auth ────────────────────────────────────────────────────────────────
-from models import db, User, Setting, Empresa
+from models import db, User, Setting, Empresa, Plano
 from themes import get_theme_css
 
 db.init_app(app)
@@ -446,7 +446,12 @@ def inject_globals():
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return render_template('landing.html')
+    mensais = Plano.query.filter_by(ativo=True, tipo='mensal').order_by(Plano.ordem).all()
+    planos_pares = []
+    for m in mensais:
+        anual = Plano.query.filter_by(slug=f'{m.slug}-anual', ativo=True).first()
+        planos_pares.append({'mensal': m, 'anual': anual})
+    return render_template('landing.html', planos_pares=planos_pares)
 
 
 @app.route('/ping')

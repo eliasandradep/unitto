@@ -191,164 +191,50 @@
     </div>
 
     <div class="plans-grid">
-
-      <!-- Básico -->
-      <div class="plan-card">
-        <p class="plan-card__name">Básico</p>
+      {% for par in planos_pares %}
+      {% set m = par.mensal %}
+      {% set a = par.anual %}
+      {% set dark = (m.slug == 'black') %}
+      <div class="plan-card {{ 'plan-card--popular' if m.destaque }}"
+           {% if dark %}style="border-color:#1B2D6E; background: linear-gradient(160deg, #0D1B4B 0%, #1B2D6E 100%); color:#fff;"{% endif %}>
+        {% if m.destaque %}<div class="plan-card__badge">Mais popular</div>{% endif %}
+        <p class="plan-card__name" {% if dark %}style="color:rgba(255,255,255,.5)"{% endif %}>{{ m.nome }}</p>
         <div class="plan-card__price">
-          <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="38" data-anual="38">38</span>
-          <span class="plan-card__period">/mês</span>
+          <span class="plan-card__currency" {% if dark %}style="color:#17C3D8"{% endif %}>R$</span>
+          <span class="plan-card__amount"
+                data-mensal="{{ '%g' % m.preco }}"
+                data-anual="{{ '%g' % a.preco if a else '%g' % m.preco }}"
+                {% if dark %}style="color:#fff"{% endif %}>{{ '%g' % m.preco }}</span>
+          <span class="plan-card__period" {% if dark %}style="color:rgba(255,255,255,.5)"{% endif %}>/mês</span>
         </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$456/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
-        <div class="plan-card__divider"></div>
+        <p class="plan-card__billing billing-note"
+           data-anual="{{ 'Cobrado R$' ~ ('%g' % a.preco_anual_total) ~ '/ano em até 12x no cartão' if a else '' }}"
+           data-mensal=""
+           {% if dark %}style="color:rgba(255,255,255,.4)"{% endif %}>&nbsp;</p>
+        <div class="plan-card__divider" {% if dark %}style="background:rgba(255,255,255,.1)"{% endif %}></div>
         <ul class="plan-card__features">
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            1 profissional
+          <li {% if dark %}style="color:rgba(255,255,255,.85)"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="{{ '#D4A96A' if dark else 'currentColor' }}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ m.max_profissionais }} profissional{{ 'is' if m.max_profissionais > 1 else '' }}
           </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Agenda e agendamentos
+          <li {% if dark %}style="color:rgba(255,255,255,.85)"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="{{ '#D4A96A' if dark else 'currentColor' }}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ m.max_wa_mes }} mensagens WhatsApp/mês
           </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Gestão de clientes
+          <li {% if dark %}style="color:rgba(255,255,255,.85)"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="{{ '#D4A96A' if dark else 'currentColor' }}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Até {{ m.max_simultaneos }} agendamentos simultâneos
           </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            100 mensagens WhatsApp/mês
+          {% for item in m.itens %}
+          <li {% if dark %}style="color:rgba(255,255,255,.85)"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="{{ '#D4A96A' if dark else 'currentColor' }}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ item.texto }}
           </li>
-          <li class="disabled">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Relatórios avançados
-          </li>
-          <li class="disabled">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Multi-unidades
-          </li>
+          {% endfor %}
         </ul>
-        <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--outline">Começar agora</a>
+        <a href="{{ url_for('signup.signup') }}" class="btn-plan {{ 'btn-plan--fill' if m.destaque or dark else 'btn-plan--outline' }}">Começar agora</a>
       </div>
-
-      <!-- Essencial (popular) -->
-      <div class="plan-card plan-card--popular">
-        <div class="plan-card__badge">Mais popular</div>
-        <p class="plan-card__name">Essencial</p>
-        <div class="plan-card__price">
-          <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="68" data-anual="68">68</span>
-          <span class="plan-card__period">/mês</span>
-        </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$816/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
-        <div class="plan-card__divider"></div>
-        <ul class="plan-card__features">
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Até 5 profissionais
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Agenda e agendamentos
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Financeiro completo
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            500 mensagens WhatsApp/mês
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Relatórios avançados
-          </li>
-          <li class="disabled">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Multi-unidades
-          </li>
-        </ul>
-        <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--fill">Começar agora</a>
-      </div>
-
-      <!-- Avançado -->
-      <div class="plan-card">
-        <p class="plan-card__name">Avançado</p>
-        <div class="plan-card__price">
-          <span class="plan-card__currency">R$</span>
-          <span class="plan-card__amount" data-mensal="120" data-anual="120">120</span>
-          <span class="plan-card__period">/mês</span>
-        </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$1.440/ano em até 12x no cartão" data-mensal="">&nbsp;</p>
-        <div class="plan-card__divider"></div>
-        <ul class="plan-card__features">
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Até 15 profissionais
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Tudo do Essencial
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Multi-unidades
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            2.000 mensagens WhatsApp/mês
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            10 agendamentos simultâneos
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Suporte prioritário
-          </li>
-        </ul>
-        <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--outline">Começar agora</a>
-      </div>
-
-      <!-- Profissional -->
-      <div class="plan-card" style="border-color:#1B2D6E; background: linear-gradient(160deg, #0D1B4B 0%, #1B2D6E 100%); color:#fff;">
-        <p class="plan-card__name" style="color:rgba(255,255,255,.5)">Profissional</p>
-        <div class="plan-card__price">
-          <span class="plan-card__currency" style="color:#17C3D8">R$</span>
-          <span class="plan-card__amount" data-mensal="210" data-anual="210" style="color:#fff">210</span>
-          <span class="plan-card__period" style="color:rgba(255,255,255,.5)">/mês</span>
-        </div>
-        <p class="plan-card__billing billing-note" data-anual="Cobrado R$2.520/ano em até 12x no cartão" data-mensal="" style="color:rgba(255,255,255,.4)">&nbsp;</p>
-        <div class="plan-card__divider" style="background:rgba(255,255,255,.1)"></div>
-        <ul class="plan-card__features">
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Até 50 profissionais
-          </li>
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Tudo do Avançado
-          </li>
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            10.000 mensagens WhatsApp/mês
-          </li>
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            30 agendamentos simultâneos
-          </li>
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Gerente de conta dedicado
-          </li>
-          <li style="color:rgba(255,255,255,.85)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#D4A96A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Integração personalizada
-          </li>
-        </ul>
-        <a href="{{ url_for('signup.signup') }}" class="btn-plan btn-plan--fill">Começar agora</a>
-      </div>
-
+      {% endfor %}
     </div>
   </div>
 </section>
