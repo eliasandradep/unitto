@@ -41,7 +41,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
         if user and user.check_password(password):
             login_user(user)
             if user.role == 'saas_admin':

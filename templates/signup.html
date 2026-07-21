@@ -77,9 +77,19 @@
 
         <div class="form-group">
           <label>Seu nome <span class="required">*</span></label>
-          <input type="text" name="nome_user"
+          <input type="text" name="nome_user" id="nomeUser"
                  value="{{ form.get('nome_user','') if form else '' }}"
                  placeholder="Nome do responsável" required />
+        </div>
+
+        <div class="form-group">
+          <label>Nome de usuário <span class="required">*</span></label>
+          <input type="text" name="username" id="usernameInput"
+                 value="{{ form.get('username','') if form else '' }}"
+                 placeholder="seu-usuario" pattern="[a-z0-9_.\-]{3,30}"
+                 title="3 a 30 caracteres: letras minúsculas, números, ponto, hífen ou underline"
+                 autocomplete="off" required />
+          <div class="slug-hint" id="usernameHint">Usado para entrar no painel — 3 a 30 caracteres, sem espaços.</div>
         </div>
 
         <div class="form-group">
@@ -138,6 +148,58 @@
       preview.textContent = this.value || '…';
     });
     preview.textContent = slugInput.value || '…';
+
+    // ── Nome de usuário: sugestão automática + validação em tempo real ──────
+    var nomeUserInput   = document.getElementById('nomeUser');
+    var usernameInput   = document.getElementById('usernameInput');
+    var usernameHint    = document.getElementById('usernameHint');
+    var usernameAuto    = usernameInput.value === '';
+    var usernameTimer   = null;
+    var usernameAbort   = null;
+
+    function usernameSlug(s) {
+      return slugify(s).replace(/-/g, '').slice(0, 30);
+    }
+
+    function setUsernameHint(text, color) {
+      usernameHint.textContent = text;
+      usernameHint.style.color = color;
+    }
+
+    function checkUsername(value) {
+      if (usernameAbort) usernameAbort.abort();
+      if (value.length < 3) {
+        setUsernameHint('Usado para entrar no painel — 3 a 30 caracteres, sem espaços.', '#888');
+        return;
+      }
+      setUsernameHint('Verificando disponibilidade…', '#888');
+      usernameAbort = new AbortController();
+      fetch('{{ url_for("signup.verificar_usuario") }}?username=' + encodeURIComponent(value),
+            { signal: usernameAbort.signal })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          setUsernameHint(data.message, data.ok ? '#1a7f37' : '#c0392b');
+        })
+        .catch(function(err) {
+          if (err.name !== 'AbortError') {
+            setUsernameHint('Não foi possível verificar agora — tente outro nome se der erro ao enviar.', '#888');
+          }
+        });
+    }
+
+    nomeUserInput.addEventListener('input', function() {
+      if (usernameAuto) {
+        var s = usernameSlug(this.value);
+        usernameInput.value = s;
+        checkUsername(s);
+      }
+    });
+    usernameInput.addEventListener('input', function() {
+      usernameAuto = this.value === '';
+      var value = this.value.toLowerCase();
+      clearTimeout(usernameTimer);
+      usernameTimer = setTimeout(function() { checkUsername(value); }, 400);
+    });
   </script>
 </body>
 </html>

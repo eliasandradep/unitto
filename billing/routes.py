@@ -82,6 +82,9 @@ def portal():
 @login_required
 def checkout():
     plano_id = request.form.get('plano_id', type=int)
+    if not plano_id:
+        flash('Selecione um plano válido.', 'error')
+        return redirect(url_for('billing.planos'))
     plano = db.get_or_404(Plano, plano_id)
 
     if _payment_provider() == 'infinitepay':
@@ -95,6 +98,10 @@ def _checkout_infinitepay(plano):
         return redirect(url_for('billing.planos'))
 
     empresa = g.get('empresa') or current_user.empresa
+    if not empresa:
+        flash('Não foi possível identificar sua empresa. Entre em contato com o suporte.', 'error')
+        return redirect(url_for('billing.planos'))
+
     order_nsu = f'unitto-{empresa.id}-{plano.id}-{uuid.uuid4().hex[:10]}'
 
     try:
@@ -103,15 +110,17 @@ def _checkout_infinitepay(plano):
             redirect_url=url_for('billing.checkout_sucesso', _external=True),
             webhook_url=url_for('billing.webhook_infinitepay', _external=True),
         )
+
+        db.session.add(CobrancaInfinitePay(
+            empresa_id=empresa.id, plano_id=plano.id, order_nsu=order_nsu,
+            checkout_url=checkout_url, valor_centavos=valor_centavos, status='pendente',
+        ))
+        db.session.commit()
     except Exception as e:
+        db.session.rollback()
         flash(f'Erro ao gerar link de pagamento InfinitePay: {e}', 'error')
         return redirect(url_for('billing.planos'))
 
-    db.session.add(CobrancaInfinitePay(
-        empresa_id=empresa.id, plano_id=plano.id, order_nsu=order_nsu,
-        checkout_url=checkout_url, valor_centavos=valor_centavos, status='pendente',
-    ))
-    db.session.commit()
     return redirect(checkout_url, code=303)
 
 
@@ -130,6 +139,10 @@ def _checkout_stripe(plano):
         return redirect(url_for('billing.planos'))
 
     empresa = g.get('empresa') or current_user.empresa
+    if not empresa:
+        flash('Não foi possível identificar sua empresa. Entre em contato com o suporte.', 'error')
+        return redirect(url_for('billing.planos'))
+
     assinatura = Assinatura.query.filter_by(empresa_id=empresa.id).first()
     customer_id = assinatura.stripe_customer_id if assinatura else None
 

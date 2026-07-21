@@ -7,10 +7,36 @@ Fluxo: /signup → cria Empresa (trial 14 dias) + User (empresa_admin)
 
 import re
 from datetime import date, timedelta
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_user
 
 signup_bp = Blueprint('signup', __name__)
+
+USERNAME_RE = re.compile(r'^[a-z0-9_.-]{3,30}$')
+
+
+def _validar_username(username):
+    """Retorna (ok, mensagem). Não checa unicidade — só formato."""
+    if not username:
+        return False, 'Informe um nome de usuário.'
+    if not USERNAME_RE.match(username):
+        return False, 'Use de 3 a 30 caracteres: letras minúsculas, números, ponto, hífen ou underline.'
+    return True, ''
+
+
+@signup_bp.route('/signup/verificar-usuario')
+def verificar_usuario():
+    from models import User
+
+    username = request.args.get('username', '').strip().lower()
+    ok, msg = _validar_username(username)
+    if not ok:
+        return jsonify(ok=False, message=msg)
+
+    if User.query.filter_by(username=username).first():
+        return jsonify(ok=False, message='Este nome de usuário já está em uso.')
+
+    return jsonify(ok=True, message='Nome de usuário disponível.')
 
 
 def _slugify(text: str) -> str:
@@ -58,14 +84,24 @@ def signup():
 
     nome_empresa = request.form.get('nome_empresa', '').strip()
     nome_user    = request.form.get('nome_user', '').strip()
+    username     = request.form.get('username', '').strip().lower()
     email        = request.form.get('email', '').strip().lower()
     senha        = request.form.get('senha', '')
     confirma     = request.form.get('confirma', '')
     slug         = request.form.get('slug', '').strip().lower() or _slugify(nome_empresa)
 
     # Validações
-    if not all([nome_empresa, nome_user, email, senha, slug]):
+    if not all([nome_empresa, nome_user, username, email, senha, slug]):
         flash('Preencha todos os campos obrigatórios.', 'error')
+        return render_template('signup.html', form=request.form)
+
+    username_ok, username_msg = _validar_username(username)
+    if not username_ok:
+        flash(username_msg, 'error')
+        return render_template('signup.html', form=request.form)
+
+    if User.query.filter_by(username=username).first():
+        flash('Este nome de usuário já está em uso. Escolha outro.', 'error')
         return render_template('signup.html', form=request.form)
 
     if len(senha) < 6:
@@ -101,13 +137,6 @@ def signup():
     db.session.flush()
 
     # Criar usuário administrador da empresa
-    username_base = re.sub(r'[^a-z0-9]', '', email.split('@')[0])[:30] or 'admin'
-    username = username_base
-    suffix = 1
-    while User.query.filter_by(username=username).first():
-        username = f'{username_base}{suffix}'
-        suffix += 1
-
     user = User(
         name=nome_user,
         username=username,
