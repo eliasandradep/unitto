@@ -100,6 +100,25 @@ def _migrate_settings_schema():
         pass
 
 
+def _migrate_checkout_url_len():
+    """cobrancas_infinitepay.checkout_url era VARCHAR(300); o link da
+    InfinitePay embute um token que passa disso e o Postgres trunca com
+    erro em vez de truncar silenciosamente. Alarga para TEXT."""
+    from sqlalchemy import inspect as _insp, text
+    if 'postgresql' not in db.engine.url.drivername:
+        return
+    try:
+        cols = _insp(db.engine).get_columns('cobrancas_infinitepay')
+        col = next((c for c in cols if c['name'] == 'checkout_url'), None)
+        if col and col['type'].__class__.__name__.upper() == 'VARCHAR':
+            with db.engine.begin() as conn:
+                conn.execute(text(
+                    'ALTER TABLE cobrancas_infinitepay ALTER COLUMN checkout_url TYPE TEXT'
+                ))
+    except Exception:
+        pass
+
+
 def _migrate_expedientes():
     from sqlalchemy import inspect as _insp, text
     _pg = 'postgresql' in db.engine.url.drivername
@@ -351,6 +370,7 @@ with app.app_context():
     _migrate_expedientes()
     _migrate_settings_schema()
     db.create_all()
+    _migrate_checkout_url_len()
     _pg = 'postgresql' in db.engine.url.drivername
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")

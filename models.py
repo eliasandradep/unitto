@@ -136,7 +136,7 @@ class CobrancaInfinitePay(db.Model):
     empresa_id      = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
     plano_id        = db.Column(db.Integer, db.ForeignKey('planos.id'), nullable=False)
     order_nsu       = db.Column(db.String(64), unique=True, nullable=False)
-    checkout_url    = db.Column(db.String(300))
+    checkout_url    = db.Column(db.Text)
     valor_centavos  = db.Column(db.Integer)
     status          = db.Column(db.String(20), default='pendente')  # pendente|paga|expirada
     invoice_slug    = db.Column(db.String(100))
