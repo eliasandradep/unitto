@@ -178,6 +178,29 @@ def _checkout_stripe(plano):
 @billing_bp.route('/checkout/sucesso')
 @login_required
 def checkout_sucesso():
+    # Fallback caso o webhook da InfinitePay não tenha chegado ainda: a própria
+    # redirect_url volta com order_nsu/transaction_nsu/slug, então confirmamos
+    # o pagamento diretamente com a InfinitePay antes de confiar no webhook.
+    order_nsu = request.args.get('order_nsu')
+    if order_nsu:
+        try:
+            cobranca = CobrancaInfinitePay.query.filter_by(order_nsu=order_nsu).first()
+            if cobranca and cobranca.status != 'paga':
+                resultado = ip.verificar_pagamento(
+                    order_nsu,
+                    request.args.get('transaction_nsu'),
+                    request.args.get('slug'),
+                )
+                if resultado.get('paid'):
+                    cobranca.status          = 'paga'
+                    cobranca.transaction_nsu = request.args.get('transaction_nsu')
+                    cobranca.invoice_slug    = request.args.get('slug')
+                    cobranca.paid_at         = datetime.utcnow()
+                    _ativar_assinatura_infinitepay(cobranca)
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()  # webhook continua sendo o caminho principal
+
     flash('Assinatura ativada com sucesso! Bem-vindo(a) ao seu plano.', 'success')
     return redirect(url_for('billing.gerenciar'))
 

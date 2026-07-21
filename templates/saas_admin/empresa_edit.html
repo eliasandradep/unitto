@@ -21,8 +21,9 @@
         <div class="form-group">
           <label>Plano</label>
           <select name="plano">
-            {% for val in ['trial','free','basic','pro'] %}
-            <option value="{{ val }}" {{ 'selected' if emp and emp.plano == val else '' }}>{{ val }}</option>
+            <option value="trial" {{ 'selected' if emp and emp.plano == 'trial' else '' }}>trial</option>
+            {% for p in planos %}
+            <option value="{{ p.slug }}" {{ 'selected' if emp and emp.plano == p.slug else '' }}>{{ p.nome }} ({{ p.slug }})</option>
             {% endfor %}
           </select>
         </div>

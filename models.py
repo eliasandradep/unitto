@@ -57,8 +57,13 @@ class Empresa(db.Model):
         from datetime import date
         if self.status != 'ativa':
             return False
-        if self.plano == 'trial' and self.trial_ends_at:
-            return date.today() <= self.trial_ends_at
+        if self.plano == 'trial':
+            if self.trial_ends_at:
+                return date.today() <= self.trial_ends_at
+            return True
+        assin = self.assinatura
+        if assin and assin.proximo_vencimento:
+            return date.today() <= assin.proximo_vencimento
         return True
 
     @property

@@ -79,7 +79,8 @@ def empresa_edit(empresa_id):
         db.session.commit()
         flash('Empresa atualizada.', 'success')
         return redirect(url_for('saas_admin.dashboard'))
-    return render_template('saas_admin/empresa_edit.html', emp=emp)
+    planos = Plano.query.order_by(Plano.ordem).all()
+    return render_template('saas_admin/empresa_edit.html', emp=emp, planos=planos)
 
 
 @saas_bp.route('/empresas/nova', methods=['GET', 'POST'])
@@ -104,7 +105,8 @@ def empresa_nova():
             db.session.commit()
             flash(f'Empresa "{nome}" criada.', 'success')
             return redirect(url_for('saas_admin.dashboard'))
-    return render_template('saas_admin/empresa_edit.html', emp=None)
+    planos = Plano.query.order_by(Plano.ordem).all()
+    return render_template('saas_admin/empresa_edit.html', emp=None, planos=planos)
 
 
 @saas_bp.route('/planos')

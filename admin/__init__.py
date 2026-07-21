@@ -38,16 +38,17 @@ def _check_assinatura():
         return
 
     if empresa.is_ativa():
-        return  # trial válido ou plano pago ativo
+        return  # trial válido ou plano pago dentro do prazo de vencimento
 
-    # Verifica se existe assinatura paga ativa
+    # Assinatura paga vencida: marca como tal para refletir no painel do SaaS Admin
     try:
-        from models import Assinatura
+        from models import db, Assinatura
         assin = Assinatura.query.filter_by(empresa_id=empresa.id, status='ativa').first()
         if assin:
-            return
+            assin.status = 'vencida'
+            db.session.commit()
     except Exception:
-        return
+        pass
 
     return redirect(url_for('billing.renovar'))
 
