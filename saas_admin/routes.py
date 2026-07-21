@@ -64,13 +64,30 @@ def empresa_toggle_status(empresa_id):
     return redirect(url_for('saas_admin.dashboard'))
 
 
+def _plano_slug_de(familia, tipo):
+    """'lite' + 'anual' -> 'lite-anual'; 'lite' + 'mensal' -> 'lite'; 'trial' -> 'trial'."""
+    if familia == 'trial':
+        return 'trial'
+    return f'{familia}-anual' if tipo == 'anual' else familia
+
+
+def _familia_tipo_de(plano_slug):
+    """Inverso de _plano_slug_de — usado para pré-selecionar os dropdowns na edição."""
+    if not plano_slug or plano_slug == 'trial':
+        return 'trial', 'mensal'
+    if plano_slug.endswith('-anual'):
+        return plano_slug[:-len('-anual')], 'anual'
+    return plano_slug, 'mensal'
+
+
 @saas_bp.route('/empresas/<int:empresa_id>/edit', methods=['GET', 'POST'])
 def empresa_edit(empresa_id):
     emp = db.get_or_404(Empresa, empresa_id)
     if request.method == 'POST':
         emp.nome          = request.form.get('nome', '').strip() or emp.nome
         emp.slug          = request.form.get('slug', '').strip() or emp.slug
-        emp.plano         = request.form.get('plano', emp.plano)
+        emp.plano         = _plano_slug_de(request.form.get('plano_familia', 'trial'),
+                                            request.form.get('plano_tipo', 'mensal'))
         emp.status        = request.form.get('status', emp.status)
         emp.telefone      = request.form.get('telefone', '').strip() or None
         emp.email         = request.form.get('email', '').strip() or None
@@ -79,8 +96,10 @@ def empresa_edit(empresa_id):
         db.session.commit()
         flash('Empresa atualizada.', 'success')
         return redirect(url_for('saas_admin.dashboard'))
-    planos = Plano.query.order_by(Plano.ordem).all()
-    return render_template('saas_admin/empresa_edit.html', emp=emp, planos=planos)
+    familias = Plano.query.filter_by(tipo='mensal').order_by(Plano.ordem).all()
+    cur_familia, cur_tipo = _familia_tipo_de(emp.plano)
+    return render_template('saas_admin/empresa_edit.html', emp=emp, familias=familias,
+                            cur_familia=cur_familia, cur_tipo=cur_tipo)
 
 
 @saas_bp.route('/empresas/nova', methods=['GET', 'POST'])
@@ -88,7 +107,8 @@ def empresa_nova():
     if request.method == 'POST':
         nome  = request.form.get('nome', '').strip()
         slug  = request.form.get('slug', '').strip()
-        plano = request.form.get('plano', 'trial')
+        plano = _plano_slug_de(request.form.get('plano_familia', 'trial'),
+                                request.form.get('plano_tipo', 'mensal'))
         if not nome or not slug:
             flash('Nome e slug são obrigatórios.', 'error')
         elif Empresa.query.filter_by(slug=slug).first():
@@ -105,8 +125,9 @@ def empresa_nova():
             db.session.commit()
             flash(f'Empresa "{nome}" criada.', 'success')
             return redirect(url_for('saas_admin.dashboard'))
-    planos = Plano.query.order_by(Plano.ordem).all()
-    return render_template('saas_admin/empresa_edit.html', emp=None, planos=planos)
+    familias = Plano.query.filter_by(tipo='mensal').order_by(Plano.ordem).all()
+    return render_template('saas_admin/empresa_edit.html', emp=None, familias=familias,
+                            cur_familia='trial', cur_tipo='mensal')
 
 
 @saas_bp.route('/planos')

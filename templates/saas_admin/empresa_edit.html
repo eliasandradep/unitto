@@ -20,11 +20,18 @@
       <div class="form-row">
         <div class="form-group">
           <label>Plano</label>
-          <select name="plano">
-            <option value="trial" {{ 'selected' if emp and emp.plano == 'trial' else '' }}>trial</option>
-            {% for p in planos %}
-            <option value="{{ p.slug }}" {{ 'selected' if emp and emp.plano == p.slug else '' }}>{{ p.nome }} ({{ p.slug }})</option>
+          <select name="plano_familia">
+            <option value="trial" {{ 'selected' if cur_familia == 'trial' else '' }}>trial</option>
+            {% for p in familias %}
+            <option value="{{ p.slug }}" {{ 'selected' if cur_familia == p.slug else '' }}>{{ p.nome }}</option>
             {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select name="plano_tipo">
+            <option value="mensal" {{ 'selected' if cur_tipo == 'mensal' else '' }}>Mensal</option>
+            <option value="anual" {{ 'selected' if cur_tipo == 'anual' else '' }}>Anual</option>
           </select>
         </div>
         <div class="form-group">
