@@ -144,6 +144,7 @@
                      style="width:100%" {% if readonly %}disabled{% endif %} />
             </div>
             <input type="hidden" name="item_servico_id" value="{{ item.servico_id or '' }}" />
+            <input type="hidden" name="item_produto_id" value="{{ item.produto_id or '' }}" />
             <input type="hidden" name="item_venda_pacote_item_id" value="{{ item.venda_pacote_item_id or '' }}" />
             {% if not readonly %}
             <button type="button" class="btn-icon btn-icon--danger" onclick="removeItem(this)" title="Remover" style="margin-bottom:2px">
@@ -189,6 +190,37 @@
           </div>
           <button type="button" class="btn-secondary" style="white-space:nowrap"
                   onclick="addFromCatalog()">Inserir</button>
+        </div>
+      </div>
+
+      <!-- Inserir produto do catálogo -->
+      <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:1fr 110px 70px auto;gap:.5rem;align-items:flex-end">
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Produto</label>
+            <select id="prodPicker" onchange="onProdPickerChange(this)" style="width:100%">
+              <option value="">Selecione um produto...</option>
+              {% for prod in produtos %}
+              <option value="{{ prod.id }}"
+                      data-nome="{{ prod.nome }}"
+                      data-preco="{{ '%.2f'|format(prod.preco)|replace('.', ',') if prod.preco else '0,00' }}">
+                {{ prod.nome }}{% if prod.preco %} — R$ {{ '%.2f'|format(prod.preco)|replace('.', ',') }}{% endif %} (estoque: {{ '%.2f'|format(prod.estoque|float) }} {{ prod.unidade_medida }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Valor (R$)</label>
+            <input type="text" id="prodValorInput" placeholder="0,00" style="width:100%"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProdFromCatalog();}" />
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted)">Qtd</label>
+            <input type="number" id="prodQtdInput" value="1" min="1" step="1" style="width:100%"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProdFromCatalog();}" />
+          </div>
+          <button type="button" class="btn-secondary" style="white-space:nowrap"
+                  onclick="addProdFromCatalog()">Inserir</button>
         </div>
       </div>
       {% endif %}
@@ -526,13 +558,14 @@ function usarSessaoPacote(nome, svcId, vpItemId) {
   });
 })();
 
-function addItem(nome, valor, svcId, vpItemId, isPacote, qtd) {
+function addItem(nome, valor, svcId, vpItemId, isPacote, qtd, prodId) {
   nome     = nome     || '';
   valor    = valor    || '';
   svcId    = svcId    || '';
   vpItemId = vpItemId || '';
   isPacote = !!isPacote;
   qtd      = qtd      || '1';
+  prodId   = prodId   || '';
   var list = document.getElementById('itensList');
   var empty = document.getElementById('itemsEmpty');
   if (empty) empty.style.display = 'none';
@@ -557,6 +590,7 @@ function addItem(nome, valor, svcId, vpItemId, isPacote, qtd) {
       <input type="number" name="item_quantidade" value="${escHtml(qtd)}" min="1" step="1" style="width:100%" />
     </div>
     <input type="hidden" name="item_servico_id" value="${escHtml(svcId)}" />
+    <input type="hidden" name="item_produto_id" value="${escHtml(prodId)}" />
     <input type="hidden" name="item_venda_pacote_item_id" value="${escHtml(vpItemId)}" />
     <button type="button" class="btn-icon btn-icon--danger" onclick="removeItem(this)" title="Remover" style="margin-bottom:2px">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -591,6 +625,30 @@ function addFromCatalog() {
   var valor = (inp && inp.value.trim()) ? inp.value.trim() : (opt.dataset.preco || '');
   var qty   = (qtd && qtd.value) ? qtd.value : '1';
   addItem(opt.dataset.nome, valor, sel.value, '', false, qty);
+  sel.value = '';
+  if (inp) inp.value = '';
+  if (qtd) qtd.value = '1';
+  sel.focus();
+}
+
+function onProdPickerChange(sel) {
+  var inp = document.getElementById('prodValorInput');
+  if (!sel.value || !inp) return;
+  var opt = sel.selectedOptions[0];
+  inp.value = opt.dataset.preco || '';
+  inp.focus();
+  inp.select();
+}
+
+function addProdFromCatalog() {
+  var sel = document.getElementById('prodPicker');
+  var inp = document.getElementById('prodValorInput');
+  var qtd = document.getElementById('prodQtdInput');
+  if (!sel.value) { sel.focus(); return; }
+  var opt   = sel.selectedOptions[0];
+  var valor = (inp && inp.value.trim()) ? inp.value.trim() : (opt.dataset.preco || '');
+  var qty   = (qtd && qtd.value) ? qtd.value : '1';
+  addItem(opt.dataset.nome, valor, '', '', false, qty, sel.value);
   sel.value = '';
   if (inp) inp.value = '';
   if (qtd) qtd.value = '1';

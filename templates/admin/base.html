@@ -24,6 +24,7 @@
       {% set in_agenda     = 'agenda' in ep %}
       {% set in_clientes   = 'lead' in ep or 'cliente' in ep or ep == 'admin.aniversariantes' %}
       {% set in_servicos   = ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe','admin.categorias','admin.pacotes'] %}
+      {% set in_produtos   = ep in ['admin.produtos','admin.produto_novo','admin.produto_detalhe','admin.produto_categorias'] %}
       {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
       {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' or 'forma_pagamento' in ep %}
       {% set in_relatorios = ep == 'admin.metrics' or ep == 'admin.relatorio_comissoes' %}
@@ -129,9 +130,9 @@
         </div>
       </div>
 
-      <!-- Produtos (em breve) -->
-      <div class="snav-group snav-group--soon">
-        <a href="javascript:void(0)" class="snav-group-btn" data-tooltip="Produtos">
+      <!-- Produtos -->
+      <div class="snav-group {% if in_produtos %}snav-active snav-group--open{% endif %}" id="grp-produtos">
+        <a href="javascript:void(0)" class="snav-group-btn" onclick="toggleGroup('grp-produtos'); return false;" data-tooltip="Produtos">
           <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
             <line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
@@ -139,6 +140,10 @@
           <span class="snav-label">Produtos</span>
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
+        <div class="snav-group-items">
+          <a href="{{ url_for('admin.produtos') }}"           class="snav-sub {% if ep in ['admin.produtos','admin.produto_novo','admin.produto_detalhe'] %}active{% endif %}">Listagem</a>
+          <a href="{{ url_for('admin.produto_categorias') }}" class="snav-sub {% if ep == 'admin.produto_categorias' %}active{% endif %}">Categorias</a>
+        </div>
       </div>
 
       <!-- Profissionais -->
@@ -248,6 +253,13 @@
             </svg>
             Nova Venda de Pacote
           </a>
+          <a href="{{ url_for('admin.produto_novo') }}" class="criar-item">
+            <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+              <line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+            Novo Produto
+          </a>
           <div class="criar-divider"></div>
           <a href="{{ url_for('admin.cliente_novo') }}" class="criar-item">
             <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -255,12 +267,14 @@
             </svg>
             Novo Cliente
           </a>
+          {% if not profissionais_limite_atingido %}
           <a href="{{ url_for('admin.profissional_novo') }}" class="criar-item">
             <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
             Novo Profissional
           </a>
+          {% endif %}
         </div>
       </div>
 

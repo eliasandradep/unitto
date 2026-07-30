@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from collections import defaultdict
 from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app, abort
 from flask_login import login_user, logout_user, login_required, current_user
@@ -17,6 +18,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     Pacote, PacoteItem, VendaPacote, VendaPacoteItem,
                     EscalaProfissionalUnidade, RecebimentoCliente,
                     ContaPagar, ContaReceber, FormaPagamento,
+                    CategoriaProduto, Produto,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA)
 from themes import THEMES
 
@@ -938,6 +940,147 @@ def categorias():
     return render_template('admin/categorias.html', categorias=all_cats)
 
 
+# ── Produtos ──────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/produtos')
+@login_required
+def produtos():
+    q      = request.args.get('q', '').strip()
+    cat_id = request.args.get('categoria', '')
+    query  = tq(Produto)
+    if q:
+        query = query.filter(Produto.nome.ilike(f'%{q}%'))
+    if cat_id:
+        try: query = query.filter_by(categoria_id=int(cat_id))
+        except ValueError: pass
+    all_produtos = query.order_by(Produto.nome).all()
+    cats         = tq(CategoriaProduto).filter_by(ativo=True).order_by(CategoriaProduto.nome).all()
+    return render_template('admin/produtos.html',
+        produtos=all_produtos, categorias=cats, q=q, cat_id=cat_id)
+
+
+@admin_bp.route('/produtos/novo', methods=['GET', 'POST'])
+@login_required
+def produto_novo():
+    if request.method == 'POST':
+        p = _build_produto(Produto())
+        if p:
+            db.session.add(p)
+            db.session.commit()
+            flash('Produto cadastrado com sucesso.', 'success')
+            return redirect(url_for('admin.produto_detalhe', produto_id=p.id))
+    cats = tq(CategoriaProduto).filter_by(ativo=True).order_by(CategoriaProduto.nome).all()
+    return render_template('admin/produto_form.html', p=None, categorias=cats)
+
+
+@admin_bp.route('/produtos/<int:produto_id>', methods=['GET', 'POST'])
+@login_required
+def produto_detalhe(produto_id):
+    p = db.get_or_404(Produto, produto_id)
+    if request.method == 'POST':
+        if request.form.get('action') == 'excluir':
+            db.session.delete(p)
+            db.session.commit()
+            flash('Produto excluído.', 'success')
+            return redirect(url_for('admin.produtos'))
+        if _build_produto(p):
+            db.session.commit()
+            flash('Produto atualizado com sucesso.', 'success')
+            return redirect(url_for('admin.produto_detalhe', produto_id=p.id))
+    cats = tq(CategoriaProduto).filter_by(ativo=True).order_by(CategoriaProduto.nome).all()
+    return render_template('admin/produto_form.html', p=p, categorias=cats)
+
+
+def _build_produto(p):
+    nome = request.form.get('nome', '').strip()
+    if not nome:
+        flash('Nome do produto é obrigatório.', 'error')
+        return None
+
+    def _float(field):
+        try: return float(request.form.get(field, '').replace(',', '.')) or None
+        except (ValueError, AttributeError): return None
+
+    def _dec(field, default='0'):
+        from decimal import Decimal, InvalidOperation
+        raw = request.form.get(field, '').strip().replace(',', '.')
+        try: return Decimal(raw) if raw else Decimal(default)
+        except InvalidOperation: return Decimal(default)
+
+    p.nome            = nome
+    p.descricao        = request.form.get('descricao', '').strip() or None
+    p.codigo_barras    = request.form.get('codigo_barras', '').strip() or None
+    p.preco            = _dec('preco')
+    p.preco_custo       = _float('preco_custo')
+    p.comissao_valor    = _float('comissao_valor')
+    p.comissao_tipo     = request.form.get('comissao_tipo', '%')
+    p.unidade_medida    = request.form.get('unidade_medida', 'un')
+    p.estoque           = _dec('estoque')
+    cat_id = request.form.get('categoria_id', '')
+    p.categoria_id      = int(cat_id) if cat_id else None
+    p.ativo              = not bool(request.form.get('inativo'))
+    p.updated_at         = datetime.utcnow()
+
+    imagem_file = request.files.get('imagem')
+    if imagem_file and imagem_file.filename:
+        ext = os.path.splitext(secure_filename(imagem_file.filename))[1].lower()
+        if ext in _LOGO_EXTS:
+            upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'produtos')
+            os.makedirs(upload_dir, exist_ok=True)
+            filename = f"{uuid.uuid4().hex}{ext}"
+            imagem_file.save(os.path.join(upload_dir, filename))
+            p.imagem_url = f'uploads/produtos/{filename}'
+        else:
+            flash('Formato de imagem não suportado. Use JPG, PNG, WebP, GIF ou SVG.', 'error')
+            return None
+
+    return p
+
+
+# ── Categorias de produtos ──────────────────────────────────────────────────────
+
+@admin_bp.route('/produtos/categorias', methods=['GET', 'POST'])
+@login_required
+def produto_categorias():
+    if request.method == 'POST':
+        action  = request.form.get('action')
+        cat_id  = request.form.get('id', '')
+        nome    = request.form.get('nome', '').strip()
+        descr   = request.form.get('descricao', '').strip() or None
+
+        if action == 'save':
+            if not nome:
+                flash('Nome é obrigatório.', 'error')
+            elif cat_id:
+                c = db.get_or_404(CategoriaProduto, int(cat_id))
+                c.nome, c.descricao = nome, descr
+                db.session.commit()
+                flash('Categoria atualizada.', 'success')
+            else:
+                db.session.add(CategoriaProduto(nome=nome, descricao=descr))
+                db.session.commit()
+                flash('Categoria criada.', 'success')
+
+        elif action == 'delete' and cat_id:
+            c = db.get_or_404(CategoriaProduto, int(cat_id))
+            if c.produtos:
+                flash('Categoria está em uso e não pode ser excluída.', 'error')
+            else:
+                db.session.delete(c)
+                db.session.commit()
+                flash('Categoria excluída.', 'success')
+
+        elif action == 'toggle' and cat_id:
+            c = db.get_or_404(CategoriaProduto, int(cat_id))
+            c.ativo = not c.ativo
+            db.session.commit()
+
+        return redirect(url_for('admin.produto_categorias'))
+
+    all_cats = tq(CategoriaProduto).order_by(CategoriaProduto.nome).all()
+    return render_template('admin/produto_categorias.html', categorias=all_cats)
+
+
 # ── Profissionais ─────────────────────────────────────────────────────────────
 
 @admin_bp.route('/profissionais', methods=['GET', 'POST'])
@@ -972,8 +1115,11 @@ def profissionais():
         elif action == 'toggle' and prof_id:
             try:
                 p = db.get_or_404(Profissional, int(prof_id))
-                p.ativo = not p.ativo
-                db.session.commit()
+                if not p.ativo and _limite_profissionais_atingido():
+                    flash(_msg_limite_profissionais(), 'error')
+                else:
+                    p.ativo = not p.ativo
+                    db.session.commit()
             except Exception as exc:
                 db.session.rollback()
                 flash(f'Erro: {exc}', 'error')
@@ -985,13 +1131,41 @@ def profissionais():
     except Exception as exc:
         flash(f'Erro ao carregar profissionais: {exc}', 'error')
         all_profs = []
-    return render_template('admin/profissionais.html', profissionais=all_profs)
+    empresa = g.get('empresa')
+    return render_template('admin/profissionais.html', profissionais=all_profs,
+        limite_atingido=_limite_profissionais_atingido(),
+        limite_profissionais=empresa.limite_profissionais if empresa else None)
+
+
+def _limite_profissionais_atingido(excluir_id=None):
+    """True se a empresa já está no (ou acima do) limite de profissionais ativos do plano."""
+    empresa = g.get('empresa')
+    if not empresa:
+        return False
+    limite = empresa.limite_profissionais
+    if limite is None:
+        return False
+    q = tq(Profissional).filter_by(ativo=True)
+    if excluir_id:
+        q = q.filter(Profissional.id != excluir_id)
+    return q.count() >= limite
+
+
+def _msg_limite_profissionais():
+    empresa = g.get('empresa')
+    limite = empresa.limite_profissionais if empresa else None
+    return (f'Seu plano permite no máximo {limite} profissional(is) ativo(s). '
+            'Desative outro profissional ou faça upgrade do plano para continuar.')
 
 
 def _save_profissional(p):
     nome = request.form.get('nome', '').strip()
     if not nome:
         flash('Nome é obrigatório.', 'error')
+        return False
+    desired_ativo = not bool(request.form.get('inativo'))
+    if desired_ativo and not p.ativo and _limite_profissionais_atingido(excluir_id=p.id):
+        flash(_msg_limite_profissionais(), 'error')
         return False
     cat_ids = request.form.getlist('categorias')
     cats    = [db.session.get(Categoria, int(cid)) for cid in cat_ids if cid]
@@ -1004,7 +1178,7 @@ def _save_profissional(p):
     p.perfil_acesso     = request.form.get('perfil_acesso', 'profissional')
     p.agendamento_online  = bool(request.form.get('agendamento_online'))
     p.agendamentos_simult = bool(request.form.get('agendamentos_simult'))
-    p.ativo             = not bool(request.form.get('inativo'))
+    p.ativo             = desired_ativo
     p.categorias        = cats
     uid = request.form.get('unidade_id', '')
     p.unidade_id = int(uid) if uid else None
@@ -1026,6 +1200,9 @@ def _prof_form_ctx():
 @admin_bp.route('/profissionais/novo', methods=['GET', 'POST'])
 @login_required
 def profissional_novo():
+    if _limite_profissionais_atingido():
+        flash(_msg_limite_profissionais(), 'error')
+        return redirect(url_for('admin.profissionais'))
     if request.method == 'POST':
         p = Profissional()
         if _save_profissional(p):
@@ -2079,10 +2256,11 @@ def comanda_nova():
             return redirect(url_for('admin.comanda_detalhe', comanda_id=c.id))
     profs    = tq(Profissional).filter_by(ativo=True).order_by(Profissional.nome).all()
     servicos = tq(Servico).filter_by(ativo=True).order_by(Servico.nome).all()
+    produtos = tq(Produto).filter_by(ativo=True).order_by(Produto.nome).all()
     unidades = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     clientes = tq(Cliente).order_by(Cliente.nome).all()
     return render_template('admin/comanda_form.html',
-        c=None, profs=profs, servicos=servicos, unidades=unidades,
+        c=None, profs=profs, servicos=servicos, produtos=produtos, unidades=unidades,
         clientes=clientes, formas=FORMA_PAGAMENTO, hoje=date.today().isoformat())
 
 
@@ -2098,10 +2276,11 @@ def comanda_detalhe(comanda_id):
             return redirect(url_for('admin.comanda_detalhe', comanda_id=c.id))
     profs    = tq(Profissional).filter_by(ativo=True).order_by(Profissional.nome).all()
     servicos = tq(Servico).filter_by(ativo=True).order_by(Servico.nome).all()
+    produtos = tq(Produto).filter_by(ativo=True).order_by(Produto.nome).all()
     unidades = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     clientes = tq(Cliente).order_by(Cliente.nome).all()
     return render_template('admin/comanda_form.html',
-        c=c, profs=profs, servicos=servicos, unidades=unidades,
+        c=c, profs=profs, servicos=servicos, produtos=produtos, unidades=unidades,
         clientes=clientes, formas=FORMA_PAGAMENTO, hoje=date.today().isoformat())
 
 
@@ -2168,6 +2347,7 @@ def _save_comanda(c):
     valors  = request.form.getlist('item_valor')
     qtds    = request.form.getlist('item_quantidade')
     svcs    = request.form.getlist('item_servico_id')
+    prods   = request.form.getlist('item_produto_id')
     vpitems = request.form.getlist('item_venda_pacote_item_id')
     profs_i    = request.form.getlist('item_profissional_id')
     comissoes_v = request.form.getlist('item_comissao_valor')
@@ -2175,9 +2355,17 @@ def _save_comanda(c):
 
     # Rastrear quais venda_pacote_item_ids já estavam na comanda (para não decrementar duplicado)
     ids_antes = {i.venda_pacote_item_id for i in c.itens if i.venda_pacote_item_id}
+
+    # Estoque de produtos antes do rebuild (quantidade vendida por produto_id)
+    qtd_produtos_antes = defaultdict(int)
+    for i in c.itens:
+        if i.produto_id:
+            qtd_produtos_antes[i.produto_id] += i.quantidade or 0
+
     c.itens.clear()
 
     ids_depois = set()
+    qtd_produtos_depois = defaultdict(int)
     novos_itens = []
     for i, desc_i in enumerate(descs):
         desc_i = desc_i.strip()
@@ -2188,6 +2376,7 @@ def _save_comanda(c):
             val    = D(valors[i].strip().replace(',', '.')) if i < len(valors) else D('0')
             qtd    = int(qtds[i]) if i < len(qtds) and qtds[i] else 1
             svc_id = int(svcs[i]) if i < len(svcs) and svcs[i] else None
+            prod_id = int(prods[i]) if i < len(prods) and prods[i] else None
             vp_id  = int(vpitems[i]) if i < len(vpitems) and vpitems[i] else None
             prof_id  = int(profs_i[i]) if i < len(profs_i) and profs_i[i] else None
             com_v_s  = comissoes_v[i].strip().replace(',', '.') if i < len(comissoes_v) else ''
@@ -2197,11 +2386,21 @@ def _save_comanda(c):
             continue
         if vp_id:
             ids_depois.add(vp_id)
+        if prod_id:
+            qtd_produtos_depois[prod_id] += qtd
         novos_itens.append(ComandaItem(
             descricao=desc_i, valor=val, quantidade=qtd,
-            servico_id=svc_id, venda_pacote_item_id=vp_id, profissional_id=prof_id,
+            servico_id=svc_id, produto_id=prod_id, venda_pacote_item_id=vp_id, profissional_id=prof_id,
             comissao_valor=com_v, comissao_tipo=com_t))
     c.itens.extend(novos_itens)
+
+    # Ajustar estoque de produtos (informativo: nunca bloqueia a venda, permite negativo)
+    for pid in set(qtd_produtos_antes) | set(qtd_produtos_depois):
+        delta = qtd_produtos_depois.get(pid, 0) - qtd_produtos_antes.get(pid, 0)
+        if delta:
+            produto = db.session.get(Produto, pid)
+            if produto:
+                produto.estoque = (produto.estoque or 0) - delta
 
     # Decrementar sessões para itens novos de pacote (não existiam antes)
     for vp_id in ids_depois - ids_antes:

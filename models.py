@@ -73,6 +73,18 @@ class Empresa(db.Model):
             return max(0, (self.trial_ends_at - date.today()).days)
         return None
 
+    def get_plano(self):
+        """Linha de `Plano` contratada por esta empresa, ou None (trial/plano desconhecido)."""
+        if not self.plano or self.plano == 'trial':
+            return None
+        return Plano.query.filter_by(slug=self.plano).first()
+
+    @property
+    def limite_profissionais(self):
+        """Máximo de profissionais ativos permitido pelo plano. None = sem limite (trial)."""
+        plano = self.get_plano()
+        return plano.max_profissionais if plano else None
+
 
 class Plano(db.Model):
     """Plano de assinatura disponível no SaaS."""
@@ -296,6 +308,37 @@ class Categoria(db.Model):
     ativo      = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+
+
+class CategoriaProduto(db.Model):
+    __tablename__ = 'categorias_produtos'
+    id         = db.Column(db.Integer, primary_key=True)
+    nome       = db.Column(db.String(100), nullable=False)
+    descricao  = db.Column(db.String(200))
+    ativo      = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+
+
+class Produto(db.Model):
+    __tablename__ = 'produtos'
+    id              = db.Column(db.Integer, primary_key=True)
+    nome            = db.Column(db.String(150), nullable=False)
+    descricao       = db.Column(db.String(500))
+    imagem_url      = db.Column(db.String(300))
+    codigo_barras   = db.Column(db.String(50))
+    categoria_id    = db.Column(db.Integer, db.ForeignKey('categorias_produtos.id'), nullable=True)
+    preco           = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    preco_custo     = db.Column(db.Numeric(10, 2), nullable=True)
+    comissao_valor  = db.Column(db.Numeric(10, 2), nullable=True)
+    comissao_tipo   = db.Column(db.String(1), default='%')
+    unidade_medida  = db.Column(db.String(10), default='un')
+    estoque         = db.Column(db.Numeric(10, 2), default=0)
+    ativo           = db.Column(db.Boolean, default=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at      = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    empresa_id      = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    categoria       = db.relationship('CategoriaProduto', backref='produtos')
 
 
 class Unidade(db.Model):
@@ -574,6 +617,7 @@ class ComandaItem(db.Model):
     id                   = db.Column(db.Integer, primary_key=True)
     comanda_id           = db.Column(db.Integer, db.ForeignKey('comandas.id'), nullable=False)
     servico_id           = db.Column(db.Integer, db.ForeignKey('servicos.id'), nullable=True)
+    produto_id           = db.Column(db.Integer, db.ForeignKey('produtos.id'), nullable=True)
     profissional_id      = db.Column(db.Integer, db.ForeignKey('profissionais.id'), nullable=True)
     descricao            = db.Column(db.String(150), nullable=False)
     valor                = db.Column(db.Numeric(10, 2), nullable=False)
@@ -585,6 +629,7 @@ class ComandaItem(db.Model):
     comissao_forma_pag   = db.Column(db.String(30))
     venda_pacote_item_id = db.Column(db.Integer, db.ForeignKey('venda_pacote_itens.id'), nullable=True)
     servico              = db.relationship('Servico', backref='comanda_itens')
+    produto              = db.relationship('Produto', backref='comanda_itens')
     profissional         = db.relationship('Profissional', backref='comanda_itens')
 
     @property

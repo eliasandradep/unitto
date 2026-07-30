@@ -13,8 +13,20 @@
 <!-- Toolbar -->
 <div class="toolbar">
   <div></div>
+  {% if limite_atingido %}
+  <span class="btn-primary" style="opacity:.5;cursor:not-allowed;pointer-events:none"
+        title="Limite de {{ limite_profissionais }} profissional(is) do seu plano atingido">+ Novo Profissional</span>
+  {% else %}
   <a href="{{ url_for('admin.profissional_novo') }}" class="btn-primary">+ Novo Profissional</a>
+  {% endif %}
 </div>
+
+{% if limite_atingido %}
+<div class="card" style="padding:.9rem 1.1rem;margin-bottom:1rem;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:.88rem">
+  Seu plano permite no máximo <strong>{{ limite_profissionais }}</strong> profissional(is) ativo(s) e esse limite já foi atingido.
+  Desative um profissional para liberar uma vaga ou <a href="{{ url_for('billing.gerenciar') }}" style="color:inherit;text-decoration:underline">faça upgrade do plano</a>.
+</div>
+{% endif %}
 
 <!-- Listagem -->
 <div class="card" style="overflow:hidden">
@@ -92,7 +104,9 @@
   {% else %}
   <div style="padding:2.5rem;text-align:center;color:var(--text-muted)">
     <p>Nenhum profissional cadastrado ainda.</p>
+    {% if not limite_atingido %}
     <a href="{{ url_for('admin.profissional_novo') }}" class="btn-primary" style="margin-top:.8rem;display:inline-block">Cadastrar primeiro profissional</a>
+    {% endif %}
   </div>
   {% endif %}
 </div>

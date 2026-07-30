@@ -395,6 +395,8 @@ with app.app_context():
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('comanda_itens', 'comissao_data_pag',  'DATE')
     _safe_add_col('comanda_itens', 'comissao_forma_pag', 'VARCHAR(30)')
+    _safe_add_col('comanda_itens', 'produto_id',
+                  'INTEGER REFERENCES produtos(id)' if _pg else 'INTEGER')
     _safe_add_col('agendamentos',  'lembrete_enviado',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('agendamentos',  'venda_pacote_item_id',

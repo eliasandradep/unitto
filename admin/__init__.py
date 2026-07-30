@@ -69,19 +69,24 @@ def _inject_empresa():
         theme_css = ''
 
     setup_pendente = False
+    profissionais_limite_atingido = False
     if empresa:
         try:
             from models import Profissional, Expediente, Servico
             eid = empresa.id
+            n_profs_ativos = Profissional.query.filter_by(empresa_id=eid, ativo=True).count()
             setup_pendente = not all([
-                Profissional.query.filter_by(empresa_id=eid, ativo=True).count() > 0,
+                n_profs_ativos > 0,
                 Expediente.query.filter_by(empresa_id=eid).count() > 0,
                 Servico.query.filter_by(empresa_id=eid, ativo=True).count() > 0,
             ])
+            limite = empresa.limite_profissionais
+            profissionais_limite_atingido = limite is not None and n_profs_ativos >= limite
         except Exception:
             pass
 
-    return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css}
+    return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css,
+            'profissionais_limite_atingido': profissionais_limite_atingido}
 
 
 from . import routes  # noqa: F401, E402

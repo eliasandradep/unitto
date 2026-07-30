@@ -1,0 +1,88 @@
+{% extends 'admin/base.html' %}
+{% block title %}Produtos{% endblock %}
+{% block page_title %}Produtos{% endblock %}
+
+{% block content %}
+
+<!-- Sub-navegação -->
+<div class="svc-subnav">
+  <a href="{{ url_for('admin.produtos') }}"           class="{% if request.endpoint == 'admin.produtos' %}active{% endif %}">Produtos</a>
+  <a href="{{ url_for('admin.produto_categorias') }}" class="{% if request.endpoint == 'admin.produto_categorias' %}active{% endif %}">Categorias</a>
+</div>
+
+<!-- Filtros + ação -->
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;gap:.5rem;flex:1;min-width:0">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar produto..." style="flex:1;min-width:0" />
+    <select name="categoria" style="min-width:150px">
+      <option value="">Todas as categorias</option>
+      {% for cat in categorias %}
+      <option value="{{ cat.id }}" {% if cat_id|string == cat.id|string %}selected{% endif %}>{{ cat.nome }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary" style="white-space:nowrap">Filtrar</button>
+  </form>
+  <a href="{{ url_for('admin.produto_novo') }}" class="btn-primary" style="white-space:nowrap">+ Novo Produto</a>
+</div>
+
+<div class="card" style="overflow:hidden">
+  {% if produtos %}
+  <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Nome</th>
+          <th>Categoria</th>
+          <th>Preço</th>
+          <th>Custo</th>
+          <th>Estoque</th>
+          <th>Status</th>
+          <th style="width:44px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in produtos %}
+        <tr>
+          <td>
+            {% if p.imagem_url %}
+            <img src="{{ url_for('static', filename=p.imagem_url) }}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+            {% else %}
+            <div style="width:32px;height:32px;border-radius:6px;background:var(--bg-sidebar,#f8f5f3);border:1px solid var(--border)"></div>
+            {% endif %}
+          </td>
+          <td><a href="{{ url_for('admin.produto_detalhe', produto_id=p.id) }}" style="font-weight:500;color:var(--accent)">{{ p.nome }}</a></td>
+          <td>{{ p.categoria.nome if p.categoria else '—' }}</td>
+          <td>R$ {{ '%.2f'|format(p.preco|float) }}</td>
+          <td>{% if p.preco_custo %}R$ {{ '%.2f'|format(p.preco_custo|float) }}{% else %}—{% endif %}</td>
+          <td>{{ '%.2f'|format(p.estoque|float) }} {{ p.unidade_medida }}</td>
+          <td>
+            {% if p.ativo %}<span class="badge badge--convertido">Ativo</span>
+            {% else %}<span class="badge badge--perdido">Inativo</span>{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('admin.produto_detalhe', produto_id=p.id) }}" class="btn-icon btn-icon--edit" title="Editar">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:3rem;text-align:center;color:var(--text-muted)">
+    <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--border)" stroke-width="1.5" style="margin-bottom:.8rem"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    <p>Nenhum produto encontrado.</p>
+    <a href="{{ url_for('admin.produto_novo') }}" class="btn-primary" style="margin-top:.8rem;display:inline-block">Cadastrar primeiro produto</a>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.svc-subnav { display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid var(--border) }
+.svc-subnav a { padding:.55rem 1.1rem;font-size:.85rem;font-weight:500;color:var(--text-muted);
+                border-bottom:2px solid transparent;margin-bottom:-2px;text-decoration:none;transition:all .15s }
+.svc-subnav a:hover,.svc-subnav a.active { color:var(--accent);border-bottom-color:var(--accent) }
+</style>
+{% endblock %}

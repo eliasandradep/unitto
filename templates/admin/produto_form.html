@@ -1,0 +1,172 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ p.nome if p else 'Novo Produto' }}{% endblock %}
+{% block page_title %}{{ p.nome if p else 'Novo Produto' }}{% endblock %}
+
+{% block content %}
+{% set action_url = url_for('admin.produto_detalhe', produto_id=p.id) if p else url_for('admin.produto_novo') %}
+
+<!-- Sub-navegação -->
+<div class="svc-subnav">
+  <a href="{{ url_for('admin.produtos') }}">Produtos</a>
+  <a href="{{ url_for('admin.produto_categorias') }}">Categorias</a>
+</div>
+
+<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem">
+  <a href="{{ url_for('admin.produtos') }}" class="btn-secondary btn-sm">← Voltar</a>
+  <span style="font-size:.82rem;color:var(--text-muted)">
+    {{ 'Editando: ' + p.nome if p else 'Novo Produto' }}
+  </span>
+</div>
+
+<form method="POST" action="{{ action_url }}" id="prodForm" enctype="multipart/form-data">
+<div class="svc-layout">
+
+  <!-- ── Coluna esquerda: dados do produto ── -->
+  <div class="svc-main">
+
+    <div class="card">
+      <div class="card__header"><h3>Informações de Cadastro do Produto</h3></div>
+
+      <!-- Nome -->
+      <div class="form-group">
+        <label>Nome do Produto <span class="required">*</span></label>
+        <input type="text" name="nome" required value="{{ p.nome if p else '' }}" placeholder="ex: Condicionador Wella 500ml" />
+      </div>
+
+      <!-- Descrição -->
+      <div class="form-group">
+        <label>Descrição</label>
+        <textarea name="descricao" id="descricaoTa" rows="4" maxlength="500"
+                  placeholder="Descrição do produto...">{{ p.descricao or '' if p else '' }}</textarea>
+        <div style="text-align:right;font-size:.74rem;color:var(--text-muted);margin-top:.2rem">
+          <span id="descCount">0</span>/500 caracteres
+        </div>
+      </div>
+
+      <!-- Imagem -->
+      <div class="form-group">
+        <label>Imagem do Produto</label>
+        {% if p and p.imagem_url %}
+        <div style="margin-bottom:.5rem">
+          <img src="{{ url_for('static', filename=p.imagem_url) }}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+        </div>
+        {% endif %}
+        <input type="file" name="imagem" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" />
+      </div>
+
+      <!-- Código de barras -->
+      <div class="form-group">
+        <label>Código de Barras</label>
+        <input type="text" name="codigo_barras" value="{{ p.codigo_barras or '' if p else '' }}" placeholder="ex: 7891234567890" />
+      </div>
+
+      <!-- Preço + Preço de custo -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Preço de Venda (R$) <span class="required">*</span></label>
+          <input type="number" name="preco" step="0.01" min="0" required
+                 value="{{ '%.2f'|format(p.preco|float) if p and p.preco else '' }}" placeholder="0,00" />
+        </div>
+        <div class="form-group">
+          <label>Preço de Custo (R$)</label>
+          <input type="number" name="preco_custo" step="0.01" min="0"
+                 value="{{ '%.2f'|format(p.preco_custo|float) if p and p.preco_custo else '' }}" placeholder="0,00" />
+        </div>
+      </div>
+
+      <!-- Comissão -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comissão</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input type="number" name="comissao_valor" step="0.01" min="0" style="flex:1"
+                   value="{{ '%.2f'|format(p.comissao_valor|float) if p and p.comissao_valor else '' }}" placeholder="0" />
+            <select name="comissao_tipo" style="width:70px">
+              <option value="%" {% if not p or p.comissao_tipo == '%' %}selected{% endif %}>%</option>
+              <option value="R" {% if p and p.comissao_tipo == 'R' %}selected{% endif %}>R$</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Unidade de Medida</label>
+          <select name="unidade_medida">
+            {% for u, label in [('un','Unidade'), ('kg','Quilograma'), ('g','Grama'), ('l','Litro'), ('ml','Mililitro'), ('cx','Caixa'), ('pct','Pacote')] %}
+            <option value="{{ u }}" {% if p and p.unidade_medida == u or (not p and u == 'un') %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Estoque + Categoria -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Estoque {{ 'Inicial' if not p else 'Atual' }}</label>
+          <input type="number" name="estoque" step="0.01" min="0"
+                 value="{{ '%.2f'|format(p.estoque|float) if p and p.estoque is not none else '0' }}" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select name="categoria_id">
+            <option value="">— Selecionar —</option>
+            {% for cat in categorias %}
+            <option value="{{ cat.id }}" {% if p and p.categoria_id == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {% if not categorias %}
+      <div class="form-group">
+        <span style="font-size:.82rem;color:var(--text-muted)">
+          Nenhuma categoria cadastrada.
+          <a href="{{ url_for('admin.produto_categorias') }}">Cadastrar →</a>
+        </span>
+      </div>
+      {% endif %}
+
+      {% if p %}
+      <div class="form-group">
+        <label class="check-item">
+          <input type="checkbox" name="inativo" value="1" {% if not p.ativo %}checked{% endif %}> Produto inativo
+        </label>
+      </div>
+      {% endif %}
+
+    </div><!-- /card -->
+
+    <!-- Ações -->
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Salvar
+      </button>
+      <a href="{{ url_for('admin.produtos') }}" class="btn-secondary">Cancelar</a>
+      {% if p %}
+      <button type="submit" name="action" value="excluir" class="btn-danger"
+        onclick="return confirm('Excluir este produto? Esta ação não pode ser desfeita.')">
+        Excluir produto
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /svc-layout -->
+</form>
+
+<style>
+.svc-subnav { display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid var(--border) }
+.svc-subnav a { padding:.55rem 1.1rem;font-size:.85rem;font-weight:500;color:var(--text-muted);
+                border-bottom:2px solid transparent;margin-bottom:-2px;text-decoration:none;transition:all .15s }
+.svc-subnav a:hover,.svc-subnav a.active { color:var(--accent);border-bottom-color:var(--accent) }
+
+.svc-layout { display:grid;grid-template-columns:1fr;gap:1.2rem;align-items:start;max-width:720px }
+</style>
+
+<script>
+const ta = document.getElementById('descricaoTa');
+const dc = document.getElementById('descCount');
+function upCount() { dc.textContent = ta.value.length; }
+ta.addEventListener('input', upCount); upCount();
+</script>
+
+{% endblock %}
