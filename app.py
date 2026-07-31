@@ -125,6 +125,22 @@ def _migrate_checkout_url_len():
         pass
 
 
+def _migrate_leads_phone_nullable():
+    """leads.phone era NOT NULL; Leads vindos de Instagram/Messenger não
+    trazem telefone (só um PSID opaco), então a coluna precisa aceitar nulo."""
+    from sqlalchemy import inspect as _insp, text
+    if 'postgresql' not in db.engine.url.drivername:
+        return
+    try:
+        cols = _insp(db.engine).get_columns('leads')
+        col = next((c for c in cols if c['name'] == 'phone'), None)
+        if col and not col['nullable']:
+            with db.engine.begin() as conn:
+                conn.execute(text('ALTER TABLE leads ALTER COLUMN phone DROP NOT NULL'))
+    except Exception:
+        pass
+
+
 def _migrate_expedientes():
     from sqlalchemy import inspect as _insp, text
     _pg = 'postgresql' in db.engine.url.drivername
@@ -411,6 +427,7 @@ with app.app_context():
     _migrate_settings_schema()
     db.create_all()
     _migrate_checkout_url_len()
+    _migrate_leads_phone_nullable()
     _pg = 'postgresql' in db.engine.url.drivername
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")
