@@ -738,7 +738,10 @@ def integracoes_meta_callback():
             db.session.add(integ)
         integ.empresa_id = g.empresa_id
         integ.nome_conta = ativo['nome_conta']
-        integ.access_token_enc = token_enc
+        # Messenger/Instagram exigem o Page Access Token (retornado por conta em
+        # /me/accounts) para o Send API — o token de usuário trocado acima só
+        # serve para listar as contas, não para enviar mensagens em nome delas.
+        integ.access_token_enc = encrypt_token(ativo['access_token']) if ativo.get('access_token') else token_enc
         integ.status = 'conectado'
         integ.conectado_em = datetime.utcnow()
         integ.conectado_por_user_id = current_user.id

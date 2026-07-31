@@ -95,7 +95,8 @@ def listar_ativos(canal, access_token):
     paginas = resp.json().get('data', [])
 
     if canal == 'messenger':
-        return [{'identificador_externo': p['id'], 'nome_conta': p.get('name') or p['id']} for p in paginas]
+        return [{'identificador_externo': p['id'], 'nome_conta': p.get('name') or p['id'],
+                  'access_token': p.get('access_token')} for p in paginas]
 
     if canal == 'instagram':
         ativos = []
@@ -107,7 +108,8 @@ def listar_ativos(canal, access_token):
                 continue
             ig = info.json().get('instagram_business_account')
             if ig:
-                ativos.append({'identificador_externo': ig['id'], 'nome_conta': p.get('name') or ig['id']})
+                ativos.append({'identificador_externo': ig['id'], 'nome_conta': p.get('name') or ig['id'],
+                                'access_token': p.get('access_token')})
         return ativos
 
     return []
