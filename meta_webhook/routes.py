@@ -30,6 +30,8 @@ _PERGUNTA_CONTATO = (
 _PALAVRAS_TELEFONE = re.compile(
     r'(?i)\b(telefone|tel|fone|whats\s?app|whats|numero|n[uú]mero|contato|cel|celular)\b[:\s]*')
 
+_PREFIXOS_NOME = re.compile(r'(?i)^(meu nome é|me chamo|sou\s+(a|o)\s+)\s*')
+
 
 def _servicos_ativos(empresa_id):
     return [s.nome for s in Servico.query.filter_by(empresa_id=empresa_id, ativo=True).all()]
@@ -38,11 +40,14 @@ def _servicos_ativos(empresa_id):
 def _extrair_contato(texto, servicos_ativos):
     """Heurística simples: extrai a primeira sequência de 10-13 dígitos como
     telefone e o nome de um serviço ativo da empresa citado no texto (o que
-    aparecer primeiro); o restante do texto (sem a sequência nem palavras
-    como "telefone"/"whats" nem o serviço encontrado) vira candidato a nome —
-    só é usado como nome quando um telefone também foi encontrado (evita
-    transformar qualquer pergunta sem número em "nome")."""
-    texto = texto or ''
+    aparecer primeiro). Contatos costumam responder em mensagens separadas
+    (uma só com o nome, outra só com o telefone, outra só com o serviço) em
+    vez de tudo numa única mensagem — por isso, quando o texto não tem
+    telefone nem serviço reconhecível, ele inteiro é tratado como candidato a
+    nome; quando tem, o nome é o que sobra do texto depois de remover o
+    trecho numérico/palavras-gatilho ("telefone", "whats" etc.) e o serviço
+    encontrado."""
+    texto = (texto or '').strip()
 
     digitos = re.sub(r'\D', '', texto)
     m = re.search(r'\d{10,13}', digitos)
@@ -55,13 +60,15 @@ def _extrair_contato(texto, servicos_ativos):
             servico = nome_serv
             break
 
-    if not telefone:
-        return None, None, servico
+    if not telefone and not servico:
+        nome = _PREFIXOS_NOME.sub('', texto).strip(' ,.-')
+        return (nome or None), None, None
 
-    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto)
+    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto) if telefone else texto
     nome = _PALAVRAS_TELEFONE.sub(' ', nome)
     if servico:
         nome = re.sub(re.escape(servico), ' ', nome, flags=re.IGNORECASE)
+    nome = _PREFIXOS_NOME.sub('', nome.strip())
     nome = re.sub(r'\s{2,}', ' ', nome).strip(' ,.-')
     return (nome or None), telefone, servico
 
@@ -135,7 +142,12 @@ def _upsert_lead(integracao, evento):
                 lead.name = nome_extraido
             if servico_extraido and not lead.service:
                 lead.service = servico_extraido
-            lead.aguardando_contato = False
+            # Continua "escutando" as próximas mensagens da conversa até ter
+            # telefone (essencial) e serviço (quando a empresa tem catálogo
+            # ativo) — sem risco de reenviar a pergunta, que só acontece na
+            # criação do Lead.
+            if lead.phone and (lead.service or not servicos):
+                lead.aguardando_contato = False
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
