@@ -44,6 +44,8 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'contas_pagar', 'conta_pagar_baixa', 'conta_pagar_excluir',
     'contas_receber', 'conta_receber_baixa', 'conta_receber_excluir',
     'formas_pagamento',
+    'integracoes', 'integracoes_meta_conectar', 'integracoes_meta_callback',
+    'integracoes_meta_desconectar',
 })
 
 

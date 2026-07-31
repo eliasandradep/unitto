@@ -8,6 +8,7 @@ from flask import render_template, redirect, url_for, request, flash, jsonify, g
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from . import admin_bp
 from .tenant import tq, get_setting, save_setting
@@ -22,9 +23,12 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     Pacote, PacoteItem, VendaPacote, VendaPacoteItem,
                     EscalaProfissionalUnidade, RecebimentoCliente,
                     ContaPagar, ContaReceber, FormaPagamento,
-                    CategoriaProduto, Produto,
-                    LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA)
+                    CategoriaProduto, Produto, IntegracaoMeta,
+                    LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
+                    META_CANAIS)
 from themes import THEMES
+import meta_client
+from crypto_utils import encrypt_token
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -657,6 +661,106 @@ def configuracoes():
         unidades=todas_unidades,
         logo_habilitado=logo_habilitado,
     )
+
+
+# ── Integrações (Meta: WhatsApp/Instagram/Messenger) ───────────────────────────
+
+def _meta_state_serializer():
+    return URLSafeTimedSerializer(current_app.secret_key, salt='integracoes-meta')
+
+
+@admin_bp.route('/integracoes')
+@login_required
+def integracoes():
+    conexoes = {c.canal: c for c in tq(IntegracaoMeta).filter_by(status='conectado').all()}
+    return render_template('admin/integracoes.html', canais=META_CANAIS, conexoes=conexoes,
+                            meta_configurado=meta_client.configurado())
+
+
+@admin_bp.route('/integracoes/meta/conectar/<canal>')
+@login_required
+def integracoes_meta_conectar(canal):
+    if canal not in dict(META_CANAIS):
+        abort(404)
+    if not meta_client.configurado():
+        flash('Integração com a Meta ainda não configurada. Fale com o suporte.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    state = _meta_state_serializer().dumps({'empresa_id': g.empresa_id, 'canal': canal})
+    return redirect(meta_client.oauth_dialog_url(canal, state))
+
+
+@admin_bp.route('/integracoes/meta/callback')
+@login_required
+def integracoes_meta_callback():
+    erro = request.args.get('error_description') or request.args.get('error')
+    if erro:
+        flash(f'Conexão cancelada: {erro}', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    state = request.args.get('state', '')
+    try:
+        dados = _meta_state_serializer().loads(state, max_age=600)
+    except (BadSignature, SignatureExpired):
+        flash('Sessão de conexão expirada ou inválida. Tente novamente.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    if dados.get('empresa_id') != g.empresa_id:
+        abort(403)
+    canal = dados.get('canal')
+
+    code = request.args.get('code')
+    if not code:
+        flash('Autorização da Meta incompleta.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    try:
+        token = meta_client.trocar_code_por_token(code)
+        ativos = meta_client.listar_ativos(canal, token)
+    except Exception as e:
+        flash(f'Não foi possível concluir a conexão: {e}', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    if not ativos:
+        flash('Nenhuma conta elegível encontrada para conectar nesse canal.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    token_enc = encrypt_token(token)
+    conflito = False
+    for ativo in ativos:
+        integ = IntegracaoMeta.query.filter_by(
+            canal=canal, identificador_externo=ativo['identificador_externo']).first()
+        if integ and integ.empresa_id != g.empresa_id:
+            conflito = True
+            continue
+        if not integ:
+            integ = IntegracaoMeta(canal=canal, identificador_externo=ativo['identificador_externo'])
+            db.session.add(integ)
+        integ.empresa_id = g.empresa_id
+        integ.nome_conta = ativo['nome_conta']
+        integ.access_token_enc = token_enc
+        integ.status = 'conectado'
+        integ.conectado_em = datetime.utcnow()
+        integ.conectado_por_user_id = current_user.id
+    db.session.commit()
+
+    if conflito:
+        flash('Uma das contas já está conectada a outra empresa e foi ignorada.', 'error')
+    else:
+        flash('Conta conectada com sucesso.', 'success')
+    return redirect(url_for('admin.integracoes'))
+
+
+@admin_bp.route('/integracoes/meta/desconectar/<int:integracao_id>', methods=['POST'])
+@login_required
+def integracoes_meta_desconectar(integracao_id):
+    integ = tq(IntegracaoMeta).filter_by(id=integracao_id).first()
+    if not integ:
+        abort(404)
+    db.session.delete(integ)
+    db.session.commit()
+    flash('Conta desconectada.', 'success')
+    return redirect(url_for('admin.integracoes'))
 
 
 # ── Themes ────────────────────────────────────────────────────────────────────

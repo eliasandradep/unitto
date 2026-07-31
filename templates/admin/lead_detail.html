@@ -20,9 +20,11 @@
       <div class="form-group">
         <label>Telefone</label>
         <div class="input-with-action">
-          <input type="text" value="{{ lead.phone }}" readonly />
+          <input type="text" value="{{ lead.phone or '' }}" readonly />
+          {% if lead.phone %}
           <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
              target="_blank" rel="noopener" class="btn-sm btn-wa">WhatsApp</a>
+          {% endif %}
         </div>
       </div>
       <div class="form-group">

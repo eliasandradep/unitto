@@ -14,11 +14,26 @@ LEAD_STATUSES = [
 ]
 
 LEAD_SOURCES = [
-    ('formulario', 'Formulário'),
-    ('whatsapp',   'WhatsApp'),
-    ('chat',       'Chat do Site'),
-    ('manual',     'Manual'),
+    ('formulario',   'Formulário'),
+    ('whatsapp',     'WhatsApp'),
+    ('chat',         'Chat do Site'),
+    ('manual',       'Manual'),
+    ('whatsapp_meta','WhatsApp (auto)'),
+    ('instagram',    'Instagram Direct'),
+    ('messenger',    'Messenger'),
 ]
+
+META_CANAIS = [
+    ('whatsapp',  'WhatsApp'),
+    ('instagram', 'Instagram'),
+    ('messenger', 'Messenger'),
+]
+
+META_CANAL_SOURCE = {
+    'whatsapp':  'whatsapp_meta',
+    'instagram': 'instagram',
+    'messenger': 'messenger',
+}
 
 AGENDAMENTO_STATUS = [
     ('agendado',   'Agendado'),
@@ -175,6 +190,26 @@ class CobrancaInfinitePay(db.Model):
     plano           = db.relationship('Plano')
 
 
+class IntegracaoMeta(db.Model):
+    """Conexão de uma empresa com um canal da Meta (WhatsApp/Instagram/Messenger) para captura automática de leads."""
+    __tablename__ = 'integracoes_meta'
+    id                    = db.Column(db.Integer, primary_key=True)
+    empresa_id            = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    canal                 = db.Column(db.String(20), nullable=False)  # whatsapp|instagram|messenger
+    identificador_externo = db.Column(db.String(100), nullable=False)  # phone_number_id | page_id
+    nome_conta            = db.Column(db.String(150))
+    access_token_enc      = db.Column(db.Text, nullable=False)
+    status                = db.Column(db.String(20), default='conectado')  # conectado|erro|desconectado
+    conectado_em          = db.Column(db.DateTime, default=datetime.utcnow)
+    conectado_por_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    empresa               = db.relationship('Empresa', backref='integracoes_meta')
+
+    __table_args__ = (db.UniqueConstraint('canal', 'identificador_externo', name='uq_integracao_canal_ext'),)
+
+    def canal_label(self):
+        return dict(META_CANAIS).get(self.canal, self.canal)
+
+
 ROLES = [
     ('saas_admin',    'SaaS Admin'),
     ('empresa_admin', 'Administrador'),
@@ -230,19 +265,23 @@ class PasswordResetToken(db.Model):
 
 class Lead(db.Model):
     __tablename__ = 'leads'
-    id         = db.Column(db.Integer, primary_key=True)
-    name       = db.Column(db.String(100))
-    phone      = db.Column(db.String(20), nullable=False)
-    email      = db.Column(db.String(120))
-    source     = db.Column(db.String(20),  default='manual')
-    service    = db.Column(db.String(50))
-    message    = db.Column(db.Text)
-    status     = db.Column(db.String(20),  default='novo')
-    notes      = db.Column(db.Text)
-    unit       = db.Column(db.String(30))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    id                 = db.Column(db.Integer, primary_key=True)
+    name               = db.Column(db.String(100))
+    phone              = db.Column(db.String(20), nullable=True)
+    email              = db.Column(db.String(120))
+    source             = db.Column(db.String(20),  default='manual')
+    service            = db.Column(db.String(50))
+    message            = db.Column(db.Text)
+    status             = db.Column(db.String(20),  default='novo')
+    notes              = db.Column(db.Text)
+    unit               = db.Column(db.String(30))
+    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at         = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    empresa_id         = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    external_thread_id = db.Column(db.String(100))
+    integracao_id      = db.Column(db.Integer, db.ForeignKey('integracoes_meta.id'), nullable=True)
+
+    integracao = db.relationship('IntegracaoMeta')
 
     def status_label(self):
         return dict(LEAD_STATUSES).get(self.status, self.status)

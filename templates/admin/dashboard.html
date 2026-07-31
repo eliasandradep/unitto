@@ -39,7 +39,7 @@
           <td>
             <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
               <strong>{{ lead.name or '—' }}</strong><br />
-              <small>{{ lead.phone }}</small>
+              <small>{{ lead.phone or '—' }}</small>
             </a>
           </td>
           <td><span class="badge badge--source-{{ lead.source }}">{{ lead.source_label() }}</span></td>

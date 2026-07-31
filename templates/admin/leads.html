@@ -46,8 +46,12 @@
       <tr>
         <td>{{ lead.name or '—' }}</td>
         <td>
+          {% if lead.phone %}
           <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
              target="_blank" rel="noopener" class="wa-link">{{ lead.phone }}</a>
+          {% else %}
+          —
+          {% endif %}
         </td>
         <td>{{ lead.service or '—' }}</td>
         <td><span class="badge badge--source-{{ lead.source }}">{{ lead.source_label() }}</span></td>

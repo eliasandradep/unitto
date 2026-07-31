@@ -1,0 +1,55 @@
+{% extends 'admin/base.html' %}
+{% block title %}Integrações{% endblock %}
+{% block page_title %}Integrações{% endblock %}
+
+{% block content %}
+
+{% if not meta_configurado %}
+<div style="display:flex;align-items:center;gap:.6rem;background:#FEF9E7;
+            border:1px solid #F0CA4D;border-radius:var(--radius);
+            padding:.6rem .9rem;font-size:.82rem;color:#7D6608;margin-bottom:1.2rem">
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <circle cx="12" cy="16" r=".5" fill="currentColor"/>
+  </svg>
+  Integração com a Meta ainda não configurada nesta instância. Fale com o suporte.
+</div>
+{% endif %}
+
+<p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1.2rem">
+  Conecte seus canais da Meta para que mensagens recebidas no WhatsApp, Instagram Direct ou Messenger
+  virem Leads automaticamente.
+</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">
+  {% for canal, label in canais %}
+  {% set integ = conexoes.get(canal) %}
+  <div class="card" style="padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.6rem;
+                            border-left:3px solid {{ 'var(--gold-dark)' if integ else 'var(--border)' }}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+      <span style="font-weight:600;font-size:.95rem">{{ label }}</span>
+      {% if integ %}
+      <span class="badge badge--convertido" style="flex-shrink:0">Conectado</span>
+      {% else %}
+      <span class="badge badge--perdido" style="flex-shrink:0">Não conectado</span>
+      {% endif %}
+    </div>
+
+    {% if integ %}
+    <div style="font-size:.82rem;color:var(--text-muted)">
+      Conta: <strong style="color:var(--text)">{{ integ.nome_conta or integ.identificador_externo }}</strong>
+    </div>
+    <form method="POST" action="{{ url_for('admin.integracoes_meta_desconectar', integracao_id=integ.id) }}"
+          onsubmit="return confirm('Desconectar esta conta? Novas mensagens deixarão de virar Leads automaticamente.')">
+      <button type="submit" class="btn-secondary" style="width:100%">Desconectar</button>
+    </form>
+    {% else %}
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0">Nenhuma conta conectada.</p>
+    <a href="{{ url_for('admin.integracoes_meta_conectar', canal=canal) }}" class="btn-primary"
+       style="text-align:center;width:100%">Conectar</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

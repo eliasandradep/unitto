@@ -342,9 +342,12 @@ body.sidebar--collapsed .sidebar__nav {
 .badge--convertido     { background: #E9F7EF; color: #1E8449; }
 .badge--perdido        { background: #F2F3F4; color: #717D7E; }
 .badge--active         { background: #E9F7EF; color: #1E8449; }
-.badge--source-formulario { background: #EBF5FB; color: #2471A3; }
-.badge--source-whatsapp   { background: #E9F7EF; color: #1A7A42; }
-.badge--source-manual     { background: #F5EEF8; color: #7D3C98; }
+.badge--source-formulario   { background: #EBF5FB; color: #2471A3; }
+.badge--source-whatsapp     { background: #E9F7EF; color: #1A7A42; }
+.badge--source-manual       { background: #F5EEF8; color: #7D3C98; }
+.badge--source-whatsapp_meta { background: #E9F7EF; color: #1A7A42; }
+.badge--source-instagram    { background: #FDEDF3; color: #B0248A; }
+.badge--source-messenger    { background: #EBF0FE; color: #3557DB; }
 
 /* ── Forms ───────────────────────────────────────────────── */
 .form-group { margin-bottom: 1rem; }

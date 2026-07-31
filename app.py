@@ -45,6 +45,9 @@ app.register_blueprint(billing_bp)
 from public import public_bp
 app.register_blueprint(public_bp)
 
+from meta_webhook import meta_webhook_bp
+app.register_blueprint(meta_webhook_bp)
+
 from admin.tenant import register_tenant_auto_fill
 register_tenant_auto_fill(app, db)
 
@@ -448,6 +451,9 @@ with app.app_context():
                   'INTEGER REFERENCES profissionais(id)' if _pg else 'INTEGER')
     _fk_emp = 'INTEGER REFERENCES empresas(id)' if _pg else 'INTEGER'
     _safe_add_col('leads',                'empresa_id', _fk_emp)
+    _safe_add_col('leads',                'external_thread_id', 'VARCHAR(100)')
+    _safe_add_col('leads',                'integracao_id',
+                  'INTEGER REFERENCES integracoes_meta(id)' if _pg else 'INTEGER')
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)
