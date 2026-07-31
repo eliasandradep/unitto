@@ -280,6 +280,7 @@ class Lead(db.Model):
     empresa_id         = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
     external_thread_id = db.Column(db.String(100))
     integracao_id      = db.Column(db.Integer, db.ForeignKey('integracoes_meta.id'), nullable=True)
+    aguardando_contato = db.Column(db.Boolean, default=False)
 
     integracao = db.relationship('IntegracaoMeta')
 

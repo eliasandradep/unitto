@@ -471,6 +471,8 @@ with app.app_context():
     _safe_add_col('leads',                'external_thread_id', 'VARCHAR(100)')
     _safe_add_col('leads',                'integracao_id',
                   'INTEGER REFERENCES integracoes_meta(id)' if _pg else 'INTEGER')
+    _safe_add_col('leads',                'aguardando_contato',
+                  'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)

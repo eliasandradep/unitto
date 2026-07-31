@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 import os
+import re
 
 from flask import request, jsonify, current_app
 
@@ -15,6 +16,37 @@ _PARSERS = {
     'page': parse_messenger,
     'instagram': parse_instagram,
 }
+
+# Canais em que a Meta não entrega telefone no payload — por isso pedimos
+# nome e telefone automaticamente na primeira mensagem de cada Lead novo.
+_CANAIS_SEM_TELEFONE = ('messenger', 'instagram')
+
+_PERGUNTA_CONTATO = (
+    'Olá! Para agilizar seu atendimento, pode me enviar seu nome completo '
+    'e um telefone/WhatsApp para contato?'
+)
+
+
+_PALAVRAS_TELEFONE = re.compile(
+    r'(?i)\b(telefone|tel|fone|whats\s?app|whats|numero|n[uú]mero|contato|cel|celular)\b[:\s]*')
+
+
+def _extrair_nome_telefone(texto):
+    """Heurística simples: extrai a primeira sequência de 10-13 dígitos como
+    telefone; o restante do texto (sem a sequência nem palavras como
+    "telefone"/"whats") vira candidato a nome — só é usado como nome quando
+    um telefone também foi encontrado (evita transformar qualquer pergunta
+    sem número em "nome")."""
+    digitos = re.sub(r'\D', '', texto or '')
+    m = re.search(r'\d{10,13}', digitos)
+    telefone = m.group(0) if m else None
+    if not telefone:
+        return None, None
+
+    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto or '')
+    nome = _PALAVRAS_TELEFONE.sub(' ', nome)
+    nome = re.sub(r'\s{2,}', ' ', nome).strip(' ,.-')
+    return (nome or None), telefone
 
 
 @meta_webhook_bp.route('/webhook', methods=['GET'])
@@ -77,19 +109,39 @@ def _upsert_lead(integracao, evento):
             nome = None
 
     if lead:
+        if lead.aguardando_contato:
+            nome_extraido, telefone_extraido = _extrair_nome_telefone(evento['mensagem'])
+            if telefone_extraido:
+                lead.phone = telefone_extraido
+            if nome_extraido and not lead.name:
+                lead.name = nome_extraido
+            lead.aguardando_contato = False
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
-    else:
-        lead = Lead(
-            empresa_id=integracao.empresa_id,
-            external_thread_id=evento['external_thread_id'],
-            integracao_id=integracao.id,
-            name=nome,
-            phone=evento['phone'],
-            source=META_CANAL_SOURCE.get(evento['canal'], evento['canal']),
-            message=evento['mensagem'],
-            status='novo',
-        )
-        db.session.add(lead)
+        db.session.commit()
+        return
+
+    lead = Lead(
+        empresa_id=integracao.empresa_id,
+        external_thread_id=evento['external_thread_id'],
+        integracao_id=integracao.id,
+        name=nome,
+        phone=evento['phone'],
+        source=META_CANAL_SOURCE.get(evento['canal'], evento['canal']),
+        message=evento['mensagem'],
+        status='novo',
+    )
+    db.session.add(lead)
+
+    if evento['canal'] in _CANAIS_SEM_TELEFONE and not lead.phone:
+        try:
+            token = decrypt_token(integracao.access_token_enc)
+            meta_client.enviar_mensagem(
+                integracao.identificador_externo, evento['external_thread_id'],
+                _PERGUNTA_CONTATO, token)
+            lead.aguardando_contato = True
+        except Exception:
+            current_app.logger.exception('Falha ao enviar pergunta automática de contato')
+
     db.session.commit()

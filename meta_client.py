@@ -113,6 +113,18 @@ def listar_ativos(canal, access_token):
     return []
 
 
+def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token):
+    """Envia mensagem de texto via Send API (Messenger/Instagram). Best-effort — quem chama trata a exceção."""
+    resp = requests.post(
+        f'{GRAPH_URL}/{identificador_externo}/messages',
+        params={'access_token': access_token},
+        json={'recipient': {'id': destinatario_id}, 'message': {'text': texto}},
+        timeout=10,
+    )
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+
+
 def buscar_nome_perfil(psid, access_token):
     """Busca o nome do remetente de uma mensagem do Instagram/Messenger. Best-effort — nunca levanta exceção."""
     try:
