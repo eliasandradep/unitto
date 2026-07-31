@@ -7,7 +7,7 @@ from flask import request, jsonify, current_app
 
 from . import meta_webhook_bp
 from .parsers import parse_whatsapp, parse_messenger, parse_instagram
-from models import db, IntegracaoMeta, Lead, META_CANAL_SOURCE
+from models import db, IntegracaoMeta, Lead, Servico, META_CANAL_SOURCE
 import meta_client
 from crypto_utils import decrypt_token
 
@@ -22,8 +22,8 @@ _PARSERS = {
 _CANAIS_SEM_TELEFONE = ('messenger', 'instagram')
 
 _PERGUNTA_CONTATO = (
-    'Olá! Para agilizar seu atendimento, pode me enviar seu nome completo '
-    'e um telefone/WhatsApp para contato?'
+    'Olá! Para agilizar seu atendimento, pode me enviar seu nome completo, '
+    'um telefone/WhatsApp para contato e qual serviço você tem interesse?'
 )
 
 
@@ -31,22 +31,39 @@ _PALAVRAS_TELEFONE = re.compile(
     r'(?i)\b(telefone|tel|fone|whats\s?app|whats|numero|n[uú]mero|contato|cel|celular)\b[:\s]*')
 
 
-def _extrair_nome_telefone(texto):
+def _servicos_ativos(empresa_id):
+    return [s.nome for s in Servico.query.filter_by(empresa_id=empresa_id, ativo=True).all()]
+
+
+def _extrair_contato(texto, servicos_ativos):
     """Heurística simples: extrai a primeira sequência de 10-13 dígitos como
-    telefone; o restante do texto (sem a sequência nem palavras como
-    "telefone"/"whats") vira candidato a nome — só é usado como nome quando
-    um telefone também foi encontrado (evita transformar qualquer pergunta
-    sem número em "nome")."""
-    digitos = re.sub(r'\D', '', texto or '')
+    telefone e o nome de um serviço ativo da empresa citado no texto (o que
+    aparecer primeiro); o restante do texto (sem a sequência nem palavras
+    como "telefone"/"whats" nem o serviço encontrado) vira candidato a nome —
+    só é usado como nome quando um telefone também foi encontrado (evita
+    transformar qualquer pergunta sem número em "nome")."""
+    texto = texto or ''
+
+    digitos = re.sub(r'\D', '', texto)
     m = re.search(r'\d{10,13}', digitos)
     telefone = m.group(0) if m else None
-    if not telefone:
-        return None, None
 
-    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto or '')
+    servico = None
+    texto_lower = texto.lower()
+    for nome_serv in servicos_ativos:
+        if re.search(r'\b' + re.escape(nome_serv.lower()) + r'\b', texto_lower):
+            servico = nome_serv
+            break
+
+    if not telefone:
+        return None, None, servico
+
+    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto)
     nome = _PALAVRAS_TELEFONE.sub(' ', nome)
+    if servico:
+        nome = re.sub(re.escape(servico), ' ', nome, flags=re.IGNORECASE)
     nome = re.sub(r'\s{2,}', ' ', nome).strip(' ,.-')
-    return (nome or None), telefone
+    return (nome or None), telefone, servico
 
 
 @meta_webhook_bp.route('/webhook', methods=['GET'])
@@ -110,11 +127,14 @@ def _upsert_lead(integracao, evento):
 
     if lead:
         if lead.aguardando_contato:
-            nome_extraido, telefone_extraido = _extrair_nome_telefone(evento['mensagem'])
+            servicos = _servicos_ativos(integracao.empresa_id)
+            nome_extraido, telefone_extraido, servico_extraido = _extrair_contato(evento['mensagem'], servicos)
             if telefone_extraido:
                 lead.phone = telefone_extraido
             if nome_extraido and not lead.name:
                 lead.name = nome_extraido
+            if servico_extraido and not lead.service:
+                lead.service = servico_extraido
             lead.aguardando_contato = False
         lead.message = evento['mensagem']
         if not lead.name and nome:
