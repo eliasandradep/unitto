@@ -1,6 +1,6 @@
 {% extends 'admin/base.html' %}
 {% block title %}Lead #{{ lead.id }}{% endblock %}
-{% block page_title %}Lead #{{ lead.id }} — {{ lead.name or lead.phone }}{% endblock %}
+{% block page_title %}Lead #{{ lead.id }} — {{ lead.name or lead.phone or lead.source_label() }}{% endblock %}
 
 {% block content %}
 
