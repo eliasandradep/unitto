@@ -215,6 +215,7 @@
           <a href="{{ url_for('admin.configuracoes') }}" class="snav-sub {% if ep in ['admin.configuracoes','admin.unidades'] %}active{% endif %}">Empresa</a>
           <a href="{{ url_for('admin.users') }}"        class="snav-sub {% if 'user' in ep %}active{% endif %}">Usuários</a>
           <a href="{{ url_for('admin.themes') }}"       class="snav-sub {% if 'theme' in ep %}active{% endif %}">Temas</a>
+          <a href="{{ url_for('admin.integracoes') }}"  class="snav-sub {% if 'integracoes' in ep %}active{% endif %}">Integrações</a>
         </div>
       </div>
       {% endif %}
