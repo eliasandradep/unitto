@@ -42,6 +42,9 @@ app.register_blueprint(signup_bp)
 from billing import billing_bp
 app.register_blueprint(billing_bp)
 
+from public import public_bp
+app.register_blueprint(public_bp)
+
 from admin.tenant import register_tenant_auto_fill
 register_tenant_auto_fill(app, db)
 

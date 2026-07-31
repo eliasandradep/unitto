@@ -10,6 +10,8 @@ from datetime import date, timedelta
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_user
 
+from slug_utils import is_reserved_slug
+
 signup_bp = Blueprint('signup', __name__)
 
 USERNAME_RE = re.compile(r'^[a-z0-9_.-]{3,30}$')
@@ -114,6 +116,10 @@ def signup():
 
     if not re.match(r'^[a-z0-9-]+$', slug):
         flash('Slug inválido: use apenas letras minúsculas, números e hífens.', 'error')
+        return render_template('signup.html', form=request.form)
+
+    if is_reserved_slug(slug):
+        flash('Este slug é reservado pelo sistema. Escolha outro identificador.', 'error')
         return render_template('signup.html', form=request.form)
 
     if Empresa.query.filter_by(slug=slug).first():

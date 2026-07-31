@@ -67,6 +67,17 @@ class Empresa(db.Model):
         return True
 
     @property
+    def plano_familia(self):
+        """Slug do plano sem o sufixo de periodicidade (ex: 'pro-anual' -> 'pro')."""
+        if not self.plano or self.plano == 'trial':
+            return self.plano or 'trial'
+        return self.plano[:-len('-anual')] if self.plano.endswith('-anual') else self.plano
+
+    def tem_agendamento_online(self):
+        """Página pública de agendamento é um recurso dos planos Avançado e Profissional."""
+        return self.plano_familia in ('pro', 'black')
+
+    @property
     def dias_trial_restantes(self):
         from datetime import date
         if self.plano == 'trial' and self.trial_ends_at:

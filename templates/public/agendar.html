@@ -1,0 +1,117 @@
+{% extends 'public/_base.html' %}
+
+{% block content %}
+<a href="{{ url_for('public.vitrine', slug=empresa.slug) }}" class="pub-back">&larr; Voltar</a>
+
+<section class="pub-agendar-header">
+  <h1>{{ servico.nome }}</h1>
+  <p>
+    {{ servico.duracao_horas }}h {{ '%02d'|format(servico.duracao_minutos) }}m
+    {% if servico.exibir_preco_online and servico.preco %} · R$ {{ '%.2f'|format(servico.preco)|replace('.', ',') }}{% endif %}
+  </p>
+</section>
+
+{% if not profissionais %}
+<div class="pub-notice">Nenhum profissional disponível para este serviço no momento.</div>
+{% else %}
+<form method="post" action="{{ url_for('public.agendar_submit', slug=empresa.slug, servico_id=servico.id) }}" class="pub-form" id="agendarForm">
+
+  <div class="pub-step">
+    <h2 class="pub-step__title">1. Profissional</h2>
+    <div class="pub-prof-grid">
+      {% for p in profissionais %}
+      <label class="pub-prof-card">
+        <input type="radio" name="profissional_id" value="{{ p.id }}" required>
+        <span>{{ p.nome }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pub-step">
+    <h2 class="pub-step__title">2. Data</h2>
+    <input type="date" name="data" id="dataInput" class="pub-date-input" min="{{ hoje }}" required>
+  </div>
+
+  <div class="pub-step">
+    <h2 class="pub-step__title">3. Horário</h2>
+    <div class="pub-slots-grid" id="slotsGrid">
+      <p class="pub-slots-empty">Escolha um profissional e uma data para ver os horários.</p>
+    </div>
+    <input type="hidden" name="hora_inicio" id="horaInicioInput">
+  </div>
+
+  <div class="pub-step">
+    <h2 class="pub-step__title">4. Seus dados</h2>
+    <input type="text" name="nome_cliente" placeholder="Seu nome" class="pub-input" required>
+    <input type="tel" name="telefone" placeholder="Seu telefone (WhatsApp)" class="pub-input" required>
+  </div>
+
+  <button type="submit" class="pub-btn pub-btn--primary pub-btn--block">Confirmar agendamento</button>
+</form>
+{% endif %}
+
+<script>
+(function() {
+  var form = document.getElementById('agendarForm');
+  if (!form) return;
+  var dataInput = document.getElementById('dataInput');
+  var slotsGrid = document.getElementById('slotsGrid');
+  var horaInput = document.getElementById('horaInicioInput');
+  var slotsUrl = "{{ url_for('public.slots_json', slug=empresa.slug, servico_id=servico.id) }}";
+
+  function profissionalSelecionado() {
+    var r = form.querySelector('input[name="profissional_id"]:checked');
+    return r ? r.value : null;
+  }
+
+  function carregarHorarios() {
+    var profId = profissionalSelecionado();
+    var data = dataInput.value;
+    horaInput.value = '';
+    if (!profId || !data) {
+      slotsGrid.innerHTML = '<p class="pub-slots-empty">Escolha um profissional e uma data para ver os horários.</p>';
+      return;
+    }
+    slotsGrid.innerHTML = '<p class="pub-slots-empty">Carregando…</p>';
+    fetch(slotsUrl + '?profissional_id=' + encodeURIComponent(profId) + '&data=' + encodeURIComponent(data))
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        var slots = json.slots || [];
+        if (!slots.length) {
+          slotsGrid.innerHTML = '<p class="pub-slots-empty">Nenhum horário disponível nesta data.</p>';
+          return;
+        }
+        slotsGrid.innerHTML = '';
+        slots.forEach(function(hora) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'pub-slot';
+          btn.textContent = hora;
+          btn.addEventListener('click', function() {
+            slotsGrid.querySelectorAll('.pub-slot').forEach(function(el) { el.classList.remove('pub-slot--selected'); });
+            btn.classList.add('pub-slot--selected');
+            horaInput.value = hora;
+          });
+          slotsGrid.appendChild(btn);
+        });
+      })
+      .catch(function() {
+        slotsGrid.innerHTML = '<p class="pub-slots-empty">Não foi possível carregar os horários. Tente novamente.</p>';
+      });
+  }
+
+  form.querySelectorAll('input[name="profissional_id"]').forEach(function(r) {
+    r.addEventListener('change', carregarHorarios);
+  });
+  dataInput.addEventListener('change', carregarHorarios);
+
+  form.addEventListener('submit', function(ev) {
+    if (!horaInput.value) {
+      ev.preventDefault();
+      alert('Escolha um horário disponível.');
+    }
+  });
+})();
+</script>
+{% endblock %}
