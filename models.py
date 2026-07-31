@@ -189,11 +189,14 @@ class User(db.Model, UserMixin):
 
     empresa       = db.relationship('Empresa', backref='users', foreign_keys=[empresa_id])
 
+    profissional_id = db.Column(db.Integer, db.ForeignKey('profissionais.id'), nullable=True)
+    profissional     = db.relationship('Profissional', backref=db.backref('user', uselist=False))
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return bool(self.password_hash) and check_password_hash(self.password_hash, password)
 
     def has_role(self, *roles):
         return self.role in roles

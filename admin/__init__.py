@@ -16,6 +16,54 @@ _SKIP_SUBSCRIPTION_CHECK = frozenset({
     'admin.boas_vindas',
 })
 
+# Endpoints reservados a perfil 'administrador' — telas de configuração/gestão
+# do negócio, sem sentido para quem só atende clientes (Agenda/Comissões/
+# Financeiro têm suas próprias regras de escopo, aplicadas nas rotas).
+_ADMIN_ONLY_ENDPOINTS = frozenset({
+    'dashboard',
+    'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete',
+    'users', 'user_new', 'user_edit', 'user_delete',
+    'metrics',
+    'configuracoes',
+    'themes', 'theme_set',
+    'servicos', 'servicos_importar_csv', 'servico_novo', 'servico_detalhe',
+    'categorias',
+    'produtos', 'produto_novo', 'produto_detalhe', 'produto_categorias',
+    'profissionais', 'profissional_novo', 'profissional_detalhe',
+    'profissional_comissao_add', 'profissional_comissao_delete',
+    'profissional_escala_data', 'profissional_escalas',
+    'profissional_escala_add', 'profissional_escala_delete',
+    'unidades',
+    'expedientes', 'expediente_novo', 'expediente_detalhe', 'expediente_excluir',
+    'boas_vindas',
+    'pacotes', 'api_pacote_criar', 'api_pacote_detalhe', 'api_servico_preco',
+    'api_cat_profissionais',
+    'financeiro',
+    'vendas_pacote', 'venda_pacote_nova', 'venda_pacote_detalhe',
+    'venda_pacote_usar_sessao', 'venda_pacote_cancelar',
+    'contas_pagar', 'conta_pagar_baixa', 'conta_pagar_excluir',
+    'contas_receber', 'conta_receber_baixa', 'conta_receber_excluir',
+    'formas_pagamento',
+})
+
+
+@admin_bp.before_request
+def _check_perfil_acesso():
+    """Bloqueia áreas administrativas para perfis não-administrador."""
+    from flask_login import current_user
+    from flask import abort
+
+    if not current_user.is_authenticated:
+        return
+    if request.endpoint is None or not request.endpoint.startswith('admin.'):
+        return
+
+    view = request.endpoint.split('.', 1)[1]
+    if view in _ADMIN_ONLY_ENDPOINTS:
+        from .permissions import is_administrador
+        if not is_administrador():
+            abort(403)
+
 
 @admin_bp.before_request
 def _check_assinatura():
@@ -85,8 +133,16 @@ def _inject_empresa():
         except Exception:
             pass
 
+    from flask_login import current_user
+    from .permissions import agenda_scope, comissoes_scope, financeiro_scope, is_administrador
+    if current_user.is_authenticated:
+        perm = {'agenda': agenda_scope(), 'comissoes': comissoes_scope(),
+                'financeiro': financeiro_scope(), 'admin': is_administrador()}
+    else:
+        perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False}
+
     return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css,
-            'profissionais_limite_atingido': profissionais_limite_atingido}
+            'profissionais_limite_atingido': profissionais_limite_atingido, 'perm': perm}
 
 
 from . import routes  # noqa: F401, E402

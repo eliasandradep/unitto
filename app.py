@@ -16,7 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI']        = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ── DB + Auth ────────────────────────────────────────────────────────────────
-from models import db, User, Setting, Empresa, Plano
+from models import db, User, Setting, Empresa, Plano, Profissional
 from themes import get_theme_css
 
 db.init_app(app)
@@ -366,6 +366,40 @@ def _backfill_empresa_id():
         pass
 
 
+def _backfill_profissional_logins():
+    """Garante que todo Profissional já cadastrado tenha um User vinculado.
+    Cria sem senha (password_hash=None) — o admin gera a senha manualmente
+    no cadastro do profissional para liberar o acesso."""
+    import re
+    import uuid as _uuid
+    try:
+        pendentes = Profissional.query.filter(
+            ~Profissional.id.in_(db.session.query(User.profissional_id).filter(User.profissional_id.isnot(None)))
+        ).all()
+    except Exception:
+        return
+    if not pendentes:
+        return
+    try:
+        for p in pendentes:
+            base = re.sub(r'[^a-z0-9]+', '.', p.nome.strip().lower()).strip('.') or 'profissional'
+            username = base
+            n = 1
+            while User.query.filter(db.func.lower(User.username) == username.lower()).first():
+                n += 1
+                username = f'{base}{n}'
+            email = p.email
+            if not email or User.query.filter(db.func.lower(User.email) == email.lower()).first():
+                email = f'{base}.{_uuid.uuid4().hex[:6]}@login.interno'
+            u = User(name=p.nome, username=username, email=email, phone=p.telefone,
+                      role='profissional', profissional_id=p.id, empresa_id=p.empresa_id,
+                      is_active=p.ativo)
+            db.session.add(u)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 with app.app_context():
     _migrate_expedientes()
     _migrate_settings_schema()
@@ -407,6 +441,8 @@ with app.app_context():
                   'INTEGER REFERENCES empresas(id)' if _pg else 'INTEGER')
     _safe_add_col('users',         'role',
                   "VARCHAR(20) DEFAULT 'empresa_admin'")
+    _safe_add_col('users',         'profissional_id',
+                  'INTEGER REFERENCES profissionais(id)' if _pg else 'INTEGER')
     _fk_emp = 'INTEGER REFERENCES empresas(id)' if _pg else 'INTEGER'
     _safe_add_col('leads',                'empresa_id', _fk_emp)
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
@@ -433,6 +469,7 @@ with app.app_context():
     _seed_formas_pagamento()
     _seed_empresa()
     _backfill_empresa_id()
+    _backfill_profissional_logins()
     _seed_servicos()
     _seed_planos()
     _migrate_planos_tipo()

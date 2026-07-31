@@ -1,8 +1,10 @@
 import json
 import os
+import re
+import secrets
 import uuid
 from collections import defaultdict
-from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app, abort
+from flask import render_template, redirect, url_for, request, flash, jsonify, g, current_app, abort, session
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
@@ -10,6 +12,8 @@ from werkzeug.utils import secure_filename
 from . import admin_bp
 from .tenant import tq, get_setting, save_setting
 from .auth import require_role
+from .permissions import (agenda_scope, comissoes_scope, financeiro_scope,
+                           current_profissional, is_administrador)
 from models import (db, User, Lead, Setting, PageView, ROLES,
                     Cliente, AnamneseCapilar, AnamneseCorporal,
                     Categoria, Unidade, Profissional, Servico,
@@ -44,10 +48,13 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
-        if user and user.check_password(password):
+        if user and user.is_active and user.check_password(password):
             login_user(user)
             if user.role == 'saas_admin':
                 return redirect(url_for('saas_admin.dashboard'))
+            from .permissions import is_administrador
+            if not is_administrador():
+                return redirect(url_for('admin.agenda'))
             return redirect(url_for('admin.dashboard'))
         flash('Usuário ou senha incorretos.', 'error')
 
@@ -1158,6 +1165,26 @@ def _msg_limite_profissionais():
             'Desative outro profissional ou faça upgrade do plano para continuar.')
 
 
+def _provision_login(p):
+    """Cria o User de login vinculado a um Profissional, com senha gerada.
+    Retorna (username, senha_texto_puro)."""
+    base = re.sub(r'[^a-z0-9]+', '.', p.nome.strip().lower()).strip('.') or 'profissional'
+    username = base
+    n = 1
+    while User.query.filter(db.func.lower(User.username) == username.lower()).first():
+        n += 1
+        username = f'{base}{n}'
+    email = p.email
+    if not email or User.query.filter(db.func.lower(User.email) == email.lower()).first():
+        email = f'{base}.{uuid.uuid4().hex[:6]}@login.interno'
+    senha = secrets.token_urlsafe(9)
+    u = User(name=p.nome, username=username, email=email, phone=p.telefone,
+              role='profissional', profissional_id=p.id, is_active=p.ativo)
+    u.set_password(senha)
+    db.session.add(u)
+    return username, senha
+
+
 def _save_profissional(p):
     nome = request.form.get('nome', '').strip()
     if not nome:
@@ -1184,6 +1211,17 @@ def _save_profissional(p):
     p.unidade_id = int(uid) if uid else None
     eid = request.form.get('expediente_id', '')
     p.expediente_id = int(eid) if eid else None
+    if p.user:
+        p.user.is_active = p.ativo
+        p.user.name = p.nome
+        novo_username = request.form.get('username', '').strip()
+        if novo_username and novo_username != p.user.username:
+            conflito = User.query.filter(db.func.lower(User.username) == novo_username.lower(),
+                                          User.id != p.user.id).first()
+            if conflito:
+                flash(f'Nome de usuário "{novo_username}" já está em uso.', 'error')
+            else:
+                p.user.username = novo_username
     return True
 
 
@@ -1208,7 +1246,10 @@ def profissional_novo():
         if _save_profissional(p):
             try:
                 db.session.add(p)
+                db.session.flush()
+                username, senha = _provision_login(p)
                 db.session.commit()
+                session['_prof_pwd_once'] = {'prof_id': p.id, 'username': username, 'senha': senha}
                 flash('Profissional cadastrado com sucesso.', 'success')
                 return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
             except Exception as exc:
@@ -1252,10 +1293,38 @@ def profissional_detalhe(prof_id):
         'tipo':         c.comissao_tipo,
     } for c in p.comissoes_custom]
     svcs_data = [{'id': s.id, 'nome': s.nome} for s in ctx['servicos']]
+    credenciais_geradas = None
+    pending = session.get('_prof_pwd_once')
+    if pending and pending.get('prof_id') == p.id:
+        credenciais_geradas = {'username': pending['username'], 'senha': pending['senha']}
+        session.pop('_prof_pwd_once', None)
     return render_template('admin/profissional_form.html',
         p=p, categorias=ctx['cats'], perfis=PERFIL_ACESSO,
         unidades=ctx['unidades'], expedientes_list=ctx['expedientes_list'],
-        comissoes_data=comissoes_data, servicos_data=svcs_data)
+        comissoes_data=comissoes_data, servicos_data=svcs_data,
+        credenciais_geradas=credenciais_geradas)
+
+
+@admin_bp.route('/profissionais/<int:prof_id>/resetar-senha', methods=['POST'])
+@login_required
+def profissional_resetar_senha(prof_id):
+    if not is_administrador():
+        abort(403)
+    p = db.get_or_404(Profissional, prof_id)
+    try:
+        if p.user:
+            senha = secrets.token_urlsafe(9)
+            p.user.set_password(senha)
+            username = p.user.username
+        else:
+            username, senha = _provision_login(p)
+        db.session.commit()
+        session['_prof_pwd_once'] = {'prof_id': p.id, 'username': username, 'senha': senha}
+        flash('Nova senha gerada com sucesso.', 'success')
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Erro ao gerar senha: {exc}', 'error')
+    return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
 
 
 @admin_bp.route('/profissionais/<int:prof_id>/comissao', methods=['POST'])
@@ -1564,6 +1633,8 @@ def _build_bloqueio(b):
 @login_required
 def agenda_bloqueios():
     from datetime import date, timedelta
+    if agenda_scope() != 'all':
+        abort(403)
 
     if request.method == 'POST':
         action = request.form.get('action', '')
@@ -1621,6 +1692,8 @@ def agenda_bloqueios():
 @admin_bp.route('/agenda/bloqueios/<int:bl_id>/editar', methods=['POST'])
 @login_required
 def agenda_bloqueio_editar(bl_id):
+    if agenda_scope() != 'all':
+        abort(403)
     b = db.get_or_404(BloqueioAgenda, bl_id)
     if _build_bloqueio(b):
         db.session.commit()
@@ -1631,6 +1704,8 @@ def agenda_bloqueio_editar(bl_id):
 @admin_bp.route('/agenda/bloqueios/<int:bl_id>/excluir', methods=['POST'])
 @login_required
 def agenda_bloqueio_excluir(bl_id):
+    if agenda_scope() != 'all':
+        abort(403)
     b = db.get_or_404(BloqueioAgenda, bl_id)
     db.session.delete(b)
     db.session.commit()
@@ -1646,13 +1721,19 @@ def agenda_listagem():
     from datetime import date, timedelta
 
     if request.method == 'POST':
+        if agenda_scope() == 'own_ro':
+            abort(403)
         ids = request.form.getlist('ids')
         if ids:
-            tq(Agendamento).filter(Agendamento.id.in_(
+            q_del = tq(Agendamento).filter(Agendamento.id.in_(
                 [int(i) for i in ids if i.isdigit()]
-            )).delete(synchronize_session=False)
+            ))
+            if agenda_scope() == 'own':
+                prof = current_profissional()
+                q_del = q_del.filter(Agendamento.profissional_id == (prof.id if prof else -1))
+            n_del = q_del.delete(synchronize_session=False)
             db.session.commit()
-            flash(f'{len(ids)} agendamento(s) removido(s).', 'success')
+            flash(f'{n_del} agendamento(s) removido(s).', 'success')
         return redirect(url_for('admin.agenda_listagem',
                                 responsavel=request.form.get('responsavel',''),
                                 dt_ini=request.form.get('dt_ini',''),
@@ -1663,6 +1744,11 @@ def agenda_listagem():
     dt_fim = request.args.get('dt_fim', '')
 
     q = tq(Agendamento).join(Agendamento.profissional)
+
+    scope = agenda_scope()
+    if scope in ('own_ro', 'own'):
+        prof = current_profissional()
+        q = q.filter(Agendamento.profissional_id == (prof.id if prof else -1))
 
     if resp_q:
         q = q.filter(Profissional.nome.ilike(f'%{resp_q}%'))
@@ -1751,7 +1837,11 @@ def agenda_dados():
         data_sel = date.fromisoformat(data_str)
     except ValueError:
         data_sel = date.today()
-    ags = tq(Agendamento).filter_by(data=data_sel).order_by(Agendamento.hora_inicio).all()
+    ags_q = tq(Agendamento).filter_by(data=data_sel)
+    if agenda_scope() in ('own_ro', 'own'):
+        prof = current_profissional()
+        ags_q = ags_q.filter(Agendamento.profissional_id == (prof.id if prof else -1))
+    ags = ags_q.order_by(Agendamento.hora_inicio).all()
     bls = tq(BloqueioAgenda).filter(
         BloqueioAgenda.data_inicio <= data_sel,
         BloqueioAgenda.data_fim    >= data_sel,
@@ -1924,9 +2014,16 @@ def _find_bloqueio_conflict(profissional_id, data, hora_inicio, duracao_min, exc
 @admin_bp.route('/agenda/novo', methods=['POST'])
 @login_required
 def agenda_novo():
+    scope = agenda_scope()
+    if scope == 'own_ro':
+        abort(403)
     a, data_str = _build_agendamento(Agendamento())
     if a is None:
         return redirect(url_for('admin.agenda', data=data_str))
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a.profissional_id != prof.id:
+            abort(403)
     exp_err = _find_expediente_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if exp_err:
         flash(f'Não é possível agendar: {exp_err}.', 'error')
@@ -1949,11 +2046,22 @@ def agenda_novo():
 @admin_bp.route('/agenda/<int:ag_id>/editar', methods=['POST'])
 @login_required
 def agenda_editar(ag_id):
+    scope = agenda_scope()
+    if scope == 'own_ro':
+        abort(403)
     a_orig = db.get_or_404(Agendamento, ag_id)
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a_orig.profissional_id != prof.id:
+            abort(403)
     orig_date = a_orig.data.isoformat()
     a, data_str = _build_agendamento(a_orig)
     if a is None:
         return redirect(url_for('admin.agenda', data=orig_date))
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a.profissional_id != prof.id:
+            abort(403)
     exp_err = _find_expediente_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if exp_err:
         flash(f'Não é possível agendar: {exp_err}.', 'error')
@@ -1975,7 +2083,14 @@ def agenda_editar(ag_id):
 @admin_bp.route('/agenda/<int:ag_id>/excluir', methods=['POST'])
 @login_required
 def agenda_excluir(ag_id):
+    scope = agenda_scope()
+    if scope == 'own_ro':
+        abort(403)
     a = db.get_or_404(Agendamento, ag_id)
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a.profissional_id != prof.id:
+            abort(403)
     data_str = a.data.isoformat()
     db.session.delete(a)
     db.session.commit()
@@ -1986,7 +2101,14 @@ def agenda_excluir(ag_id):
 @admin_bp.route('/agenda/<int:ag_id>/status', methods=['POST'])
 @login_required
 def agenda_status(ag_id):
+    scope = agenda_scope()
+    if scope == 'own_ro':
+        abort(403)
     a = db.get_or_404(Agendamento, ag_id)
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a.profissional_id != prof.id:
+            abort(403)
     data = request.get_json(silent=True) or {}
     novo = data.get('status') or request.form.get('status', '')
     if novo not in {'agendado', 'confirmado', 'concluido', 'cancelado', 'faltou'}:
@@ -2061,7 +2183,19 @@ def _add_servicos_agendamento_comanda(comanda, agendamento):
 def agenda_faturar(ag_id):
     from datetime import date
     from sqlalchemy import func
+    fin_scope = financeiro_scope()
+    if fin_scope == 'none':
+        abort(403)
+    scope = agenda_scope()
+    if scope == 'own_ro':
+        abort(403)
     a = db.get_or_404(Agendamento, ag_id)
+    if scope == 'own':
+        prof = current_profissional()
+        if not prof or a.profissional_id != prof.id:
+            abort(403)
+    if fin_scope == 'limited' and a.data != date.today():
+        abort(403)
     if a.comanda:
         return redirect(url_for('admin.comanda_detalhe', comanda_id=a.comanda.id))
     codigo = _next_codigo()
@@ -2088,6 +2222,18 @@ def _next_codigo():
     if eid:
         q = q.filter(Comanda.empresa_id == eid)
     return (q.scalar() or 0) + 1
+
+
+def _check_financeiro_scope(c=None):
+    """Bloqueia conforme o escopo financeiro do usuário logado.
+    Com 'c' informado, também bloqueia quando o escopo é 'limited' e a
+    comanda carregada não é do dia."""
+    from datetime import date
+    scope = financeiro_scope()
+    if scope == 'none':
+        abort(403)
+    if scope == 'limited' and c is not None and c.data != date.today():
+        abort(403)
 
 
 @admin_bp.route('/financeiro')
@@ -2182,7 +2328,13 @@ def financeiro():
 def financeiro_comandas():
     from datetime import date, timedelta
 
+    scope = financeiro_scope()
+    if scope == 'none':
+        abort(403)
+
     if request.method == 'POST':
+        if scope != 'full':
+            abort(403)
         ids = request.form.getlist('ids')
         if ids:
             for cid in ids:
@@ -2212,10 +2364,15 @@ def financeiro_comandas():
         except ValueError: pass
     if status_f:
         q = q.filter(Comanda.status == status_f)
+    if scope == 'limited':
+        q = q.filter(Comanda.data == date.today())
 
     hoje  = date.today()
-    d_ini = dt_ini or hoje.isoformat()
-    d_fim = dt_fim or (hoje + timedelta(days=30)).isoformat()
+    if scope == 'limited':
+        d_ini = d_fim = hoje.isoformat()
+    else:
+        d_ini = dt_ini or hoje.isoformat()
+        d_fim = dt_fim or (hoje + timedelta(days=30)).isoformat()
 
     comandas = q.order_by(Comanda.data.desc(), Comanda.id.desc()).all()
     return render_template('admin/financeiro_comandas.html',
@@ -2247,9 +2404,15 @@ def _reabrir_comanda(c):
 @login_required
 def comanda_nova():
     from datetime import date
+    scope = financeiro_scope()
+    if scope == 'none':
+        abort(403)
     if request.method == 'POST':
         c = Comanda(codigo=_next_codigo())
         if _save_comanda(c):
+            if scope == 'limited' and c.data != date.today():
+                flash('Perfil com acesso limitado só pode criar comandas do dia de hoje.', 'error')
+                return redirect(url_for('admin.comanda_nova'))
             db.session.add(c)
             db.session.commit()
             flash('Comanda criada.', 'success')
@@ -2269,8 +2432,14 @@ def comanda_nova():
 def comanda_detalhe(comanda_id):
     from datetime import date
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
     if request.method == 'POST':
+        scope = financeiro_scope()
         if _save_comanda(c):
+            if scope == 'limited' and c.data != date.today():
+                db.session.rollback()
+                flash('Perfil com acesso limitado só pode movimentar comandas do dia de hoje.', 'error')
+                return redirect(url_for('admin.comanda_detalhe', comanda_id=comanda_id))
             db.session.commit()
             flash('Comanda atualizada.', 'success')
             return redirect(url_for('admin.comanda_detalhe', comanda_id=c.id))
@@ -2444,9 +2613,15 @@ def _save_comanda(c):
 @login_required
 def comanda_autosave(comanda_id):
     """Salva itens e campos da comanda silenciosamente (sem flash, retorna JSON)."""
+    from datetime import date
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
+    scope = financeiro_scope()
     try:
         if _save_comanda(c):
+            if scope == 'limited' and c.data != date.today():
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'Perfil com acesso limitado só pode movimentar comandas do dia de hoje.'})
             db.session.commit()
         return jsonify({'ok': True, 'comanda': _comanda_to_json(c)})
     except Exception as exc:
@@ -2460,6 +2635,7 @@ def comanda_pagamento_add(comanda_id):
     from datetime import date
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
     forma = request.form.get('forma_pagamento', '').strip()
     valor_s = request.form.get('valor', '').strip().replace(',', '.')
     parcelas = request.form.get('parcelas', '1')
@@ -2514,6 +2690,7 @@ def comanda_pagamento_excluir(comanda_id, pag_id):
     from decimal import Decimal
     p = db.get_or_404(PagamentoComanda, pag_id)
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
 
     # Reverter fechamento (desfaz ajuste de saldo do cliente)
     if c.status == 'fechada':
@@ -2533,6 +2710,7 @@ def comanda_pagamento_excluir(comanda_id, pag_id):
 @login_required
 def comanda_fechar(comanda_id):
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
     _fechar_comanda(c)
     db.session.commit()
     flash('Comanda fechada.', 'success')
@@ -2542,7 +2720,7 @@ def comanda_fechar(comanda_id):
 @admin_bp.route('/financeiro/comandas/<int:comanda_id>/excluir', methods=['POST'])
 @login_required
 def comanda_excluir(comanda_id):
-    if not current_user.has_role('empresa_admin', 'saas_admin'):
+    if not is_administrador():
         flash('Apenas administradores podem excluir comandas.', 'error')
         return redirect(url_for('admin.comanda_detalhe', comanda_id=comanda_id))
     c = db.get_or_404(Comanda, comanda_id)
@@ -2895,9 +3073,15 @@ def comissoes():
     import calendar as _cal
     from decimal import Decimal
 
+    scope = comissoes_scope()
+    if scope == 'none':
+        abort(403)
+
     if request.method == 'POST':
         action = request.form.get('action', '')
         if action in ('pagar', 'pagar_um'):
+            if scope != 'all':
+                abort(403)
             ids  = request.form.getlist('item_ids') if action == 'pagar' else [request.form.get('item_id')]
             forma = request.form.get('forma_pagamento', 'dinheiro')
             data_s = request.form.get('data_pagamento', _date.today().isoformat())
@@ -2930,6 +3114,9 @@ def comissoes():
     dt_fim_s  = request.args.get('dt_fim', '')
     prof_id_s = request.args.get('profissional_id', '')
     status_f  = request.args.get('status', '')
+    if scope == 'own':
+        prof = current_profissional()
+        prof_id_s = str(prof.id) if prof else '-1'
 
     if periodo == 'hoje':
         dt_ini = dt_fim = hoje
@@ -2997,6 +3184,10 @@ def relatorio_comissoes():
     import calendar as _cal
     from decimal import Decimal
 
+    scope = comissoes_scope()
+    if scope == 'none':
+        abort(403)
+
     hoje = _date.today()
     dt_ini_s     = request.args.get('dt_ini', '')
     dt_fim_s     = request.args.get('dt_fim', '')
@@ -3014,6 +3205,9 @@ def relatorio_comissoes():
 
     unidade_id = int(unidade_id_s) if unidade_id_s.isdigit() else None
     prof_id    = int(prof_id_s) if (prof_id_s.isdigit() and unidade_id) else None
+    if scope == 'own':
+        prof = current_profissional()
+        prof_id = prof.id if prof else -1
 
     _eid_c = g.get('empresa_id')
 
@@ -3174,10 +3368,17 @@ def _comanda_to_json(c):
 @admin_bp.route('/api/ag/<int:ag_id>/comanda', methods=['POST'])
 @login_required
 def api_ag_comanda(ag_id):
+    from datetime import date
     from decimal import Decimal
     a = db.get_or_404(Agendamento, ag_id)
+    scope = financeiro_scope()
+    if scope == 'none':
+        abort(403)
     if a.comanda:
+        _check_financeiro_scope(a.comanda)
         return jsonify(_comanda_to_json(a.comanda))
+    if scope == 'limited' and a.data != date.today():
+        abort(403)
     # Tenta auto-vincular cliente pelo telefone quando agendamento não tem cliente_id
     cliente_id = a.cliente_id
     if not cliente_id and a.telefone:
@@ -3208,6 +3409,7 @@ def api_comanda_pag_add(comanda_id):
     from datetime import date as _date
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
     pl = request.get_json(silent=True) or {}
     forma = pl.get('forma_pagamento', '').strip()
     try:
@@ -3244,6 +3446,7 @@ def api_comanda_pag_add(comanda_id):
 def api_comanda_pag_del(comanda_id, pag_id):
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
+    _check_financeiro_scope(c)
     p = db.get_or_404(PagamentoComanda, pag_id)
     if p.comanda_id != comanda_id:
         return jsonify({'ok': False, 'error': 'Pagamento não pertence a esta comanda.'}), 400

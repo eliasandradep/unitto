@@ -132,6 +132,7 @@
         <!-- Nav de abas -->
         <div class="ptab-nav">
           <button type="button" class="ptab-btn active" data-tab="perfil">Perfil de Acesso</button>
+          <button type="button" class="ptab-btn" data-tab="acesso">Acesso ao Sistema</button>
           <button type="button" class="ptab-btn" data-tab="comissoes">Comissões</button>
           <button type="button" class="ptab-btn" data-tab="restricoes">Restrições</button>
           <button type="button" class="ptab-btn" data-tab="escalas">Escalas</button>
@@ -153,6 +154,49 @@
               </div>
             </label>
             {% endfor %}
+          </div>
+        </div>
+
+        <!-- ABA: Acesso ao Sistema -->
+        <div class="ptab-pane" id="ptab-acesso" style="display:none">
+          <div style="padding:1rem">
+
+            {% if credenciais_geradas %}
+            <div class="acesso-credenciais">
+              <strong>Credenciais de acesso geradas</strong>
+              <span>Anote agora — a senha não será mostrada novamente.</span>
+              <div class="acesso-cred-row">
+                <span class="acesso-cred-label">Usuário</span>
+                <code id="credUsername">{{ credenciais_geradas.username }}</code>
+              </div>
+              <div class="acesso-cred-row">
+                <span class="acesso-cred-label">Senha</span>
+                <code id="credSenha">{{ credenciais_geradas.senha }}</code>
+              </div>
+              <button type="button" class="btn-secondary" style="margin-top:.6rem" onclick="copiarCredenciais()">Copiar usuário e senha</button>
+            </div>
+            {% endif %}
+
+            {% if p %}
+            <div class="form-group">
+              <label>Nome de usuário</label>
+              <input type="text" name="username" value="{{ p.user.username if p.user else '' }}"
+                     placeholder="nome.usuario" autocomplete="off" />
+            </div>
+            <p style="font-size:.78rem;color:var(--text-muted);margin:.4rem 0 1rem;line-height:1.4">
+              Login {{ 'ativo' if p.ativo else 'inativo (profissional marcado como inativo)' }}.
+              {% if p.user and p.user.password_hash %}Senha já definida.{% else %}Senha ainda não gerada — o profissional não consegue acessar até que uma senha seja gerada.{% endif %}
+            </p>
+            <button type="button" class="btn-secondary" onclick="gerarSenha()">
+              {{ 'Gerar nova senha' if p.user and p.user.password_hash else 'Gerar senha de acesso' }}
+            </button>
+            {% else %}
+            <p style="font-size:.82rem;color:var(--text-muted);line-height:1.4">
+              Usuário e senha de acesso serão gerados automaticamente ao salvar o cadastro,
+              conforme o perfil de acesso escolhido.
+            </p>
+            {% endif %}
+
           </div>
         </div>
 
@@ -308,6 +352,21 @@
 .ptoggle input:checked + .ptoggle-track { background: var(--success); }
 .ptoggle input:checked + .ptoggle-track::before { transform: translateX(20px); }
 
+/* Acesso ao sistema */
+.acesso-credenciais {
+  background: rgba(52,168,83,.08); border: 1px solid var(--success, #34a853);
+  border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: 1.1rem;
+  display: flex; flex-direction: column; gap: .3rem;
+}
+.acesso-credenciais strong { font-size: .86rem; }
+.acesso-credenciais span   { font-size: .76rem; color: var(--text-muted); margin-bottom: .3rem; }
+.acesso-cred-row { display: flex; align-items: center; gap: .5rem; font-size: .84rem; }
+.acesso-cred-label { color: var(--text-muted); min-width: 55px; }
+.acesso-cred-row code {
+  background: #fff; border: 1px solid var(--border); border-radius: 4px;
+  padding: .2rem .5rem; font-size: .85rem;
+}
+
 /* Restrição */
 .restricao-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .restricao-item-text { flex: 1; }
@@ -369,6 +428,29 @@ document.querySelectorAll('.ptab-btn').forEach(function(btn) {
     }
   });
 });
+
+// ── Acesso ao Sistema ──────────────────────────────────────────────────────
+function gerarSenha() {
+  if (!_PROF_ID) return;
+  if (!confirm('Gerar uma nova senha de acesso? A senha atual (se houver) deixará de funcionar.')) return;
+  var f = document.createElement('form');
+  f.method = 'POST';
+  f.action = '/admin/profissionais/' + _PROF_ID + '/resetar-senha';
+  document.body.appendChild(f);
+  f.submit();
+}
+
+function copiarCredenciais() {
+  var u = document.getElementById('credUsername');
+  var s = document.getElementById('credSenha');
+  if (!u || !s) return;
+  var texto = 'Usuário: ' + u.textContent + '\nSenha: ' + s.textContent;
+  navigator.clipboard.writeText(texto).catch(function() {});
+}
+
+{% if credenciais_geradas %}
+document.querySelector('.ptab-btn[data-tab="acesso"]')?.click();
+{% endif %}
 
 // ── Comissões AJAX ─────────────────────────────────────────────────────────
 function renderComissoes() {
