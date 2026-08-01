@@ -7,7 +7,7 @@ from flask import request, jsonify, current_app
 
 from . import meta_webhook_bp
 from .parsers import parse_whatsapp, parse_messenger, parse_instagram
-from models import db, IntegracaoMeta, Lead, Servico, META_CANAL_SOURCE
+from models import db, IntegracaoMeta, Lead, Servico, Cliente, META_CANAL_SOURCE
 import meta_client
 from crypto_utils import decrypt_token
 
@@ -35,6 +35,24 @@ _PREFIXOS_NOME = re.compile(r'(?i)^(meu nome é|me chamo|sou\s+(a|o)\s+)\s*')
 
 def _servicos_ativos(empresa_id):
     return [s.nome for s in Servico.query.filter_by(empresa_id=empresa_id, ativo=True).all()]
+
+
+def _somente_digitos(texto):
+    return re.sub(r'\D', '', texto or '')
+
+
+def _e_cliente_existente(empresa_id, telefone):
+    """Compara os últimos 8 dígitos (ignora formatação e DDI/código de país,
+    já que o número que a Meta entrega e o que fica salvo no cadastro do
+    cliente raramente vêm no mesmo formato) contra os clientes já cadastrados
+    da empresa."""
+    alvo = _somente_digitos(telefone)[-8:]
+    if len(alvo) < 8:
+        return False
+    return any(
+        _somente_digitos(c.telefone)[-8:] == alvo
+        for c in Cliente.query.filter_by(empresa_id=empresa_id).all()
+    )
 
 
 def _extrair_contato(texto, servicos_ativos):
@@ -138,6 +156,8 @@ def _upsert_lead(integracao, evento):
             nome_extraido, telefone_extraido, servico_extraido = _extrair_contato(evento['mensagem'], servicos)
             if telefone_extraido:
                 lead.phone = telefone_extraido
+                if lead.status == 'novo' and _e_cliente_existente(integracao.empresa_id, telefone_extraido):
+                    lead.status = 'cliente_existente'
             if nome_extraido and not lead.name:
                 lead.name = nome_extraido
             if servico_extraido and not lead.service:
@@ -154,6 +174,10 @@ def _upsert_lead(integracao, evento):
         db.session.commit()
         return
 
+    status = 'novo'
+    if evento['phone'] and _e_cliente_existente(integracao.empresa_id, evento['phone']):
+        status = 'cliente_existente'
+
     lead = Lead(
         empresa_id=integracao.empresa_id,
         external_thread_id=evento['external_thread_id'],
@@ -162,7 +186,7 @@ def _upsert_lead(integracao, evento):
         phone=evento['phone'],
         source=META_CANAL_SOURCE.get(evento['canal'], evento['canal']),
         message=evento['mensagem'],
-        status='novo',
+        status=status,
     )
     db.session.add(lead)
 

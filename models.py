@@ -6,11 +6,12 @@ from datetime import datetime
 db = SQLAlchemy()
 
 LEAD_STATUSES = [
-    ('novo',            'Novo'),
-    ('qualificado',     'Qualificado'),
-    ('em_atendimento',  'Em atendimento'),
-    ('convertido',      'Convertido'),
-    ('perdido',         'Perdido'),
+    ('novo',              'Novo'),
+    ('cliente_existente', 'Cliente existente'),
+    ('qualificado',       'Qualificado'),
+    ('em_atendimento',    'Em atendimento'),
+    ('convertido',        'Convertido'),
+    ('perdido',           'Perdido'),
 ]
 
 LEAD_SOURCES = [

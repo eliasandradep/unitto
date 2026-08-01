@@ -336,7 +336,8 @@ body.sidebar--collapsed .sidebar__nav {
   font-weight: 600;
   white-space: nowrap;
 }
-.badge--novo           { background: #EBF5FB; color: #2980B9; }
+.badge--novo              { background: #EBF5FB; color: #2980B9; }
+.badge--cliente_existente { background: #EAF2F8; color: #5B6DB8; }
 .badge--qualificado    { background: #FEF9E7; color: #B7950B; }
 .badge--em_atendimento { background: #FEF5E7; color: #CA6F1E; }
 .badge--convertido     { background: #E9F7EF; color: #1E8449; }
