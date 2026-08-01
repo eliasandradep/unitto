@@ -338,6 +338,7 @@ body.sidebar--collapsed .sidebar__nav {
 }
 .badge--novo              { background: #EBF5FB; color: #2980B9; }
 .badge--cliente_existente { background: #EAF2F8; color: #5B6DB8; }
+.badge--aguardando        { background: #FDEBD0; color: #B9770E; margin-left: .35rem; }
 .badge--qualificado    { background: #FEF9E7; color: #B7950B; }
 .badge--em_atendimento { background: #FEF5E7; color: #CA6F1E; }
 .badge--convertido     { background: #E9F7EF; color: #1E8449; }
@@ -542,6 +543,7 @@ body.sidebar--collapsed .sidebar__nav {
 }
 .alert--success { background: #E9F7EF; color: #1E8449; border: 1px solid #A9DFBF; }
 .alert--error   { background: #FDEDEC; color: #922B21; border: 1px solid #F1948A; }
+.alert--warning { background: #FEF9E7; color: #9A7D0A; border: 1px solid #F7DC6F; }
 
 /* ── Lead detail ─────────────────────────────────────────── */
 .detail-grid {

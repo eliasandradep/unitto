@@ -55,7 +55,12 @@
         </td>
         <td>{{ lead.service or '—' }}</td>
         <td><span class="badge badge--source-{{ lead.source }}">{{ lead.source_label() }}</span></td>
-        <td><span class="badge badge--{{ lead.status }}">{{ lead.status_label() }}</span></td>
+        <td>
+          <span class="badge badge--{{ lead.status }}">{{ lead.status_label() }}</span>
+          {% if lead.aguardando_contato %}
+          <span class="badge badge--aguardando" title="Contato ainda não respondeu nome/telefone/serviço — confira a conversa direto na rede social.">Aguardando resposta</span>
+          {% endif %}
+        </td>
         <td>{{ lead.created_at.strftime('%d/%m/%Y') }}</td>
         <td>
           <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}" class="btn-icon btn-icon--view" title="Ver detalhes">

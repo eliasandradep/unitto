@@ -4,6 +4,12 @@
 
 {% block content %}
 
+{% if lead.aguardando_contato %}
+<div class="alert alert--warning">
+  Aguardando resposta do contato com nome, telefone e/ou serviço pretendido — enquanto isso não chega, confira a conversa diretamente no {{ lead.source_label() }}.
+</div>
+{% endif %}
+
 <div class="detail-grid">
 
   <!-- Informações principais -->
