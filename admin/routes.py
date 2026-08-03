@@ -745,6 +745,16 @@ def integracoes_meta_callback():
         integ.status = 'conectado'
         integ.conectado_em = datetime.utcnow()
         integ.conectado_por_user_id = current_user.id
+
+        # Sem isso a Página nunca recebe eventos de webhook, mesmo com os
+        # campos configurados no nível do App.
+        if canal in ('messenger', 'instagram') and ativo.get('page_id') and ativo.get('access_token'):
+            try:
+                meta_client.assinar_pagina(ativo['page_id'], ativo['access_token'])
+            except Exception:
+                current_app.logger.exception('Falha ao assinar página %s nos webhooks', ativo.get('page_id'))
+                flash('Conta conectada, mas houve falha ao ativar o recebimento automático de mensagens. '
+                      'Fale com o suporte se as mensagens não aparecerem como Leads.', 'error')
     db.session.commit()
 
     if conflito:

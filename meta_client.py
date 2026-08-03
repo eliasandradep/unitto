@@ -101,7 +101,7 @@ def listar_ativos(canal, access_token):
 
     if canal == 'messenger':
         return [{'identificador_externo': p['id'], 'nome_conta': p.get('name') or p['id'],
-                  'access_token': p.get('access_token')} for p in paginas]
+                  'access_token': p.get('access_token'), 'page_id': p['id']} for p in paginas]
 
     if canal == 'instagram':
         ativos = []
@@ -119,10 +119,23 @@ def listar_ativos(canal, access_token):
                                 p.get('id'), p.get('name'), info.text[:500])
                 continue
             ativos.append({'identificador_externo': ig['id'], 'nome_conta': p.get('name') or ig['id'],
-                            'access_token': p.get('access_token')})
+                            'access_token': p.get('access_token'), 'page_id': p['id']})
         return ativos
 
     return []
+
+
+def assinar_pagina(page_id, page_access_token, campos='messages'):
+    """Assina a Página nos campos de webhook do app (ex: 'messages'). Sem isso, mesmo
+    com os campos configurados no App, a Meta não envia eventos para essa Página
+    específica — a configuração no nível do App só define o que está disponível,
+    a assinatura por Página é o que efetivamente liga o fluxo."""
+    resp = requests.post(f'{GRAPH_URL}/{page_id}/subscribed_apps',
+                          params={'subscribed_fields': campos, 'access_token': page_access_token},
+                          timeout=15)
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+    return resp.json()
 
 
 def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token):
