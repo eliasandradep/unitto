@@ -4,9 +4,12 @@ Segue o mesmo estilo de billing/infinitepay.py: funções soltas, sem estado,
 usando `requests` direto e `raise RuntimeError` quando a integração não está
 configurada via variáveis de ambiente.
 """
+import logging
 import os
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 GRAPH_URL = 'https://graph.facebook.com/v21.0'
 OAUTH_DIALOG_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
@@ -93,6 +96,8 @@ def listar_ativos(canal, access_token):
     if not resp.ok:
         raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
     paginas = resp.json().get('data', [])
+    logger.warning('/me/accounts (%s) retornou %d página(s): %s',
+                    canal, len(paginas), [p.get('id') for p in paginas])
 
     if canal == 'messenger':
         return [{'identificador_externo': p['id'], 'nome_conta': p.get('name') or p['id'],
@@ -105,11 +110,16 @@ def listar_ativos(canal, access_token):
                                  params={'fields': 'instagram_business_account', 'access_token': access_token},
                                  timeout=15)
             if not info.ok:
+                logger.warning('Falha ao buscar instagram_business_account da página %s: %s %s',
+                                p.get('id'), info.status_code, info.text[:500])
                 continue
             ig = info.json().get('instagram_business_account')
-            if ig:
-                ativos.append({'identificador_externo': ig['id'], 'nome_conta': p.get('name') or ig['id'],
-                                'access_token': p.get('access_token')})
+            if not ig:
+                logger.warning('Página %s (%s) sem instagram_business_account vinculado. Resposta: %s',
+                                p.get('id'), p.get('name'), info.text[:500])
+                continue
+            ativos.append({'identificador_externo': ig['id'], 'nome_conta': p.get('name') or ig['id'],
+                            'access_token': p.get('access_token')})
         return ativos
 
     return []
