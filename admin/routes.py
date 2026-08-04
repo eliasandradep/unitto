@@ -787,7 +787,10 @@ def integracoes_meta_desconectar(integracao_id):
     integ = tq(IntegracaoMeta).filter_by(id=integracao_id).first()
     if not integ:
         abort(404)
-    db.session.delete(integ)
+    # Marca como desconectado em vez de apagar a linha: Leads já capturados
+    # referenciam integracao_id via FK, e apagar quebraria essa referência
+    # (e perderia o histórico de qual conexão originou cada Lead).
+    integ.status = 'desconectado'
     db.session.commit()
     flash('Conta desconectada.', 'success')
     return redirect(url_for('admin.integracoes'))
