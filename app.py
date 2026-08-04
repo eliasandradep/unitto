@@ -544,6 +544,16 @@ def index():
     return render_template('landing.html', planos_pares=planos_pares)
 
 
+@app.route('/privacidade')
+def privacidade():
+    return render_template('privacidade.html')
+
+
+@app.route('/exclusao-de-dados')
+def exclusao_dados():
+    return render_template('exclusao_dados.html')
+
+
 @app.route('/ping')
 def ping():
     return 'ok', 200

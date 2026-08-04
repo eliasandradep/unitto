@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — Unitto</title>
+  <link rel="canonical" href="https://unitto.com.br/privacidade" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}" />
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+    .legal h1 { font-size: 1.8rem; margin-bottom: .3rem; }
+    .legal .legal-updated { color: var(--muted, #6b7280); font-size: .85rem; margin-bottom: 2.2rem; }
+    .legal h2 { font-size: 1.15rem; margin: 2.2rem 0 .7rem; }
+    .legal p, .legal li { font-size: .95rem; line-height: 1.7; color: #33404f; }
+    .legal ul { padding-left: 1.3rem; margin: .5rem 0; }
+    .legal a { color: inherit; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav__inner">
+    <a href="{{ url_for('index') }}" class="nav__logo">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Unitto" />
+    </a>
+  </div>
+</header>
+
+<main class="legal">
+  <h1>Política de Privacidade</h1>
+  <p class="legal-updated">Última atualização: agosto de 2026</p>
+
+  <p>
+    A Unitto ("nós") oferece uma plataforma de gestão para salões e clínicas de beleza
+    (agenda, comandas, comissões e financeiro). Esta política explica quais dados
+    coletamos, para quê, e como os tratamos, em conformidade com a Lei Geral de Proteção
+    de Dados (LGPD — Lei 13.709/2018).
+  </p>
+
+  <h2>1. Quem trata os dados</h2>
+  <p>
+    Cada salão/clínica que usa a Unitto ("empresa contratante") é responsável pelos dados
+    dos próprios clientes que cadastra na plataforma. A Unitto atua como operadora desses
+    dados, fornecendo a infraestrutura para que a empresa contratante os gerencie.
+  </p>
+
+  <h2>2. Dados que coletamos</h2>
+  <ul>
+    <li>Dados de cadastro da empresa contratante e de seus usuários (nome, e-mail, telefone, senha criptografada).</li>
+    <li>Dados de clientes/leads inseridos pela empresa contratante (nome, telefone, serviços de interesse, histórico de agendamentos).</li>
+    <li>Mensagens recebidas via integrações de canais de atendimento conectados pela empresa contratante — WhatsApp Business, Instagram Direct e Messenger — usadas exclusivamente para registrar o contato como um lead e, quando configurado, responder automaticamente pedindo nome/telefone/serviço.</li>
+    <li>Dados de uso da plataforma (páginas acessadas, ações realizadas) para fins de suporte e melhoria do serviço.</li>
+  </ul>
+
+  <h2>3. Como usamos os dados</h2>
+  <ul>
+    <li>Operar as funcionalidades da plataforma (agenda, comandas, comissões, leads).</li>
+    <li>Processar pagamentos de assinatura (via Stripe/InfinitePay).</li>
+    <li>Enviar comunicações transacionais (ex.: recuperação de senha) por e-mail.</li>
+    <li>Cumprir obrigações legais e responder a solicitações dos titulares dos dados.</li>
+  </ul>
+
+  <h2>4. Compartilhamento com terceiros</h2>
+  <p>Utilizamos os seguintes fornecedores para operar a plataforma, cada um tratando apenas os dados estritamente necessários à função que presta:</p>
+  <ul>
+    <li><strong>Meta Platforms</strong> — para receber e enviar mensagens via WhatsApp Business API, Instagram Messaging e Messenger, quando a empresa contratante conecta esses canais.</li>
+    <li><strong>Stripe</strong> e <strong>InfinitePay</strong> — processamento de pagamentos de assinatura.</li>
+    <li><strong>Resend</strong> — envio de e-mails transacionais.</li>
+    <li><strong>Railway</strong> — hospedagem da aplicação e do banco de dados.</li>
+  </ul>
+  <p>Não vendemos dados pessoais a terceiros.</p>
+
+  <h2>5. Retenção e segurança</h2>
+  <p>
+    Os dados são mantidos enquanto a conta da empresa contratante estiver ativa, ou pelo
+    prazo necessário para cumprir obrigações legais. Tokens de acesso a integrações (Meta)
+    são armazenados de forma criptografada. Senhas são armazenadas com hash, nunca em texto puro.
+  </p>
+
+  <h2>6. Direitos do titular</h2>
+  <p>
+    Nos termos da LGPD, você pode solicitar confirmação de tratamento, acesso, correção,
+    anonimização, portabilidade ou exclusão dos seus dados. Veja as instruções em
+    <a href="{{ url_for('exclusao_dados') }}">Exclusão de Dados</a>, ou entre em contato pelo
+    e-mail abaixo.
+  </p>
+
+  <h2>7. Contato</h2>
+  <p>
+    Dúvidas sobre esta política ou sobre seus dados: <a href="mailto:contato@unitto.com.br">contato@unitto.com.br</a>.
+  </p>
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__brand">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Unitto" />
+      <span class="footer__brand-name">Unitto</span>
+    </div>
+    <p class="footer__copy">© 2026 Unitto. Todos os direitos reservados.</p>
+    <nav class="footer__links">
+      <a href="{{ url_for('index') }}">Início</a>
+      <a href="{{ url_for('exclusao_dados') }}">Exclusão de Dados</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
