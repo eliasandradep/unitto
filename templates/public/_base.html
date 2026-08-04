@@ -13,12 +13,10 @@
 
 <header class="pub-header">
   <a href="{{ url_for('public.vitrine', slug=empresa.slug) }}" class="pub-header__brand">
-    {% if empresa.logo_url %}
-      {% if empresa.logo_url.startswith('http') %}
-      <img src="{{ empresa.logo_url }}" alt="{{ empresa.nome }}" class="pub-header__logo" />
-      {% else %}
-      <img src="{{ url_for('static', filename=empresa.logo_url) }}" alt="{{ empresa.nome }}" class="pub-header__logo" />
-      {% endif %}
+    {% if empresa.logo_data %}
+    <img src="{{ url_for('logo_serve', empresa_id=empresa.id) }}?v={{ empresa.updated_at.timestamp()|int if empresa.updated_at else 0 }}" alt="{{ empresa.nome }}" class="pub-header__logo" />
+    {% elif empresa.logo_url and empresa.logo_url.startswith('http') %}
+    <img src="{{ empresa.logo_url }}" alt="{{ empresa.nome }}" class="pub-header__logo" />
     {% endif %}
     <span class="pub-header__name">{{ empresa.nome }}</span>
   </a>

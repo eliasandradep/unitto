@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, Response, abort
 from flask_login import LoginManager
 from dotenv import load_dotenv
 
@@ -429,6 +429,8 @@ with app.app_context():
     _migrate_checkout_url_len()
     _migrate_leads_phone_nullable()
     _pg = 'postgresql' in db.engine.url.drivername
+    _safe_add_col('empresas',      'logo_data', 'BYTEA' if _pg else 'BLOB')
+    _safe_add_col('empresas',      'logo_mime', 'VARCHAR(50)')
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")
     _safe_add_col('profissionais', 'agendamento_online',
@@ -545,6 +547,19 @@ def index():
 @app.route('/ping')
 def ping():
     return 'ok', 200
+
+
+@app.route('/logo/<int:empresa_id>')
+def logo_serve(empresa_id):
+    """Serve a logomarca da empresa a partir do banco (não do disco: em produção
+    o filesystem é efêmero e um arquivo salvo em static/uploads some no próximo
+    deploy)."""
+    empresa = db.session.get(Empresa, empresa_id)
+    if not empresa or not empresa.logo_data:
+        abort(404)
+    resp = Response(empresa.logo_data, mimetype=empresa.logo_mime or 'application/octet-stream')
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
 
 
 if __name__ == '__main__':

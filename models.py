@@ -66,6 +66,8 @@ class Empresa(db.Model):
     telefone      = db.Column(db.String(20))
     email         = db.Column(db.String(120))
     logo_url      = db.Column(db.String(250))
+    logo_data     = db.Column(db.LargeBinary)
+    logo_mime     = db.Column(db.String(50))
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

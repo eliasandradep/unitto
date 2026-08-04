@@ -596,11 +596,8 @@ def configuracoes():
                 if empresa.plano not in ('trial', 'free'):
                     ext = os.path.splitext(secure_filename(logo_file.filename))[1].lower()
                     if ext in _LOGO_EXTS:
-                        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'logos')
-                        os.makedirs(upload_dir, exist_ok=True)
-                        filename = f"{empresa.slug}{ext}"
-                        logo_file.save(os.path.join(upload_dir, filename))
-                        empresa.logo_url = f'uploads/logos/{filename}'
+                        empresa.logo_data = logo_file.read()
+                        empresa.logo_mime = logo_file.mimetype or 'application/octet-stream'
                     else:
                         flash('Formato não suportado. Use JPG, PNG, WebP, GIF ou SVG.', 'error')
                         return redirect(url_for('admin.configuracoes'))

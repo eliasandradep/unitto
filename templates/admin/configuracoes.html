@@ -45,12 +45,12 @@
     <div class="form-group">
       <label>Logomarca</label>
       {% if logo_habilitado %}
-        {% if empresa and empresa.logo_url %}
+        {% if empresa and (empresa.logo_data or (empresa.logo_url and empresa.logo_url.startswith('http'))) %}
         <div style="margin-bottom:.7rem">
-          {% if empresa.logo_url.startswith('http') %}
-          <img src="{{ empresa.logo_url }}"
+          {% if empresa.logo_data %}
+          <img src="{{ url_for('logo_serve', empresa_id=empresa.id) }}?v={{ empresa.updated_at.timestamp()|int if empresa.updated_at else 0 }}"
           {% else %}
-          <img src="{{ url_for('static', filename=empresa.logo_url) }}"
+          <img src="{{ empresa.logo_url }}"
           {% endif %}
                alt="Logo atual" style="max-height:80px;max-width:240px;border-radius:4px;
                                        border:1px solid var(--border);padding:4px;background:#fff" />
