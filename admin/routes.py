@@ -760,6 +760,18 @@ def integracoes_meta_callback():
                     current_app.logger.exception('Falha ao assinar página %s nos webhooks', ativo.get('page_id'))
                     flash('Conta conectada, mas houve falha ao ativar o recebimento automático de mensagens. '
                           'Fale com o suporte se as mensagens não aparecerem como Leads.', 'error')
+
+                # A conta profissional do Instagram é um nó separado da Página no
+                # Graph API — assinar a Página não garante que a própria conta do
+                # Instagram esteja assinada nos webhooks de mensagens.
+                if canal == 'instagram':
+                    try:
+                        resultado_ig = meta_client.assinar_pagina(
+                            ativo['identificador_externo'], ativo['access_token'])
+                        current_app.logger.warning('assinar_pagina (conta IG) OK: %s', resultado_ig)
+                    except Exception:
+                        current_app.logger.exception(
+                            'Falha ao assinar conta do Instagram %s nos webhooks', ativo.get('identificador_externo'))
     db.session.commit()
 
     if conflito:
