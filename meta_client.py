@@ -17,7 +17,7 @@ OAUTH_DIALOG_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
 _SCOPES = {
     'whatsapp':  'whatsapp_business_management,whatsapp_business_messaging',
     'instagram': 'instagram_basic,instagram_manage_messages,pages_show_list,pages_read_engagement',
-    'messenger': 'pages_messaging,pages_show_list',
+    'messenger': 'pages_messaging,pages_show_list,pages_manage_metadata',
 }
 
 
