@@ -133,6 +133,12 @@
         {% endif %}
 
         <a href="{{ url_for('admin.leads') }}" class="btn-secondary btn-full">← Voltar</a>
+        {% if lead.integracao_id %}
+        <form method="POST" action="{{ url_for('admin.lead_marcar_pessoal', lead_id=lead.id) }}"
+              onsubmit="return confirm('Marcar como contato pessoal? Esse Lead será removido e mensagens futuras dessa mesma pessoa serão ignoradas permanentemente, até você desfazer em Configurar → Contatos ignorados.')">
+              <button type="submit" class="btn-danger btn-full">Marcar como contato pessoal</button>
+        </form>
+        {% endif %}
         <form method="POST" action="{{ url_for('admin.lead_delete', lead_id=lead.id) }}"
               onsubmit="return confirm('Remover este lead?')">
               <button type="submit" class="btn-danger btn-full">Remover lead</button>

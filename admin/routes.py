@@ -23,7 +23,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     Pacote, PacoteItem, VendaPacote, VendaPacoteItem,
                     EscalaProfissionalUnidade, RecebimentoCliente,
                     ContaPagar, ContaReceber, FormaPagamento,
-                    CategoriaProduto, Produto, IntegracaoMeta,
+                    CategoriaProduto, Produto, IntegracaoMeta, ContatoIgnorado,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
                     META_CANAIS)
 from themes import THEMES
@@ -346,6 +346,26 @@ def lead_delete(lead_id):
     db.session.delete(lead)
     db.session.commit()
     flash('Lead removido.', 'success')
+    return redirect(url_for('admin.leads'))
+
+
+@admin_bp.route('/leads/<int:lead_id>/marcar-pessoal', methods=['POST'])
+@login_required
+def lead_marcar_pessoal(lead_id):
+    lead = db.get_or_404(Lead, lead_id)
+    if lead.integracao_id and lead.external_thread_id:
+        ja_existe = ContatoIgnorado.query.filter_by(
+            empresa_id=lead.empresa_id, canal=lead.integracao.canal,
+            external_thread_id=lead.external_thread_id).first()
+        if not ja_existe:
+            # empresa_id vem explicitamente do lead, não do listener de auto-fill do tenant
+            # (g.empresa_id pode não bater com o dono do lead, ex: saas_admin sem tenant fixo)
+            db.session.add(ContatoIgnorado(
+                empresa_id=lead.empresa_id, canal=lead.integracao.canal,
+                external_thread_id=lead.external_thread_id, criado_por_user_id=current_user.id))
+    db.session.delete(lead)
+    db.session.commit()
+    flash('Contato marcado como pessoal. Mensagens futuras dessa pessoa não vão gerar Lead até você desfazer isso em Configurar → Contatos ignorados.', 'success')
     return redirect(url_for('admin.leads'))
 
 
@@ -791,6 +811,25 @@ def integracoes_meta_desconectar(integracao_id):
     db.session.commit()
     flash('Conta desconectada.', 'success')
     return redirect(url_for('admin.integracoes'))
+
+
+@admin_bp.route('/contatos-ignorados')
+@login_required
+def contatos_ignorados():
+    ignorados = tq(ContatoIgnorado).order_by(ContatoIgnorado.criado_em.desc()).all()
+    return render_template('admin/contatos_ignorados.html', ignorados=ignorados)
+
+
+@admin_bp.route('/contatos-ignorados/<int:id>/remover', methods=['POST'])
+@login_required
+def contato_ignorado_remover(id):
+    c = tq(ContatoIgnorado).filter_by(id=id).first()
+    if not c:
+        abort(404)
+    db.session.delete(c)
+    db.session.commit()
+    flash('Contato removido da lista de ignorados — mensagens futuras voltam a gerar Lead.', 'success')
+    return redirect(url_for('admin.contatos_ignorados'))
 
 
 # ── Themes ────────────────────────────────────────────────────────────────────

@@ -154,12 +154,15 @@ def assinar_pagina(page_id, page_access_token, campos='messages'):
     return resp.json()
 
 
-def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token):
+def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token, quick_replies=None):
     """Envia mensagem de texto via Send API (Messenger/Instagram). Best-effort — quem chama trata a exceção."""
+    payload_msg = {'text': texto}
+    if quick_replies:
+        payload_msg['quick_replies'] = quick_replies
     resp = requests.post(
         f'{GRAPH_URL}/{identificador_externo}/messages',
         params={'access_token': access_token},
-        json={'recipient': {'id': destinatario_id}, 'message': {'text': texto}},
+        json={'recipient': {'id': destinatario_id}, 'message': payload_msg},
         timeout=10,
     )
     if not resp.ok:

@@ -63,6 +63,19 @@ def _safe_add_col(table, col, defn):
         pass
 
 
+def _safe_widen_col(table, col, novo_tipo):
+    """Alarga o tipo de uma coluna existente (ex: VARCHAR(50) -> VARCHAR(150)).
+    Só necessário em Postgres — SQLite não aplica limite de tamanho a VARCHAR."""
+    if 'postgresql' not in db.engine.url.drivername:
+        return
+    from sqlalchemy import text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(text(f'ALTER TABLE {table} ALTER COLUMN {col} TYPE {novo_tipo}'))
+    except Exception:
+        pass
+
+
 def _migrate_settings_schema():
     """Migra settings de chave-PK global para (id, empresa_id, key) por tenant."""
     from sqlalchemy import inspect as _insp, text
@@ -475,6 +488,8 @@ with app.app_context():
                   'INTEGER REFERENCES integracoes_meta(id)' if _pg else 'INTEGER')
     _safe_add_col('leads',                'aguardando_contato',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('leads',                'contato_etapa', 'VARCHAR(20)')
+    _safe_widen_col('leads', 'service', 'VARCHAR(150)')
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)

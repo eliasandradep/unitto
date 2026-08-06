@@ -21,7 +21,7 @@ _SKIP_SUBSCRIPTION_CHECK = frozenset({
 # Financeiro têm suas próprias regras de escopo, aplicadas nas rotas).
 _ADMIN_ONLY_ENDPOINTS = frozenset({
     'dashboard',
-    'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete',
+    'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete', 'lead_marcar_pessoal',
     'users', 'user_new', 'user_edit', 'user_delete',
     'metrics',
     'configuracoes',
@@ -46,6 +46,7 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'formas_pagamento',
     'integracoes', 'integracoes_meta_conectar', 'integracoes_meta_callback',
     'integracoes_meta_desconectar',
+    'contatos_ignorados', 'contato_ignorado_remover',
 })
 
 

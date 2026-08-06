@@ -1,6 +1,6 @@
 """Normaliza os payloads de webhook da Meta para uma lista de eventos.
 
-Cada evento normalizado: {identificador_externo, external_thread_id, phone, nome, mensagem, canal}.
+Cada evento normalizado: {identificador_externo, external_thread_id, phone, nome, mensagem, canal, quick_reply_payload}.
 """
 
 
@@ -26,6 +26,7 @@ def parse_whatsapp(body):
                     'nome': nomes.get(wa_id),
                     'mensagem': texto,
                     'canal': 'whatsapp',
+                    'quick_reply_payload': None,
                 })
     return eventos
 
@@ -49,6 +50,7 @@ def _parse_messaging(body, canal):
                 'nome': None,
                 'mensagem': texto,
                 'canal': canal,
+                'quick_reply_payload': (message.get('quick_reply') or {}).get('payload'),
             })
     return eventos
 

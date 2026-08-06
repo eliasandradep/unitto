@@ -213,6 +213,24 @@ class IntegracaoMeta(db.Model):
         return dict(META_CANAIS).get(self.canal, self.canal)
 
 
+class ContatoIgnorado(db.Model):
+    """Contato de Instagram/Messenger/WhatsApp marcado como pessoal — mensagens
+    futuras dessa pessoa não geram Lead nem disparam a automação de coleta."""
+    __tablename__ = 'contatos_ignorados'
+    id                 = db.Column(db.Integer, primary_key=True)
+    empresa_id         = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    canal              = db.Column(db.String(20), nullable=False)
+    external_thread_id = db.Column(db.String(100), nullable=False)
+    criado_em          = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_por_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    empresa            = db.relationship('Empresa')
+
+    __table_args__ = (db.UniqueConstraint('empresa_id', 'canal', 'external_thread_id', name='uq_contato_ignorado'),)
+
+    def canal_label(self):
+        return dict(META_CANAIS).get(self.canal, self.canal)
+
+
 ROLES = [
     ('saas_admin',    'SaaS Admin'),
     ('empresa_admin', 'Administrador'),
@@ -273,7 +291,7 @@ class Lead(db.Model):
     phone              = db.Column(db.String(20), nullable=True)
     email              = db.Column(db.String(120))
     source             = db.Column(db.String(20),  default='manual')
-    service            = db.Column(db.String(50))
+    service            = db.Column(db.String(150))
     message            = db.Column(db.Text)
     status             = db.Column(db.String(20),  default='novo')
     notes              = db.Column(db.Text)
@@ -284,6 +302,7 @@ class Lead(db.Model):
     external_thread_id = db.Column(db.String(100))
     integracao_id      = db.Column(db.Integer, db.ForeignKey('integracoes_meta.id'), nullable=True)
     aguardando_contato = db.Column(db.Boolean, default=False)
+    contato_etapa      = db.Column(db.String(20), nullable=True)  # 'servico'|'telefone'|'tudo'|None
 
     integracao = db.relationship('IntegracaoMeta')
 

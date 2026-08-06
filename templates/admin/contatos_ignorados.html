@@ -1,0 +1,49 @@
+{% extends 'admin/base.html' %}
+{% block title %}Contatos ignorados{% endblock %}
+{% block page_title %}Contatos ignorados{% endblock %}
+
+{% block content %}
+
+<div class="toolbar">
+  <p class="empty-state" style="margin:0">
+    Contatos marcados como pessoais no Instagram/Messenger/WhatsApp — mensagens futuras dessa pessoa não geram Lead automaticamente.
+  </p>
+</div>
+
+{% if ignorados %}
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Canal</th>
+        <th>Identificador</th>
+        <th>Ignorado em</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in ignorados %}
+      <tr>
+        <td><span class="badge badge--source-{{ c.canal }}">{{ c.canal_label() }}</span></td>
+        <td>{{ c.external_thread_id }}</td>
+        <td>{{ c.criado_em.strftime('%d/%m/%Y %H:%M') if c.criado_em else '—' }}</td>
+        <td>
+          <form method="POST" action="{{ url_for('admin.contato_ignorado_remover', id=c.id) }}"
+                onsubmit="return confirm('Remover da lista de ignorados? Mensagens futuras dessa pessoa voltam a gerar Lead.')">
+            <button type="submit" class="btn-icon btn-icon--delete" title="Remover">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <p class="empty-state">Nenhum contato marcado como pessoal ainda.</p>
+</div>
+{% endif %}
+
+{% endblock %}

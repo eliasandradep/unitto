@@ -7,7 +7,7 @@ from flask import request, jsonify, current_app
 
 from . import meta_webhook_bp
 from .parsers import parse_whatsapp, parse_messenger, parse_instagram
-from models import db, IntegracaoMeta, Lead, Servico, Cliente, META_CANAL_SOURCE
+from models import db, IntegracaoMeta, Lead, Servico, Cliente, ContatoIgnorado, META_CANAL_SOURCE
 import meta_client
 from crypto_utils import decrypt_token
 
@@ -25,6 +25,8 @@ _PERGUNTA_CONTATO = (
     'Olá! Para agilizar seu atendimento, pode me enviar seu nome completo, '
     'um telefone/WhatsApp para contato e qual serviço você tem interesse?'
 )
+_PERGUNTA_SERVICO = 'Olá! Para agilizar seu atendimento, qual serviço você tem interesse?'
+_PERGUNTA_TELEFONE = 'Perfeito! Agora me diga seu nome completo e um telefone/WhatsApp para contato.'
 
 
 _PALAVRAS_TELEFONE = re.compile(
@@ -91,6 +93,50 @@ def _extrair_contato(texto, servicos_ativos):
     return (nome or None), telefone, servico
 
 
+def _truncar_titulo(nome, limite=20):
+    """Corta no último espaço antes do limite, evitando cortar uma palavra ao meio."""
+    if len(nome) <= limite:
+        return nome
+    corte = nome[:limite].rsplit(' ', 1)[0]
+    return corte if corte else nome[:limite]
+
+
+def _quick_replies_servicos(servicos):
+    """None se os títulos truncados colidirem entre si (dois serviços com o mesmo
+    prefixo de 20 caracteres viram botões indistinguíveis pro cliente, mesmo com
+    payloads diferentes por baixo) — nesse caso o chamador cai pro fluxo de texto livre."""
+    titulos = [_truncar_titulo(s.nome) for s in servicos]
+    if len(set(titulos)) != len(titulos):
+        return None
+    return [{'content_type': 'text', 'title': t, 'payload': f'SVC_{s.id}'}
+            for s, t in zip(servicos, titulos)]
+
+
+def _extrair_servico(texto, servicos_ativos):
+    """Extraído de _extrair_contato: só a parte de casar nome de serviço no texto."""
+    texto_lower = (texto or '').lower()
+    for nome in servicos_ativos:
+        if re.search(r'\b' + re.escape(nome.lower()) + r'\b', texto_lower):
+            return nome
+    return None
+
+
+def _extrair_nome_e_telefone(texto):
+    """Extraído de _extrair_contato: mesma lógica, sem a parte de serviço."""
+    texto = (texto or '').strip()
+    digitos = re.sub(r'\D', '', texto)
+    m = re.search(r'\d{10,13}', digitos)
+    telefone = m.group(0) if m else None
+    if not telefone:
+        nome = _PREFIXOS_NOME.sub('', texto).strip(' ,.-')
+        return (nome or None), None
+    nome = re.sub(r'[\d()+\-.]{6,}', ' ', texto)
+    nome = _PALAVRAS_TELEFONE.sub(' ', nome)
+    nome = _PREFIXOS_NOME.sub('', nome.strip())
+    nome = re.sub(r'\s{2,}', ' ', nome).strip(' ,.-')
+    return (nome or None), telefone
+
+
 @meta_webhook_bp.route('/webhook', methods=['GET'])
 def verificar():
     verify_token = os.getenv('META_VERIFY_TOKEN', '').strip()
@@ -133,6 +179,10 @@ def _processar_evento(evento):
     ).first()
     if not integ:
         return
+    if ContatoIgnorado.query.filter_by(
+            empresa_id=integ.empresa_id, canal=evento['canal'],
+            external_thread_id=evento['external_thread_id']).first():
+        return
     _upsert_lead(integ, evento)
 
 
@@ -152,22 +202,62 @@ def _upsert_lead(integracao, evento):
 
     if lead:
         if lead.aguardando_contato:
-            servicos = _servicos_ativos(integracao.empresa_id)
-            nome_extraido, telefone_extraido, servico_extraido = _extrair_contato(evento['mensagem'], servicos)
-            if telefone_extraido:
-                lead.phone = telefone_extraido
-                if lead.status == 'novo' and _e_cliente_existente(integracao.empresa_id, telefone_extraido):
-                    lead.status = 'cliente_existente'
-            if nome_extraido and not lead.name:
-                lead.name = nome_extraido
-            if servico_extraido and not lead.service:
-                lead.service = servico_extraido
-            # Continua "escutando" as próximas mensagens da conversa até ter
-            # telefone (essencial) e serviço (quando a empresa tem catálogo
-            # ativo) — sem risco de reenviar a pergunta, que só acontece na
-            # criação do Lead.
-            if lead.phone and (lead.service or not servicos):
-                lead.aguardando_contato = False
+            etapa = lead.contato_etapa or 'tudo'  # leads em andamento antes do deploy caem no fallback antigo
+
+            if etapa == 'servico':
+                servico = None
+                payload = evento.get('quick_reply_payload')
+                if payload and payload.startswith('SVC_'):
+                    s = Servico.query.filter_by(id=payload[4:], empresa_id=integracao.empresa_id, ativo=True).first()
+                    servico = s.nome if s else None
+                if not servico:
+                    servico = _extrair_servico(evento['mensagem'], _servicos_ativos(integracao.empresa_id))
+                if servico:
+                    lead.service = servico
+                    try:
+                        token = decrypt_token(integracao.access_token_enc)
+                        meta_client.enviar_mensagem(
+                            integracao.identificador_externo, evento['external_thread_id'],
+                            _PERGUNTA_TELEFONE, token)
+                        lead.contato_etapa = 'telefone'
+                    except Exception:
+                        current_app.logger.exception('Falha ao enviar pergunta de telefone')
+                        lead.contato_etapa = None
+                        lead.aguardando_contato = False
+                # sem match (ex: cliente respondeu algo não reconhecível, ou o
+                # serviço foi desativado nesse meio-tempo): não avança, continua
+                # em 'servico' esperando uma resposta que dê pra casar.
+
+            elif etapa == 'telefone':
+                nome_extraido, telefone_extraido = _extrair_nome_e_telefone(evento['mensagem'])
+                if telefone_extraido:
+                    lead.phone = telefone_extraido
+                    if lead.status == 'novo' and _e_cliente_existente(integracao.empresa_id, telefone_extraido):
+                        lead.status = 'cliente_existente'
+                    lead.contato_etapa = None
+                    lead.aguardando_contato = False
+                if nome_extraido and not lead.name:
+                    lead.name = nome_extraido
+                # sem telefone reconhecível: continua em 'telefone', esperando resposta melhor.
+
+            else:  # 'tudo' — fallback quando não há botões (sem serviços ativos, ou mais de 13)
+                servicos = _servicos_ativos(integracao.empresa_id)
+                nome_extraido, telefone_extraido, servico_extraido = _extrair_contato(evento['mensagem'], servicos)
+                if telefone_extraido:
+                    lead.phone = telefone_extraido
+                    if lead.status == 'novo' and _e_cliente_existente(integracao.empresa_id, telefone_extraido):
+                        lead.status = 'cliente_existente'
+                if nome_extraido and not lead.name:
+                    lead.name = nome_extraido
+                if servico_extraido and not lead.service:
+                    lead.service = servico_extraido
+                # Continua "escutando" as próximas mensagens da conversa até ter
+                # telefone (essencial) e serviço (quando a empresa tem catálogo
+                # ativo) — sem risco de reenviar a pergunta, que só acontece na
+                # criação do Lead.
+                if lead.phone and (lead.service or not servicos):
+                    lead.contato_etapa = None
+                    lead.aguardando_contato = False
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
@@ -191,11 +281,21 @@ def _upsert_lead(integracao, evento):
     db.session.add(lead)
 
     if evento['canal'] in _CANAIS_SEM_TELEFONE and not lead.phone:
+        servicos_obj = Servico.query.filter_by(empresa_id=integracao.empresa_id, ativo=True) \
+            .order_by(Servico.nome).all()
+        quick_replies = _quick_replies_servicos(servicos_obj) if 0 < len(servicos_obj) <= 13 else None
         try:
             token = decrypt_token(integracao.access_token_enc)
-            meta_client.enviar_mensagem(
-                integracao.identificador_externo, evento['external_thread_id'],
-                _PERGUNTA_CONTATO, token)
+            if quick_replies:
+                meta_client.enviar_mensagem(
+                    integracao.identificador_externo, evento['external_thread_id'],
+                    _PERGUNTA_SERVICO, token, quick_replies=quick_replies)
+                lead.contato_etapa = 'servico'
+            else:
+                meta_client.enviar_mensagem(
+                    integracao.identificador_externo, evento['external_thread_id'],
+                    _PERGUNTA_CONTATO, token)
+                lead.contato_etapa = 'tudo'
             lead.aguardando_contato = True
         except Exception:
             current_app.logger.exception('Falha ao enviar pergunta automática de contato')
