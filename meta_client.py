@@ -15,7 +15,7 @@ GRAPH_URL = 'https://graph.facebook.com/v21.0'
 OAUTH_DIALOG_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
 
 _SCOPES = {
-    'whatsapp':  'whatsapp_business_management,whatsapp_business_messaging',
+    'whatsapp':  'whatsapp_business_management,whatsapp_business_messaging,business_management',
     'instagram': 'instagram_basic,instagram_manage_messages,pages_show_list,pages_read_engagement',
     'messenger': 'pages_messaging,pages_show_list,pages_manage_metadata',
 }
@@ -81,15 +81,20 @@ def listar_ativos(canal, access_token):
             raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
         ativos = []
         for biz in resp.json().get('data', []):
-            nums = requests.get(f'{GRAPH_URL}/{biz["id"]}/phone_numbers',
-                                 params={'access_token': access_token}, timeout=15)
-            if not nums.ok:
+            wabas = requests.get(f'{GRAPH_URL}/{biz["id"]}/owned_whatsapp_business_accounts',
+                                  params={'access_token': access_token}, timeout=15)
+            if not wabas.ok:
                 continue
-            for num in nums.json().get('data', []):
-                ativos.append({
-                    'identificador_externo': num['id'],
-                    'nome_conta': num.get('verified_name') or num.get('display_phone_number') or num['id'],
-                })
+            for waba in wabas.json().get('data', []):
+                nums = requests.get(f'{GRAPH_URL}/{waba["id"]}/phone_numbers',
+                                     params={'access_token': access_token}, timeout=15)
+                if not nums.ok:
+                    continue
+                for num in nums.json().get('data', []):
+                    ativos.append({
+                        'identificador_externo': num['id'],
+                        'nome_conta': num.get('verified_name') or num.get('display_phone_number') or num['id'],
+                    })
         return ativos
 
     resp = requests.get(f'{GRAPH_URL}/me/accounts', params={'access_token': access_token}, timeout=15)
