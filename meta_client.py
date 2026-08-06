@@ -79,22 +79,33 @@ def listar_ativos(canal, access_token):
         resp = requests.get(f'{GRAPH_URL}/me/businesses', params={'access_token': access_token}, timeout=15)
         if not resp.ok:
             raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+        negocios = resp.json().get('data', [])
+        logger.warning('/me/businesses retornou %d empresa(s): %s',
+                        len(negocios), [b.get('id') for b in negocios])
         ativos = []
-        for biz in resp.json().get('data', []):
-            wabas = requests.get(f'{GRAPH_URL}/{biz["id"]}/owned_whatsapp_business_accounts',
-                                  params={'access_token': access_token}, timeout=15)
-            if not wabas.ok:
-                continue
-            for waba in wabas.json().get('data', []):
-                nums = requests.get(f'{GRAPH_URL}/{waba["id"]}/phone_numbers',
-                                     params={'access_token': access_token}, timeout=15)
-                if not nums.ok:
+        waba_ids_vistos = set()
+        for biz in negocios:
+            for edge in ('owned_whatsapp_business_accounts', 'client_whatsapp_business_accounts'):
+                wabas = requests.get(f'{GRAPH_URL}/{biz["id"]}/{edge}',
+                                      params={'access_token': access_token}, timeout=15)
+                if not wabas.ok:
+                    logger.warning('%s (%s) falhou: %s %s', edge, biz.get('id'), wabas.status_code, wabas.text[:300])
                     continue
-                for num in nums.json().get('data', []):
-                    ativos.append({
-                        'identificador_externo': num['id'],
-                        'nome_conta': num.get('verified_name') or num.get('display_phone_number') or num['id'],
-                    })
+                lista = wabas.json().get('data', [])
+                logger.warning('%s (%s) retornou %d WABA(s): %s', edge, biz.get('id'), len(lista), [w.get('id') for w in lista])
+                for waba in lista:
+                    if waba['id'] in waba_ids_vistos:
+                        continue
+                    waba_ids_vistos.add(waba['id'])
+                    nums = requests.get(f'{GRAPH_URL}/{waba["id"]}/phone_numbers',
+                                         params={'access_token': access_token}, timeout=15)
+                    if not nums.ok:
+                        continue
+                    for num in nums.json().get('data', []):
+                        ativos.append({
+                            'identificador_externo': num['id'],
+                            'nome_conta': num.get('verified_name') or num.get('display_phone_number') or num['id'],
+                        })
         return ativos
 
     resp = requests.get(f'{GRAPH_URL}/me/accounts', params={'access_token': access_token}, timeout=15)
