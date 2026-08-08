@@ -46,7 +46,10 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'formas_pagamento',
     'integracoes', 'integracoes_meta_conectar', 'integracoes_meta_callback',
     'integracoes_meta_desconectar',
+    'integracoes_meta_ads_conectar', 'integracoes_meta_ads_callback',
+    'integracoes_meta_ads_sincronizar', 'integracoes_meta_ads_desconectar',
     'contatos_ignorados', 'contato_ignorado_remover',
+    'campanhas',
 })
 
 

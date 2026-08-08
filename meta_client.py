@@ -18,6 +18,7 @@ _SCOPES = {
     'whatsapp':  'whatsapp_business_management,whatsapp_business_messaging,business_management',
     'instagram': 'instagram_basic,instagram_manage_messages,pages_show_list,pages_read_engagement',
     'messenger': 'pages_messaging,pages_show_list,pages_manage_metadata',
+    'ads':       'ads_read,business_management',
 }
 
 
@@ -167,6 +168,40 @@ def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token,
     )
     if not resp.ok:
         raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+
+
+def listar_contas_anuncio(access_token):
+    """Retorna [{'identificador_externo': 'act_...', 'nome_conta': ...}] das contas de anúncio acessíveis."""
+    resp = requests.get(f'{GRAPH_URL}/me/adaccounts',
+                         params={'fields': 'id,name', 'access_token': access_token}, timeout=15)
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+    return [{'identificador_externo': a['id'], 'nome_conta': a.get('name') or a['id']}
+            for a in resp.json().get('data', [])]
+
+
+def buscar_insights_diarios(ad_account_id, access_token, desde, ate):
+    """Retorna gasto/impressões/cliques por anúncio por dia num intervalo. Uma única
+    chamada (paginada) já devolve o nome do anúncio e da campanha junto com o gasto —
+    não precisa de chamadas separadas a /campaigns ou /ads."""
+    import json as _json
+    linhas = []
+    url = f'{GRAPH_URL}/{ad_account_id}/insights'
+    params = {
+        'level': 'ad', 'time_increment': 1,
+        'time_range': _json.dumps({'since': desde.isoformat(), 'until': ate.isoformat()}),
+        'fields': 'ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,date_start',
+        'access_token': access_token, 'limit': 500,
+    }
+    while url:
+        resp = requests.get(url, params=params, timeout=30)
+        if not resp.ok:
+            raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+        body = resp.json()
+        linhas.extend(body.get('data', []))
+        url = body.get('paging', {}).get('next')
+        params = None  # a URL de 'next' já vem com querystring completa
+    return linhas
 
 
 def buscar_nome_perfil(psid, access_token):

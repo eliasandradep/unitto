@@ -231,6 +231,58 @@ class ContatoIgnorado(db.Model):
         return dict(META_CANAIS).get(self.canal, self.canal)
 
 
+class IntegracaoMetaAds(db.Model):
+    """Conexão de uma empresa com uma conta de anúncios da Meta (ads_read),
+    separada de IntegracaoMeta porque não é um canal de mensagens — não entra
+    em META_CANAIS nem no roteamento do webhook."""
+    __tablename__ = 'integracoes_meta_ads'
+    id                     = db.Column(db.Integer, primary_key=True)
+    empresa_id             = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    ad_account_id          = db.Column(db.String(30), nullable=False)  # ex: 'act_123456'
+    nome_conta             = db.Column(db.String(150))
+    access_token_enc       = db.Column(db.Text, nullable=False)
+    status                 = db.Column(db.String(20), default='conectado')  # conectado|erro|desconectado
+    conectado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+    conectado_por_user_id  = db.Column(db.Integer, db.ForeignKey('users.id'))
+    ultima_sincronizacao   = db.Column(db.DateTime)
+    empresa                = db.relationship('Empresa')
+
+    __table_args__ = (db.UniqueConstraint('ad_account_id', name='uq_integracao_ads_conta'),)
+
+
+class AnuncioMeta(db.Model):
+    """Cache local de nome/campanha de cada anúncio — resolvido a partir da
+    própria resposta da Insights API (campaign_name/ad_name vêm de graça
+    junto com o gasto, sem chamada extra a /campaigns ou /ads)."""
+    __tablename__ = 'anuncios_meta'
+    id             = db.Column(db.Integer, primary_key=True)
+    empresa_id     = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    ad_id          = db.Column(db.String(50), nullable=False)
+    nome           = db.Column(db.String(200))
+    campanha_id    = db.Column(db.String(50))
+    campanha_nome  = db.Column(db.String(200))
+    atualizado_em  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('empresa_id', 'ad_id', name='uq_anuncio_meta'),)
+
+
+class InsightDiarioAnuncio(db.Model):
+    """Gasto/impressões/cliques por anúncio por dia — granularidade diária
+    (é o que a Insights API já devolve com time_increment=1) pra permitir
+    relatório filtrado por período, no mesmo padrão de Financeiro/Comissões."""
+    __tablename__ = 'insights_diarios_anuncio'
+    id          = db.Column(db.Integer, primary_key=True)
+    anuncio_id  = db.Column(db.Integer, db.ForeignKey('anuncios_meta.id'), nullable=False)
+    data        = db.Column(db.Date, nullable=False)
+    gasto       = db.Column(db.Numeric(10, 2), default=0)
+    impressoes  = db.Column(db.Integer, default=0)
+    cliques     = db.Column(db.Integer, default=0)
+
+    anuncio = db.relationship('AnuncioMeta', backref='insights')
+
+    __table_args__ = (db.UniqueConstraint('anuncio_id', 'data', name='uq_insight_anuncio_data'),)
+
+
 ROLES = [
     ('saas_admin',    'SaaS Admin'),
     ('empresa_admin', 'Administrador'),
@@ -303,6 +355,8 @@ class Lead(db.Model):
     integracao_id      = db.Column(db.Integer, db.ForeignKey('integracoes_meta.id'), nullable=True)
     aguardando_contato = db.Column(db.Boolean, default=False)
     contato_etapa      = db.Column(db.String(20), nullable=True)  # 'servico'|'telefone'|'tudo'|None
+    ad_id              = db.Column(db.String(50))   # referral.ad_id da Meta — casa com AnuncioMeta.ad_id quando sincronizado
+    ad_title           = db.Column(db.String(200))  # snapshot do título do anúncio no momento do clique
 
     integracao = db.relationship('IntegracaoMeta')
 

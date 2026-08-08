@@ -24,6 +24,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     EscalaProfissionalUnidade, RecebimentoCliente,
                     ContaPagar, ContaReceber, FormaPagamento,
                     CategoriaProduto, Produto, IntegracaoMeta, ContatoIgnorado,
+                    IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
                     META_CANAIS)
 from themes import THEMES
@@ -690,8 +691,9 @@ def _meta_state_serializer():
 @login_required
 def integracoes():
     conexoes = {c.canal: c for c in tq(IntegracaoMeta).filter_by(status='conectado').all()}
+    contas_ads = tq(IntegracaoMetaAds).filter_by(status='conectado').all()
     return render_template('admin/integracoes.html', canais=META_CANAIS, conexoes=conexoes,
-                            meta_configurado=meta_client.configurado())
+                            meta_configurado=meta_client.configurado(), contas_ads=contas_ads)
 
 
 @admin_bp.route('/integracoes/meta/conectar/<canal>')
@@ -810,6 +812,110 @@ def integracoes_meta_desconectar(integracao_id):
     integ.status = 'desconectado'
     db.session.commit()
     flash('Conta desconectada.', 'success')
+    return redirect(url_for('admin.integracoes'))
+
+
+# ── Integrações (Meta Ads: gasto/atribuição de campanhas) ─────────────────────
+
+@admin_bp.route('/integracoes/meta-ads/conectar')
+@login_required
+def integracoes_meta_ads_conectar():
+    if not meta_client.configurado():
+        flash('Integração com a Meta ainda não configurada. Fale com o suporte.', 'error')
+        return redirect(url_for('admin.integracoes'))
+    state = _meta_state_serializer().dumps({'empresa_id': g.empresa_id, 'canal': 'ads'})
+    return redirect(meta_client.oauth_dialog_url('ads', state))
+
+
+@admin_bp.route('/integracoes/meta-ads/callback')
+@login_required
+def integracoes_meta_ads_callback():
+    erro = request.args.get('error_description') or request.args.get('error')
+    if erro:
+        flash(f'Conexão cancelada: {erro}', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    state = request.args.get('state', '')
+    try:
+        dados = _meta_state_serializer().loads(state, max_age=600)
+    except (BadSignature, SignatureExpired):
+        flash('Sessão de conexão expirada ou inválida. Tente novamente.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    if dados.get('empresa_id') != g.empresa_id:
+        abort(403)
+
+    code = request.args.get('code')
+    if not code:
+        flash('Autorização da Meta incompleta.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    try:
+        token = meta_client.trocar_code_por_token(code)
+        contas = meta_client.listar_contas_anuncio(token)
+    except Exception as e:
+        flash(f'Não foi possível concluir a conexão: {e}', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    if not contas:
+        flash('Nenhuma conta de anúncios encontrada para essa conta da Meta.', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    conflito = False
+    for conta in contas:
+        integ = IntegracaoMetaAds.query.filter_by(ad_account_id=conta['identificador_externo']).first()
+        if integ and integ.empresa_id != g.empresa_id:
+            conflito = True
+            continue
+        if not integ:
+            integ = IntegracaoMetaAds(ad_account_id=conta['identificador_externo'])
+            db.session.add(integ)
+        integ.empresa_id = g.empresa_id
+        integ.nome_conta = conta['nome_conta']
+        integ.access_token_enc = encrypt_token(token)
+        integ.status = 'conectado'
+        integ.conectado_em = datetime.utcnow()
+        integ.conectado_por_user_id = current_user.id
+    db.session.commit()
+
+    from meta_ads_sync import sincronizar_conta_ads
+    for integ in IntegracaoMetaAds.query.filter_by(empresa_id=g.empresa_id, status='conectado').all():
+        try:
+            sincronizar_conta_ads(integ)
+        except Exception:
+            current_app.logger.exception('Falha na primeira sincronização da conta de anúncios %s', integ.id)
+
+    if conflito:
+        flash('Uma das contas já está conectada a outra empresa e foi ignorada.', 'error')
+    else:
+        flash('Conta de anúncios conectada e sincronizada.', 'success')
+    return redirect(url_for('admin.integracoes'))
+
+
+@admin_bp.route('/integracoes/meta-ads/<int:integracao_id>/sincronizar', methods=['POST'])
+@login_required
+def integracoes_meta_ads_sincronizar(integracao_id):
+    integ = tq(IntegracaoMetaAds).filter_by(id=integracao_id).first()
+    if not integ:
+        abort(404)
+    from meta_ads_sync import sincronizar_conta_ads
+    try:
+        sincronizar_conta_ads(integ)
+        flash('Sincronizado com sucesso.', 'success')
+    except Exception as e:
+        flash(f'Falha ao sincronizar: {e}', 'error')
+    return redirect(url_for('admin.integracoes'))
+
+
+@admin_bp.route('/integracoes/meta-ads/<int:integracao_id>/desconectar', methods=['POST'])
+@login_required
+def integracoes_meta_ads_desconectar(integracao_id):
+    integ = tq(IntegracaoMetaAds).filter_by(id=integracao_id).first()
+    if not integ:
+        abort(404)
+    integ.status = 'desconectado'
+    db.session.commit()
+    flash('Conta de anúncios desconectada.', 'success')
     return redirect(url_for('admin.integracoes'))
 
 
@@ -3496,6 +3602,80 @@ def relatorio_comissoes():
         unidades=unidades, profissionais_disponiveis=profissionais_disponiveis,
         unidade_id=unidade_id, prof_id=prof_id,
         dt_ini=dt_ini.isoformat(), dt_fim=dt_fim.isoformat())
+
+
+@admin_bp.route('/campanhas')
+@login_required
+def campanhas():
+    from datetime import date as _date, timedelta
+    from decimal import Decimal
+    from sqlalchemy import func
+
+    hoje = _date.today()
+    dt_ini_s = request.args.get('dt_ini', '')
+    dt_fim_s = request.args.get('dt_fim', '')
+
+    try:
+        dt_ini = _date.fromisoformat(dt_ini_s) if dt_ini_s else hoje.replace(day=1)
+    except ValueError:
+        dt_ini = hoje.replace(day=1)
+    try:
+        dt_fim = _date.fromisoformat(dt_fim_s) if dt_fim_s else hoje
+    except ValueError:
+        dt_fim = hoje
+
+    anuncios = tq(AnuncioMeta).all()
+    anuncio_por_ad_id = {a.ad_id: a for a in anuncios}
+
+    gasto_por_anuncio = dict(db.session.query(
+        InsightDiarioAnuncio.anuncio_id, func.sum(InsightDiarioAnuncio.gasto)
+    ).filter(
+        InsightDiarioAnuncio.anuncio_id.in_([a.id for a in anuncios] or [-1]),
+        InsightDiarioAnuncio.data.between(dt_ini, dt_fim),
+    ).group_by(InsightDiarioAnuncio.anuncio_id).all())
+
+    leads_periodo = tq(Lead).filter(
+        Lead.ad_id.isnot(None),
+        Lead.created_at >= dt_ini, Lead.created_at < dt_fim + timedelta(days=1),
+    ).all()
+
+    por_campanha = {}
+
+    def _linha(nome):
+        return por_campanha.setdefault(nome, {'gasto': Decimal('0'), 'leads': 0, 'convertidos': 0, 'receita': Decimal('0')})
+
+    for anuncio in anuncios:
+        gasto = gasto_por_anuncio.get(anuncio.id)
+        if gasto:
+            _linha(anuncio.campanha_nome or anuncio.nome or anuncio.ad_id)['gasto'] += gasto
+
+    for lead in leads_periodo:
+        anuncio = anuncio_por_ad_id.get(lead.ad_id)
+        nome = (anuncio.campanha_nome or anuncio.nome) if anuncio else (lead.ad_title or 'Anúncio não sincronizado')
+        linha = _linha(nome)
+        linha['leads'] += 1
+        if lead.status == 'convertido':
+            linha['convertidos'] += 1
+            digits = ''.join(ch for ch in (lead.phone or '') if ch.isdigit())
+            if len(digits) >= 8:
+                cliente = tq(Cliente).filter(Cliente.telefone.like(f'%{digits[-8:]}')).first()
+                if cliente:
+                    # receita vitalícia do cliente (todas as comandas, não só do período) —
+                    # decisão confirmada: reflete melhor o retorno real pro negócio de salão
+                    linha['receita'] += sum(
+                        (p.valor for cmd in cliente.comandas for p in cmd.pagamentos), Decimal('0'))
+
+    linhas = []
+    for nome, d in por_campanha.items():
+        d['campanha'] = nome
+        d['custo_lead'] = (d['gasto'] / d['leads']) if d['leads'] else None
+        d['roas'] = (d['receita'] / d['gasto']) if d['gasto'] else None
+        linhas.append(d)
+    linhas.sort(key=lambda x: x['gasto'], reverse=True)
+
+    return render_template('admin/campanhas.html', linhas=linhas,
+                            dt_ini=dt_ini.isoformat(), dt_fim=dt_fim.isoformat(),
+                            tem_conexao_ads=tq(IntegracaoMetaAds).filter_by(status='conectado').first() is not None)
 
 
 # ── API JSON — modal de comanda na agenda ─────────────────────────────────────

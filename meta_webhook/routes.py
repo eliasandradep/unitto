@@ -261,6 +261,9 @@ def _upsert_lead(integracao, evento):
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
+        if not lead.ad_id and evento.get('ad_id'):
+            lead.ad_id = evento['ad_id']
+            lead.ad_title = evento.get('ad_title')
         db.session.commit()
         return
 
@@ -277,6 +280,8 @@ def _upsert_lead(integracao, evento):
         source=META_CANAL_SOURCE.get(evento['canal'], evento['canal']),
         message=evento['mensagem'],
         status=status,
+        ad_id=evento.get('ad_id'),
+        ad_title=evento.get('ad_title'),
     )
     db.session.add(lead)
 

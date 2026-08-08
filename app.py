@@ -490,6 +490,8 @@ with app.app_context():
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('leads',                'contato_etapa', 'VARCHAR(20)')
     _safe_widen_col('leads', 'service', 'VARCHAR(150)')
+    _safe_add_col('leads',                'ad_id', 'VARCHAR(50)')
+    _safe_add_col('leads',                'ad_title', 'VARCHAR(200)')
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)
@@ -585,6 +587,30 @@ def logo_serve(empresa_id):
     resp = Response(empresa.logo_data, mimetype=empresa.logo_mime or 'application/octet-stream')
     resp.headers['Cache-Control'] = 'public, max-age=86400'
     return resp
+
+
+# ── Sincronização diária de custo de campanhas Meta Ads ─────────────────────
+from apscheduler.schedulers.background import BackgroundScheduler
+
+
+def _sincronizar_todas_contas_ads():
+    with app.app_context():
+        from meta_ads_sync import sincronizar_conta_ads
+        from models import IntegracaoMetaAds
+        for integ in IntegracaoMetaAds.query.filter_by(status='conectado').all():
+            try:
+                sincronizar_conta_ads(integ)
+            except Exception:
+                app.logger.exception('Falha ao sincronizar conta de anúncios %s', integ.id)
+
+
+# Evita registrar o job duas vezes por causa do reloader do Flask em dev
+# (processo pai sem WERKZEUG_RUN_MAIN não deve rodar; processo filho, ou
+# produção sem debug/reloader, deve).
+if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    _scheduler = BackgroundScheduler(daemon=True)
+    _scheduler.add_job(_sincronizar_todas_contas_ads, 'cron', hour=6, minute=0)
+    _scheduler.start()
 
 
 if __name__ == '__main__':

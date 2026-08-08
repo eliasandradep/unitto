@@ -1,0 +1,73 @@
+{% extends 'admin/base.html' %}
+{% block title %}Campanhas{% endblock %}
+{% block page_title %}Relatórios / Campanhas{% endblock %}
+
+{% block content %}
+
+{% if not tem_conexao_ads %}
+<div class="alert alert--info" style="margin-bottom:1.2rem">
+  Conecte sua conta de anúncios em <strong>Configurar → Integrações</strong> para ver o gasto de cada campanha.
+  Enquanto isso, os Leads e conversões vindos de anúncios já aparecem abaixo.
+</div>
+{% endif %}
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">De</label>
+      <input type="date" name="dt_ini" value="{{ dt_ini }}" />
+    </div>
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Até</label>
+      <input type="date" name="dt_fim" value="{{ dt_fim }}" />
+    </div>
+    <button type="submit" class="btn-primary">Buscar</button>
+  </form>
+  <div style="font-size:.78rem;color:var(--text-muted);margin-top:.5rem">
+    Período: {{ dt_ini[8:10] }}/{{ dt_ini[5:7] }}/{{ dt_ini[0:4] }} até {{ dt_fim[8:10] }}/{{ dt_fim[5:7] }}/{{ dt_fim[0:4] }}
+  </div>
+</div>
+
+{% if linhas %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="overflow-x:auto">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Campanha</th>
+        <th style="text-align:right">Gasto</th>
+        <th style="text-align:right">Leads</th>
+        <th style="text-align:right">Custo por Lead</th>
+        <th style="text-align:right">Convertidos</th>
+        <th style="text-align:right">Receita (vitalícia)</th>
+        <th style="text-align:right">ROAS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in linhas %}
+      <tr>
+        <td>{{ l.campanha }}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">R$ {{ '%.2f'|format(l.gasto)|replace('.', ',') }}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">{{ l.leads }}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">
+          {% if l.custo_lead is not none %}R$ {{ '%.2f'|format(l.custo_lead)|replace('.', ',') }}{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">{{ l.convertidos }}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;color:#27ae60">R$ {{ '%.2f'|format(l.receita)|replace('.', ',') }}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">
+          {% if l.roas is not none %}{{ '%.2f'|format(l.roas)|replace('.', ',') }}x{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted)">
+  Nenhum Lead vindo de anúncio encontrado para o período selecionado.
+</div>
+{% endif %}
+
+{% endblock %}

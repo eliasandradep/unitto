@@ -52,4 +52,39 @@
   {% endfor %}
 </div>
 
+<h3 style="font-size:1rem;margin:1.6rem 0 .4rem">Conta de anúncios (custo de campanhas)</h3>
+<p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1.2rem">
+  Conecte sua conta de anúncios da Meta para ver o gasto de cada campanha no relatório de Campanhas.
+</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">
+  {% for integ in contas_ads %}
+  <div class="card" style="padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.6rem;
+                            border-left:3px solid var(--gold-dark)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+      <span style="font-weight:600;font-size:.95rem">{{ integ.nome_conta or integ.ad_account_id }}</span>
+      <span class="badge badge--convertido" style="flex-shrink:0">Conectado</span>
+    </div>
+    <div style="font-size:.82rem;color:var(--text-muted)">
+      Última sincronização: <strong style="color:var(--text)">
+        {{ integ.ultima_sincronizacao.strftime('%d/%m/%Y %H:%M') if integ.ultima_sincronizacao else 'ainda não sincronizou' }}
+      </strong>
+    </div>
+    <form method="POST" action="{{ url_for('admin.integracoes_meta_ads_sincronizar', integracao_id=integ.id) }}">
+      <button type="submit" class="btn-secondary" style="width:100%">Sincronizar agora</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin.integracoes_meta_ads_desconectar', integracao_id=integ.id) }}"
+          onsubmit="return confirm('Desconectar esta conta de anúncios? O relatório de Campanhas deixará de mostrar o gasto.')">
+      <button type="submit" class="btn-secondary" style="width:100%">Desconectar</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card" style="padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.6rem">
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0">Nenhuma conta de anúncios conectada.</p>
+    <a href="{{ url_for('admin.integracoes_meta_ads_conectar') }}" class="btn-primary"
+       style="text-align:center;width:100%">Conectar conta de anúncios</a>
+  </div>
+  {% endfor %}
+</div>
+
 {% endblock %}

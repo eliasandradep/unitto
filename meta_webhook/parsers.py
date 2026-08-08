@@ -1,6 +1,9 @@
 """Normaliza os payloads de webhook da Meta para uma lista de eventos.
 
-Cada evento normalizado: {identificador_externo, external_thread_id, phone, nome, mensagem, canal, quick_reply_payload}.
+Cada evento normalizado: {identificador_externo, external_thread_id, phone, nome, mensagem, canal,
+quick_reply_payload, ad_id, ad_title}. `ad_id`/`ad_title` só vêm preenchidos quando a conversa começou
+a partir de um clique num anúncio "Enviar mensagem" (campo `referral` que a Meta inclui de graça
+junto com a primeira mensagem desse tipo de anúncio).
 """
 
 
@@ -19,6 +22,7 @@ def parse_whatsapp(body):
                 if not wa_id:
                     continue
                 texto = msg.get('text', {}).get('body') or f'[{msg.get("type", "mensagem")}]'
+                referral = msg.get('referral') or {}
                 eventos.append({
                     'identificador_externo': phone_number_id,
                     'external_thread_id': wa_id,
@@ -27,6 +31,8 @@ def parse_whatsapp(body):
                     'mensagem': texto,
                     'canal': 'whatsapp',
                     'quick_reply_payload': None,
+                    'ad_id': referral.get('source_id'),
+                    'ad_title': referral.get('headline'),
                 })
     return eventos
 
@@ -43,6 +49,7 @@ def _parse_messaging(body, canal):
             if not page_id or not psid:
                 continue
             texto = message.get('text') or '[anexo]'
+            referral = msg_evt.get('referral') or {}
             eventos.append({
                 'identificador_externo': page_id,
                 'external_thread_id': psid,
@@ -51,6 +58,8 @@ def _parse_messaging(body, canal):
                 'mensagem': texto,
                 'canal': canal,
                 'quick_reply_payload': (message.get('quick_reply') or {}).get('payload'),
+                'ad_id': referral.get('ad_id'),
+                'ad_title': (referral.get('ads_context_data') or {}).get('ad_title'),
             })
     return eventos
 

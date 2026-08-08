@@ -10,6 +10,12 @@
 </div>
 {% endif %}
 
+{% if lead.ad_id %}
+<div class="alert alert--info">
+  Veio do anúncio: <strong>{{ lead.ad_title or lead.ad_id }}</strong>
+</div>
+{% endif %}
+
 <div class="detail-grid">
 
   <!-- Informações principais -->
