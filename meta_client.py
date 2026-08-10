@@ -176,13 +176,20 @@ def listar_contas_anuncio(access_token):
     Negócios (Business Manager) onde o usuário tem papel, sejam contas próprias (owned) ou de
     clientes (client). Mesmo padrão de listar_ativos('whatsapp', ...): /me/adaccounts sozinho não
     enxerga contas que só existem dentro de um Business Manager."""
+    def _com_prefixo(cid):
+        """owned_ad_accounts/client_ad_accounts às vezes devolvem o id sem o
+        prefixo 'act_' (inconsistência conhecida da Graph API — /me/adaccounts
+        sempre devolve prefixado, esses dois edges nem sempre). Sem o prefixo,
+        a Insights API não erra, só devolve dado vazio silenciosamente."""
+        return cid if cid.startswith('act_') else f'act_{cid}'
+
     resp = requests.get(f'{GRAPH_URL}/me/adaccounts',
                          params={'fields': 'id,name', 'access_token': access_token}, timeout=15)
     if not resp.ok:
         raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
     contas = resp.json().get('data', [])
     logger.warning('/me/adaccounts retornou %d conta(s): %s', len(contas), [c.get('id') for c in contas])
-    vistas = {c['id']: (c.get('name') or c['id']) for c in contas}
+    vistas = {_com_prefixo(c['id']): (c.get('name') or c['id']) for c in contas}
 
     resp_biz = requests.get(f'{GRAPH_URL}/me/businesses', params={'access_token': access_token}, timeout=15)
     if resp_biz.ok:
@@ -198,7 +205,8 @@ def listar_contas_anuncio(access_token):
                 lista = r.json().get('data', [])
                 logger.warning('%s (%s) retornou %d conta(s): %s', edge, biz.get('id'), len(lista), [c.get('id') for c in lista])
                 for c in lista:
-                    vistas.setdefault(c['id'], c.get('name') or c['id'])
+                    cid = _com_prefixo(c['id'])
+                    vistas.setdefault(cid, c.get('name') or cid)
     else:
         logger.warning('/me/businesses falhou: %s %s', resp_biz.status_code, resp_biz.text[:300])
 
@@ -226,6 +234,8 @@ def buscar_insights_diarios(ad_account_id, access_token, desde, ate):
         linhas.extend(body.get('data', []))
         url = body.get('paging', {}).get('next')
         params = None  # a URL de 'next' já vem com querystring completa
+    logger.warning('buscar_insights_diarios(%s, %s..%s) retornou %d linha(s)',
+                    ad_account_id, desde, ate, len(linhas))
     return linhas
 
 
