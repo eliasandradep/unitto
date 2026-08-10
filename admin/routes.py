@@ -735,6 +735,17 @@ def integracoes_meta_callback():
 
     try:
         token = meta_client.trocar_code_por_token(code)
+    except Exception as e:
+        flash(f'Não foi possível concluir a conexão: {e}', 'error')
+        return redirect(url_for('admin.integracoes'))
+
+    # A conta de anúncios usa a mesma META_REDIRECT_URI (evita cadastrar uma
+    # segunda Redirect URI no App da Meta) — o canal vem do 'state' assinado,
+    # não da URL, então despachamos aqui em vez de num endpoint próprio.
+    if canal == 'ads':
+        return _concluir_conexao_meta_ads(token)
+
+    try:
         ativos = meta_client.listar_ativos(canal, token)
     except Exception as e:
         flash(f'Não foi possível concluir a conexão: {e}', 'error')
@@ -827,31 +838,11 @@ def integracoes_meta_ads_conectar():
     return redirect(meta_client.oauth_dialog_url('ads', state))
 
 
-@admin_bp.route('/integracoes/meta-ads/callback')
-@login_required
-def integracoes_meta_ads_callback():
-    erro = request.args.get('error_description') or request.args.get('error')
-    if erro:
-        flash(f'Conexão cancelada: {erro}', 'error')
-        return redirect(url_for('admin.integracoes'))
-
-    state = request.args.get('state', '')
+def _concluir_conexao_meta_ads(token):
+    """Continuação de integracoes_meta_callback() para canal='ads' — sem rota
+    própria porque a Meta sempre redireciona para META_REDIRECT_URI, e essa
+    variável já aponta para o callback dos canais de mensagem."""
     try:
-        dados = _meta_state_serializer().loads(state, max_age=600)
-    except (BadSignature, SignatureExpired):
-        flash('Sessão de conexão expirada ou inválida. Tente novamente.', 'error')
-        return redirect(url_for('admin.integracoes'))
-
-    if dados.get('empresa_id') != g.empresa_id:
-        abort(403)
-
-    code = request.args.get('code')
-    if not code:
-        flash('Autorização da Meta incompleta.', 'error')
-        return redirect(url_for('admin.integracoes'))
-
-    try:
-        token = meta_client.trocar_code_por_token(code)
         contas = meta_client.listar_contas_anuncio(token)
     except Exception as e:
         flash(f'Não foi possível concluir a conexão: {e}', 'error')

@@ -28,7 +28,7 @@
       {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
       {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' or 'forma_pagamento' in ep %}
       {% set in_relatorios = ep == 'admin.metrics' or ep == 'admin.relatorio_comissoes' or ep == 'admin.campanhas' %}
-      {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades','admin.integracoes','admin.integracoes_meta_conectar','admin.integracoes_meta_callback','admin.integracoes_meta_desconectar','admin.integracoes_meta_ads_conectar','admin.integracoes_meta_ads_callback','admin.integracoes_meta_ads_sincronizar','admin.integracoes_meta_ads_desconectar','admin.contatos_ignorados','admin.contato_ignorado_remover'] %}
+      {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades','admin.integracoes','admin.integracoes_meta_conectar','admin.integracoes_meta_callback','admin.integracoes_meta_desconectar','admin.integracoes_meta_ads_conectar','admin.integracoes_meta_ads_sincronizar','admin.integracoes_meta_ads_desconectar','admin.contatos_ignorados','admin.contato_ignorado_remover'] %}
       {# admin.unidades redireciona para configuracoes, mantido no set para compatibilidade #}
 
       <!-- Dashboard -->
