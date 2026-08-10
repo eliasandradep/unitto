@@ -870,16 +870,23 @@ def _concluir_conexao_meta_ads(token):
     db.session.commit()
 
     from meta_ads_sync import sincronizar_conta_ads
+    falha_sync = False
+    total_linhas = 0
     for integ in IntegracaoMetaAds.query.filter_by(empresa_id=g.empresa_id, status='conectado').all():
         try:
-            sincronizar_conta_ads(integ)
+            total_linhas += sincronizar_conta_ads(integ)
         except Exception:
+            falha_sync = True
             current_app.logger.exception('Falha na primeira sincronização da conta de anúncios %s', integ.id)
 
     if conflito:
         flash('Uma das contas já está conectada a outra empresa e foi ignorada.', 'error')
+    elif falha_sync:
+        flash('Conta de anúncios conectada, mas a primeira sincronização falhou. Tente "Sincronizar agora" na tela de Integrações.', 'error')
+    elif total_linhas == 0:
+        flash('Conta de anúncios conectada. A sincronização não retornou nenhum dado de gasto para os últimos 30 dias.', 'success')
     else:
-        flash('Conta de anúncios conectada e sincronizada.', 'success')
+        flash(f'Conta de anúncios conectada e sincronizada ({total_linhas} linha(s) de gasto).', 'success')
     return redirect(url_for('admin.integracoes'))
 
 
@@ -891,8 +898,11 @@ def integracoes_meta_ads_sincronizar(integracao_id):
         abort(404)
     from meta_ads_sync import sincronizar_conta_ads
     try:
-        sincronizar_conta_ads(integ)
-        flash('Sincronizado com sucesso.', 'success')
+        total_linhas = sincronizar_conta_ads(integ)
+        if total_linhas == 0:
+            flash('Sincronizado, mas a API da Meta não retornou nenhum dado de gasto para os últimos 30 dias.', 'success')
+        else:
+            flash(f'Sincronizado com sucesso ({total_linhas} linha(s) de gasto).', 'success')
     except Exception as e:
         flash(f'Falha ao sincronizar: {e}', 'error')
     return redirect(url_for('admin.integracoes'))

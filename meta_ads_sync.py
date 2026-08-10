@@ -12,6 +12,10 @@ JANELA_DIAS = 30  # cobre atraso de atribuição da Meta e permite sincronizar 1
 
 
 def sincronizar_conta_ads(integ_ads):
+    """Retorna a quantidade de linhas de insight recebidas da API nesta sincronização
+    (não a quantidade de anúncios/dias distintos) — usado pra diagnóstico na UI, já que
+    uma sincronização 'bem-sucedida' com 0 linhas costuma indicar problema do lado da
+    Meta (permissão, access tier, conta sem gasto no período), não um bug local."""
     token = decrypt_token(integ_ads.access_token_enc)
     hoje = date.today()
     linhas = meta_client.buscar_insights_diarios(
@@ -42,3 +46,4 @@ def sincronizar_conta_ads(integ_ads):
 
     integ_ads.ultima_sincronizacao = datetime.utcnow()
     db.session.commit()
+    return len(linhas)
