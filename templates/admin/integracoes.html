@@ -86,5 +86,12 @@
   </div>
   {% endfor %}
 </div>
+{% if contas_ads %}
+<p style="margin:.6rem 0 0">
+  <a href="{{ url_for('admin.integracoes_meta_ads_conectar') }}" style="font-size:.82rem">
+    + Conectar outra conta de anúncios
+  </a>
+</p>
+{% endif %}
 
 {% endblock %}

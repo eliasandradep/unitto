@@ -171,13 +171,38 @@ def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token,
 
 
 def listar_contas_anuncio(access_token):
-    """Retorna [{'identificador_externo': 'act_...', 'nome_conta': ...}] das contas de anúncio acessíveis."""
+    """Retorna [{'identificador_externo': 'act_...', 'nome_conta': ...}] das contas de anúncio
+    acessíveis — tanto as vinculadas diretamente ao perfil pessoal (/me/adaccounts) quanto as de
+    Negócios (Business Manager) onde o usuário tem papel, sejam contas próprias (owned) ou de
+    clientes (client). Mesmo padrão de listar_ativos('whatsapp', ...): /me/adaccounts sozinho não
+    enxerga contas que só existem dentro de um Business Manager."""
     resp = requests.get(f'{GRAPH_URL}/me/adaccounts',
                          params={'fields': 'id,name', 'access_token': access_token}, timeout=15)
     if not resp.ok:
         raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
-    return [{'identificador_externo': a['id'], 'nome_conta': a.get('name') or a['id']}
-            for a in resp.json().get('data', [])]
+    contas = resp.json().get('data', [])
+    logger.warning('/me/adaccounts retornou %d conta(s): %s', len(contas), [c.get('id') for c in contas])
+    vistas = {c['id']: (c.get('name') or c['id']) for c in contas}
+
+    resp_biz = requests.get(f'{GRAPH_URL}/me/businesses', params={'access_token': access_token}, timeout=15)
+    if resp_biz.ok:
+        negocios = resp_biz.json().get('data', [])
+        logger.warning('/me/businesses retornou %d negócio(s): %s', len(negocios), [b.get('id') for b in negocios])
+        for biz in negocios:
+            for edge in ('owned_ad_accounts', 'client_ad_accounts'):
+                r = requests.get(f'{GRAPH_URL}/{biz["id"]}/{edge}',
+                                  params={'fields': 'id,name', 'access_token': access_token}, timeout=15)
+                if not r.ok:
+                    logger.warning('%s (%s) falhou: %s %s', edge, biz.get('id'), r.status_code, r.text[:300])
+                    continue
+                lista = r.json().get('data', [])
+                logger.warning('%s (%s) retornou %d conta(s): %s', edge, biz.get('id'), len(lista), [c.get('id') for c in lista])
+                for c in lista:
+                    vistas.setdefault(c['id'], c.get('name') or c['id'])
+    else:
+        logger.warning('/me/businesses falhou: %s %s', resp_biz.status_code, resp_biz.text[:300])
+
+    return [{'identificador_externo': cid, 'nome_conta': nome} for cid, nome in vistas.items()]
 
 
 def buscar_insights_diarios(ad_account_id, access_token, desde, ate):
