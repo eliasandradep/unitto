@@ -3,7 +3,7 @@ import hashlib
 import os
 import re
 
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, url_for
 
 from . import meta_webhook_bp
 from .parsers import parse_whatsapp, parse_messenger, parse_instagram
@@ -28,6 +28,34 @@ _PERGUNTA_CONTATO = (
 _PERGUNTA_SERVICO = 'Olá! Para agilizar seu atendimento, qual serviço você tem interesse?'
 _PERGUNTA_TELEFONE = 'Perfeito! Agora me diga seu nome completo e um telefone/WhatsApp para contato.'
 
+_MENU_WHATSAPP = (
+    'Olá! Bem-vindo(a) à {empresa}. Escolha uma opção:\n'
+    '1. Agendamento\n'
+    '2. Serviços\n'
+    '3. Falar com Atendente'
+)
+_SEM_MATCH_WHATSAPP = (
+    'Não entendi. Digite *1* para Agendamento, *2* para Serviços ou '
+    '*3* para falar com um atendente.'
+)
+_RE_OPCAO_ATENDENTE   = re.compile(r'(?i)^\s*3\b|atendente|humano|\bpessoa\b')
+_RE_OPCAO_AGENDAMENTO = re.compile(r'(?i)^\s*1\b|agend')
+_RE_OPCAO_SERVICOS    = re.compile(r'(?i)^\s*2\b|servi[cç]o')
+
+
+def _classificar_intent_whatsapp(texto):
+    """Classifica a mensagem numa das 3 opções do menu. 'atendente' é checado
+    primeiro de propósito: independente do sub-estado atual, o cliente sempre
+    consegue escapar pro humano digitando '3'/'atendente' a qualquer momento."""
+    texto = (texto or '').strip()
+    if _RE_OPCAO_ATENDENTE.search(texto):
+        return 'atendente'
+    if _RE_OPCAO_AGENDAMENTO.search(texto):
+        return 'agendamento'
+    if _RE_OPCAO_SERVICOS.search(texto):
+        return 'servicos'
+    return None
+
 
 _PALAVRAS_TELEFONE = re.compile(
     r'(?i)\b(telefone|tel|fone|whats\s?app|whats|numero|n[uú]mero|contato|cel|celular)\b[:\s]*')
@@ -37,6 +65,31 @@ _PREFIXOS_NOME = re.compile(r'(?i)^(meu nome é|me chamo|sou\s+(a|o)\s+)\s*')
 
 def _servicos_ativos(empresa_id):
     return [s.nome for s in Servico.query.filter_by(empresa_id=empresa_id, ativo=True).all()]
+
+
+def _servicos_bookable(empresa_id):
+    return Servico.query.filter_by(empresa_id=empresa_id, ativo=True, agendamento_online=True) \
+        .order_by(Servico.nome).all()
+
+
+def _texto_servicos_whatsapp(empresa_id):
+    servicos = _servicos_bookable(empresa_id)
+    if not servicos:
+        return 'No momento não temos serviços disponíveis para agendamento online.'
+    linhas = ['Nossos serviços:']
+    for s in servicos:
+        if s.exibir_preco_online and s.preco:
+            linhas.append(f'- {s.nome} — R$ {s.preco:.2f}'.replace('.', ','))
+        else:
+            linhas.append(f'- {s.nome}')
+    return '\n'.join(linhas)
+
+
+def _texto_atendente_whatsapp(empresa):
+    numero = empresa.whatsapp_humano_resolvido()
+    if numero:
+        return f'Você pode falar direto com um de nossos atendentes por aqui: https://wa.me/{numero}'
+    return 'Um atendente vai continuar seu atendimento por aqui em breve.'
 
 
 def _somente_digitos(texto):
@@ -258,6 +311,33 @@ def _upsert_lead(integracao, evento):
                 if lead.phone and (lead.service or not servicos):
                     lead.contato_etapa = None
                     lead.aguardando_contato = False
+        elif evento['canal'] == 'whatsapp' and lead.contato_etapa != 'transferido':
+            intent = _classificar_intent_whatsapp(evento['mensagem'])
+            try:
+                token = decrypt_token(integracao.access_token_enc)
+                if intent == 'atendente':
+                    meta_client.enviar_mensagem_whatsapp(
+                        integracao.identificador_externo, evento['external_thread_id'],
+                        _texto_atendente_whatsapp(integracao.empresa), token)
+                    lead.contato_etapa = 'transferido'
+                elif intent == 'agendamento':
+                    link = url_for('public.vitrine', slug=integracao.empresa.slug, _external=True)
+                    meta_client.enviar_mensagem_whatsapp(
+                        integracao.identificador_externo, evento['external_thread_id'],
+                        f'Agende seu horário aqui: {link}', token)
+                    lead.contato_etapa = 'wa_menu'
+                elif intent == 'servicos':
+                    meta_client.enviar_mensagem_whatsapp(
+                        integracao.identificador_externo, evento['external_thread_id'],
+                        _texto_servicos_whatsapp(integracao.empresa_id), token)
+                    lead.contato_etapa = 'wa_menu'
+                else:
+                    meta_client.enviar_mensagem_whatsapp(
+                        integracao.identificador_externo, evento['external_thread_id'],
+                        _SEM_MATCH_WHATSAPP, token)
+                    lead.contato_etapa = 'wa_menu'
+            except Exception:
+                current_app.logger.exception('Falha ao processar resposta automática de WhatsApp')
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
@@ -304,5 +384,14 @@ def _upsert_lead(integracao, evento):
             lead.aguardando_contato = True
         except Exception:
             current_app.logger.exception('Falha ao enviar pergunta automática de contato')
+    elif evento['canal'] == 'whatsapp':
+        try:
+            token = decrypt_token(integracao.access_token_enc)
+            meta_client.enviar_mensagem_whatsapp(
+                integracao.identificador_externo, evento['external_thread_id'],
+                _MENU_WHATSAPP.format(empresa=integracao.empresa.nome), token)
+            lead.contato_etapa = 'wa_menu'
+        except Exception:
+            current_app.logger.exception('Falha ao enviar menu automático de WhatsApp')
 
     db.session.commit()

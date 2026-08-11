@@ -106,6 +106,7 @@ def listar_ativos(canal, access_token):
                         ativos.append({
                             'identificador_externo': num['id'],
                             'nome_conta': num.get('verified_name') or num.get('display_phone_number') or num['id'],
+                            'numero_whatsapp': num.get('display_phone_number'),
                         })
         return ativos
 
@@ -164,6 +165,25 @@ def enviar_mensagem(identificador_externo, destinatario_id, texto, access_token,
         f'{GRAPH_URL}/{identificador_externo}/messages',
         params={'access_token': access_token},
         json={'recipient': {'id': destinatario_id}, 'message': payload_msg},
+        timeout=10,
+    )
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+
+
+def enviar_mensagem_whatsapp(identificador_externo, destinatario_wa_id, texto, access_token):
+    """Envia mensagem de texto via WhatsApp Cloud API. Payload incompatível com o
+    Send API do Messenger/Instagram (enviar_mensagem) — por isso é uma função
+    separada, não um parâmetro a mais. Best-effort — quem chama trata a exceção."""
+    resp = requests.post(
+        f'{GRAPH_URL}/{identificador_externo}/messages',
+        params={'access_token': access_token},
+        json={
+            'messaging_product': 'whatsapp',
+            'to': destinatario_wa_id,
+            'type': 'text',
+            'text': {'body': texto},
+        },
         timeout=10,
     )
     if not resp.ok:

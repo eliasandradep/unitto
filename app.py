@@ -444,6 +444,9 @@ with app.app_context():
     _pg = 'postgresql' in db.engine.url.drivername
     _safe_add_col('empresas',      'logo_data', 'BYTEA' if _pg else 'BLOB')
     _safe_add_col('empresas',      'logo_mime', 'VARCHAR(50)')
+    _safe_add_col('empresas',        'whatsapp_automacao', 'VARCHAR(20)')
+    _safe_add_col('empresas',        'whatsapp_humano',    'VARCHAR(20)')
+    _safe_add_col('integracoes_meta','numero_whatsapp',    'VARCHAR(30)')
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")
     _safe_add_col('profissionais', 'agendamento_online',

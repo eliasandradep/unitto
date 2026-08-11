@@ -6,6 +6,15 @@
   <p class="pub-hero__sub">Escolha um serviço para agendar seu horário.</p>
 </section>
 
+{% set wa = empresa.whatsapp_automacao_resolvido() %}
+{% if wa %}
+<div style="text-align:center;margin-bottom:1.5rem">
+  <a href="https://wa.me/{{ wa }}" target="_blank" rel="noopener" class="pub-btn pub-btn--secondary">
+    Fale conosco no WhatsApp
+  </a>
+</div>
+{% endif %}
+
 {% if motivo_indisponivel == 'inativa' %}
 <div class="pub-notice">
   Esta página está temporariamente indisponível para agendamentos online.

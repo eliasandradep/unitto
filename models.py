@@ -1,3 +1,4 @@
+import re
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -65,6 +66,8 @@ class Empresa(db.Model):
     trial_ends_at = db.Column(db.Date,        nullable=True)
     telefone      = db.Column(db.String(20))
     email         = db.Column(db.String(120))
+    whatsapp_automacao = db.Column(db.String(20))  # fallback manual — só usado quando não há IntegracaoMeta whatsapp conectada
+    whatsapp_humano    = db.Column(db.String(20))  # nunca exibido publicamente; só enviado no handoff do bot
     logo_url      = db.Column(db.String(250))
     logo_data     = db.Column(db.LargeBinary)
     logo_mime     = db.Column(db.String(50))
@@ -113,6 +116,28 @@ class Empresa(db.Model):
         """Máximo de profissionais ativos permitido pelo plano. None = sem limite (trial)."""
         plano = self.get_plano()
         return plano.max_profissionais if plano else None
+
+    @staticmethod
+    def _normalizar_whatsapp(numero):
+        """BR-first, mesma convenção implícita do resto do app (templates/admin/clientes.html
+        e outros já hardcodam prefixo '55' na hora de montar o link wa.me): números com até
+        11 dígitos (DDD+número, sem DDI) recebem '55'; números mais longos (ex:
+        display_phone_number da Meta, que já vem com DDI) são mantidos como estão."""
+        digitos = re.sub(r'\D', '', numero or '')
+        if not digitos:
+            return None
+        return digitos if len(digitos) > 11 else f'55{digitos}'
+
+    def whatsapp_automacao_resolvido(self):
+        """Prioriza a IntegracaoMeta de whatsapp conectada; cai pro campo manual
+        quando não há integração (ou está sem numero_whatsapp)."""
+        for integ in self.integracoes_meta:
+            if integ.canal == 'whatsapp' and integ.status == 'conectado' and integ.numero_whatsapp:
+                return self._normalizar_whatsapp(integ.numero_whatsapp)
+        return self._normalizar_whatsapp(self.whatsapp_automacao)
+
+    def whatsapp_humano_resolvido(self):
+        return self._normalizar_whatsapp(self.whatsapp_humano)
 
 
 class Plano(db.Model):
@@ -201,6 +226,7 @@ class IntegracaoMeta(db.Model):
     canal                 = db.Column(db.String(20), nullable=False)  # whatsapp|instagram|messenger
     identificador_externo = db.Column(db.String(100), nullable=False)  # phone_number_id | page_id
     nome_conta            = db.Column(db.String(150))
+    numero_whatsapp       = db.Column(db.String(30))  # display_phone_number da Meta (só canal='whatsapp'); nome_conta é o nome do negócio, não o número
     access_token_enc      = db.Column(db.Text, nullable=False)
     status                = db.Column(db.String(20), default='conectado')  # conectado|erro|desconectado
     conectado_em          = db.Column(db.DateTime, default=datetime.utcnow)
@@ -361,7 +387,9 @@ class Lead(db.Model):
     external_thread_id = db.Column(db.String(100))
     integracao_id      = db.Column(db.Integer, db.ForeignKey('integracoes_meta.id'), nullable=True)
     aguardando_contato = db.Column(db.Boolean, default=False)
-    contato_etapa      = db.Column(db.String(20), nullable=True)  # 'servico'|'telefone'|'tudo'|None
+    contato_etapa      = db.Column(db.String(20), nullable=True)
+    # messenger/instagram (requer aguardando_contato=True): 'servico'|'telefone'|'tudo'
+    # whatsapp: 'wa_menu'|'transferido'|None
     ad_id              = db.Column(db.String(50))   # referral.ad_id da Meta — casa com AnuncioMeta.ad_id quando sincronizado
     ad_title           = db.Column(db.String(200))  # snapshot do título do anúncio no momento do clique
 

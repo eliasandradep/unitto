@@ -628,6 +628,11 @@ def configuracoes():
             if nome:
                 empresa.nome = nome
 
+            whatsapp_automacao = request.form.get('whatsapp_automacao', '').strip()
+            empresa.whatsapp_automacao = whatsapp_automacao or None
+            whatsapp_humano = request.form.get('whatsapp_humano', '').strip()
+            empresa.whatsapp_humano = whatsapp_humano or None
+
             logo_file = request.files.get('logo')
             if logo_file and logo_file.filename:
                 if empresa.plano not in ('trial', 'free'):
@@ -689,11 +694,13 @@ def configuracoes():
     birthday_message  = _get_setting('birthday_message', _DEFAULT_BIRTHDAY_MSG)
     todas_unidades    = tq(Unidade).order_by(Unidade.nome).all()
     logo_habilitado   = empresa and empresa.plano not in ('trial', 'free')
+    integracao_whatsapp = tq(IntegracaoMeta).filter_by(canal='whatsapp', status='conectado').first()
 
     return render_template('admin/configuracoes.html',
         birthday_message=birthday_message,
         unidades=todas_unidades,
         logo_habilitado=logo_habilitado,
+        integracao_whatsapp=integracao_whatsapp,
     )
 
 
@@ -784,6 +791,7 @@ def integracoes_meta_callback():
             db.session.add(integ)
         integ.empresa_id = g.empresa_id
         integ.nome_conta = ativo['nome_conta']
+        integ.numero_whatsapp = ativo.get('numero_whatsapp')
         # Messenger/Instagram exigem o Page Access Token (retornado por conta em
         # /me/accounts) para o Send API — o token de usuário trocado acima só
         # serve para listar as contas, não para enviar mensagens em nome delas.
