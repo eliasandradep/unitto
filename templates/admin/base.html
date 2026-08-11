@@ -243,6 +243,8 @@
 
   </aside>
 
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <main class="admin-main" id="adminMain">
     <header class="admin-topbar">
       <div class="admin-topbar__left">
@@ -383,6 +385,8 @@
   const GRP_KEY = 'rrbc_sidebar_grps';
   const body    = document.body;
   const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const mqMobile = window.matchMedia('(max-width: 700px)');
 
   function setCollapsed(on) {
     body.classList.toggle('sidebar--collapsed', on);
@@ -394,10 +398,22 @@
     });
   }
 
-  function toggle() { setCollapsed(!body.classList.contains('sidebar--collapsed')); }
+  function setMobileOpen(on) { body.classList.toggle('sidebar--mobile-open', on); }
+
+  function toggle() {
+    if (mqMobile.matches) {
+      setMobileOpen(!body.classList.contains('sidebar--mobile-open'));
+    } else {
+      setCollapsed(!body.classList.contains('sidebar--collapsed'));
+    }
+  }
 
   document.getElementById('sidebarToggle')?.addEventListener('click', toggle);
   document.getElementById('topbarToggle')?.addEventListener('click', toggle);
+  overlay?.addEventListener('click', () => setMobileOpen(false));
+  sidebar.querySelectorAll('a[href]:not([href^="javascript"])').forEach(function (a) {
+    a.addEventListener('click', function () { if (mqMobile.matches) setMobileOpen(false); });
+  });
 
   // Restore saved collapse state (no transition flash)
   if (localStorage.getItem(KEY) === '1') {

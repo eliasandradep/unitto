@@ -194,6 +194,8 @@ body.sidebar--collapsed .sidebar__nav {
 .admin-main {
   margin-left: var(--sidebar-w);
   flex: 1;
+  min-width: 0; /* sem isso, o item flex nunca encolhe abaixo do min-content dos
+                   filhos (tabelas/toolbar largos) e a página inteira vaza no mobile */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -942,6 +944,22 @@ body.sidebar--collapsed .sidebar__nav {
 }
 @media (max-width: 700px) {
   .check-group { grid-template-columns: 1fr; }
+
+  /* Tabelas largas (Serviços, Profissionais, Clientes...) vazavam da tela
+     sem nenhuma forma de rolar até as colunas cortadas — em vez de espremer
+     o conteúdo, deixa o cartão rolar horizontalmente. !important necessário:
+     a maioria dos templates usa <div class="card" style="overflow:hidden">
+     inline (para arredondar cantos sobre o cabeçalho da tabela). */
+  .card:has(> .data-table), .card:has(> .admin-table) { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .data-table, .admin-table { min-width: 480px; }
+
+  .toolbar__search { min-width: 0; flex: 1 1 100%; }
+  .toolbar__select { min-width: 0; flex: 1 1 45%; }
+
+  /* Grids com colunas fixas em px/fr (inline, style="grid-template-columns:...")
+     não encolhem sozinhas no mobile — telas com cards de resumo/gráfico
+     (ex: Financeiro) viram uma única coluna abaixo de 700px. */
+  .fin-summary-grid, .fin-chart-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ── Sidebar colapsada ───────────────────────────────────── */
@@ -988,14 +1006,29 @@ body.sidebar--collapsed .sidebar__nav a:hover::after { opacity: 1; }
   .detail-grid   { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
-  .sidebar { width: var(--sidebar-w-col) !important; }
-  .sidebar__brand-text, .sidebar__nav-label,
-  .sidebar__footer { display: none !important; }
-  .admin-main { margin-left: var(--sidebar-w-col) !important; }
-  .sidebar__nav a { justify-content: center !important; padding: .8rem !important; gap: 0 !important; }
-  .sidebar__brand { justify-content: center !important; }
+  /* No mobile o sidebar vira uma gaveta (drawer) fora da tela por padrão —
+     sem isso os grupos de menu (Agenda, Financeiro, Clientes...) ficam
+     permanentemente inacessíveis, já que abrem via clique/toque, não hover. */
+  .sidebar {
+    width: var(--sidebar-w) !important;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    z-index: 300;
+  }
+  body.sidebar--mobile-open .sidebar { transform: translateX(0); }
+
+  .admin-main { margin-left: 0 !important; }
+  .sidebar__brand { justify-content: flex-start !important; }
   .sidebar__collapse-btn { display: none; }
-  .topbar-menu-btn { display: none; }
+  .topbar-menu-btn { display: inline-flex; }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 250;
+  }
+  body.sidebar--mobile-open .sidebar-overlay { display: block; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1087,12 +1120,11 @@ body.sidebar--collapsed .snav-link[data-tooltip]::after {
 body.sidebar--collapsed .snav-group-btn[data-tooltip]:hover::after,
 body.sidebar--collapsed .snav-link[data-tooltip]:hover::after { opacity: 1; }
 
-/* Mobile: sempre como se colapsado */
+/* Mobile: sidebar abre como gaveta com o mesmo visual "expandido" do desktop —
+   grupos (.snav-group-items) continuam controlados por .snav-group--open,
+   permitindo abrir/fechar Agenda/Financeiro/Clientes/etc. normalmente. */
 @media (max-width: 700px) {
-  .snav-label, .snav-chevron { display: none !important; }
-  .snav-group-btn { justify-content: center !important; padding: .7rem !important; gap: 0 !important; }
-  .snav-link { justify-content: center !important; padding: .7rem !important; gap: 0 !important; }
-  .snav-group-items { display: none !important; }
+  .snav-group-btn, .snav-link { padding: .7rem 1.2rem !important; }
 }
 
 /* ════════════════════════════════════════════════════════════
