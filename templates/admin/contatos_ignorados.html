@@ -6,7 +6,7 @@
 
 <div class="toolbar">
   <p class="empty-state" style="margin:0">
-    Contatos marcados como pessoais no Instagram/Messenger/WhatsApp — mensagens futuras dessa pessoa não geram Lead automaticamente.
+    Contatos marcados como pessoais ou spam no Instagram/Messenger/WhatsApp — mensagens futuras dessa pessoa não geram Lead automaticamente.
   </p>
 </div>
 
@@ -17,6 +17,7 @@
       <tr>
         <th>Canal</th>
         <th>Identificador</th>
+        <th>Motivo</th>
         <th>Ignorado em</th>
         <th></th>
       </tr>
@@ -26,6 +27,7 @@
       <tr>
         <td><span class="badge badge--source-{{ c.canal }}">{{ c.canal_label() }}</span></td>
         <td>{{ c.external_thread_id }}</td>
+        <td><span class="badge {% if c.motivo == 'spam' %}badge--perdido{% else %}badge--convertido{% endif %}">{{ c.motivo_label() }}</span></td>
         <td>{{ c.criado_em.strftime('%d/%m/%Y %H:%M') if c.criado_em else '—' }}</td>
         <td>
           <form method="POST" action="{{ url_for('admin.contato_ignorado_remover', id=c.id) }}"
@@ -42,7 +44,7 @@
 </div>
 {% else %}
 <div class="card">
-  <p class="empty-state">Nenhum contato marcado como pessoal ainda.</p>
+  <p class="empty-state">Nenhum contato ignorado ainda.</p>
 </div>
 {% endif %}
 

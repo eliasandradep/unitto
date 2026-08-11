@@ -213,14 +213,18 @@ class IntegracaoMeta(db.Model):
         return dict(META_CANAIS).get(self.canal, self.canal)
 
 
+MOTIVOS_IGNORADO = [('pessoal', 'Contato pessoal'), ('spam', 'Spam')]
+
+
 class ContatoIgnorado(db.Model):
-    """Contato de Instagram/Messenger/WhatsApp marcado como pessoal — mensagens
-    futuras dessa pessoa não geram Lead nem disparam a automação de coleta."""
+    """Contato de Instagram/Messenger/WhatsApp marcado como pessoal ou spam —
+    mensagens futuras dessa pessoa não geram Lead nem disparam a automação de coleta."""
     __tablename__ = 'contatos_ignorados'
     id                 = db.Column(db.Integer, primary_key=True)
     empresa_id         = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
     canal              = db.Column(db.String(20), nullable=False)
     external_thread_id = db.Column(db.String(100), nullable=False)
+    motivo             = db.Column(db.String(20), nullable=False, default='pessoal')
     criado_em          = db.Column(db.DateTime, default=datetime.utcnow)
     criado_por_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     empresa            = db.relationship('Empresa')
@@ -229,6 +233,9 @@ class ContatoIgnorado(db.Model):
 
     def canal_label(self):
         return dict(META_CANAIS).get(self.canal, self.canal)
+
+    def motivo_label(self):
+        return dict(MOTIVOS_IGNORADO).get(self.motivo, self.motivo)
 
 
 class IntegracaoMetaAds(db.Model):

@@ -22,6 +22,7 @@ _SKIP_SUBSCRIPTION_CHECK = frozenset({
 _ADMIN_ONLY_ENDPOINTS = frozenset({
     'dashboard',
     'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete', 'lead_marcar_pessoal',
+    'lead_marcar_spam',
     'users', 'user_new', 'user_edit', 'user_delete',
     'metrics',
     'configuracoes',

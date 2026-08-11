@@ -492,6 +492,7 @@ with app.app_context():
     _safe_widen_col('leads', 'service', 'VARCHAR(150)')
     _safe_add_col('leads',                'ad_id', 'VARCHAR(50)')
     _safe_add_col('leads',                'ad_title', 'VARCHAR(200)')
+    _safe_add_col('contatos_ignorados',   'motivo', "VARCHAR(20) DEFAULT 'pessoal'")
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)

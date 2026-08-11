@@ -350,10 +350,7 @@ def lead_delete(lead_id):
     return redirect(url_for('admin.leads'))
 
 
-@admin_bp.route('/leads/<int:lead_id>/marcar-pessoal', methods=['POST'])
-@login_required
-def lead_marcar_pessoal(lead_id):
-    lead = db.get_or_404(Lead, lead_id)
+def _ignorar_lead(lead, motivo):
     if lead.integracao_id and lead.external_thread_id:
         ja_existe = ContatoIgnorado.query.filter_by(
             empresa_id=lead.empresa_id, canal=lead.integracao.canal,
@@ -363,10 +360,29 @@ def lead_marcar_pessoal(lead_id):
             # (g.empresa_id pode não bater com o dono do lead, ex: saas_admin sem tenant fixo)
             db.session.add(ContatoIgnorado(
                 empresa_id=lead.empresa_id, canal=lead.integracao.canal,
-                external_thread_id=lead.external_thread_id, criado_por_user_id=current_user.id))
+                external_thread_id=lead.external_thread_id, motivo=motivo,
+                criado_por_user_id=current_user.id))
+        elif ja_existe.motivo != motivo:
+            ja_existe.motivo = motivo
     db.session.delete(lead)
     db.session.commit()
+
+
+@admin_bp.route('/leads/<int:lead_id>/marcar-pessoal', methods=['POST'])
+@login_required
+def lead_marcar_pessoal(lead_id):
+    lead = db.get_or_404(Lead, lead_id)
+    _ignorar_lead(lead, 'pessoal')
     flash('Contato marcado como pessoal. Mensagens futuras dessa pessoa não vão gerar Lead até você desfazer isso em Configurar → Contatos ignorados.', 'success')
+    return redirect(url_for('admin.leads'))
+
+
+@admin_bp.route('/leads/<int:lead_id>/marcar-spam', methods=['POST'])
+@login_required
+def lead_marcar_spam(lead_id):
+    lead = db.get_or_404(Lead, lead_id)
+    _ignorar_lead(lead, 'spam')
+    flash('Lead marcado como spam. Novos contatos dessa mesma pessoa não vão mais gerar Lead até você desfazer isso em Configurar → Contatos ignorados.', 'success')
     return redirect(url_for('admin.leads'))
 
 
