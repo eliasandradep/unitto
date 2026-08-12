@@ -39,6 +39,30 @@ def index():
     return redirect(url_for('admin.dashboard'))
 
 
+def _buscar_user_por_login(identificador):
+    """Aceita usuário, CPF ou telefone no mesmo campo. Usuário é o único
+    identificador único de verdade no banco (email/telefone não têm
+    constraint de unicidade), então CPF e telefone comparam dígito a dígito
+    (ignorando pontuação/DDI) em vez de query direta."""
+    identificador = (identificador or '').strip()
+    if not identificador:
+        return None
+    user = User.query.filter(db.func.lower(User.username) == identificador.lower()).first()
+    if user:
+        return user
+    digitos = re.sub(r'\D', '', identificador)
+    if len(digitos) == 11:  # CPF e celular com DDD têm o mesmo tamanho — tenta CPF primeiro
+        for u in User.query.filter(User.cpf.isnot(None)).all():
+            if re.sub(r'\D', '', u.cpf) == digitos:
+                return u
+    if len(digitos) >= 8:
+        alvo = digitos[-8:]
+        for u in User.query.filter(User.phone.isnot(None)).all():
+            if re.sub(r'\D', '', u.phone)[-8:] == alvo:
+                return u
+    return None
+
+
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -50,9 +74,9 @@ def login():
         return redirect(url_for('admin.setup'))
 
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        identificador = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+        user = _buscar_user_por_login(identificador)
         if user and user.is_active and user.check_password(password):
             login_user(user)
             if user.role == 'saas_admin':
@@ -61,7 +85,7 @@ def login():
             if not is_administrador():
                 return redirect(url_for('admin.agenda'))
             return redirect(url_for('admin.dashboard'))
-        flash('Usuário ou senha incorretos.', 'error')
+        flash('Usuário, CPF, telefone ou senha incorretos.', 'error')
 
     return render_template('admin/login.html')
 
@@ -406,6 +430,7 @@ def user_new():
         username = request.form.get('username', '').strip()
         email    = request.form.get('email', '').strip()
         phone    = request.form.get('phone', '').strip()
+        cpf      = request.form.get('cpf', '').strip()
         password = request.form.get('password', '')
         confirm  = request.form.get('confirm', '')
 
@@ -421,8 +446,10 @@ def user_new():
             flash('Nome de usuário já em uso.', 'error')
         elif User.query.filter_by(email=email).first():
             flash('E-mail já cadastrado.', 'error')
+        elif cpf and User.query.filter_by(cpf=cpf).first():
+            flash('CPF já cadastrado para outro usuário.', 'error')
         else:
-            user = User(name=name, username=username, email=email, phone=phone)
+            user = User(name=name, username=username, email=email, phone=phone, cpf=cpf or None)
             user.role = requested_role
             user.set_password(password)
             db.session.add(user)
@@ -443,11 +470,13 @@ def user_edit(user_id):
         username = request.form.get('username', '').strip()
         email    = request.form.get('email', '').strip()
         phone    = request.form.get('phone', '').strip()
+        cpf      = request.form.get('cpf', '').strip()
         password = request.form.get('password', '')
         confirm  = request.form.get('confirm', '')
 
         dup_u = User.query.filter(User.username == username, User.id != user_id).first()
         dup_e = User.query.filter(User.email == email,    User.id != user_id).first()
+        dup_c = cpf and User.query.filter(User.cpf == cpf, User.id != user_id).first()
 
         if not all([name, username, email]):
             flash('Nome, usuário e e-mail são obrigatórios.', 'error')
@@ -455,6 +484,8 @@ def user_edit(user_id):
             flash('Nome de usuário já em uso.', 'error')
         elif dup_e:
             flash('E-mail já cadastrado.', 'error')
+        elif dup_c:
+            flash('CPF já cadastrado para outro usuário.', 'error')
         else:
             requested_role = request.form.get('role', user.role)
             if requested_role == 'saas_admin' and current_user.role != 'saas_admin':
@@ -465,6 +496,7 @@ def user_edit(user_id):
             user.username = username
             user.email    = email
             user.phone    = phone
+            user.cpf      = cpf or None
             if current_user.has_role('empresa_admin', 'saas_admin'):
                 user.role = requested_role
             if password:
@@ -1526,6 +1558,13 @@ def _save_profissional(p):
                 flash(f'Nome de usuário "{novo_username}" já está em uso.', 'error')
             else:
                 p.user.username = novo_username
+        novo_cpf = request.form.get('cpf', '').strip()
+        if novo_cpf != (p.user.cpf or ''):
+            conflito_cpf = novo_cpf and User.query.filter(User.cpf == novo_cpf, User.id != p.user.id).first()
+            if conflito_cpf:
+                flash(f'CPF "{novo_cpf}" já está em uso por outro usuário.', 'error')
+            else:
+                p.user.cpf = novo_cpf or None
     return True
 
 

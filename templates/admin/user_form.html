@@ -21,6 +21,12 @@
     <div class="form-group">
       <label>Telefone para contato</label>
       <input type="tel" name="phone" value="{{ user.phone if user else '' }}" />
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Pode ser usado para login, além do usuário.</p>
+    </div>
+    <div class="form-group">
+      <label>CPF</label>
+      <input type="text" name="cpf" id="cpfInput" value="{{ user.cpf if user else '' }}" placeholder="000.000.000-00" maxlength="14" />
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional. Pode ser usado para login, além do usuário.</p>
     </div>
     <div class="form-group">
       <label>{{ 'Nova senha' if user else 'Senha' }} {% if not user %}<span class="required">*</span>{% endif %}</label>
@@ -51,4 +57,14 @@
     </div>
   </form>
 </div>
+
+<script>
+document.getElementById('cpfInput')?.addEventListener('input', function() {
+  let v = this.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d+)/, '$1.$2');
+  this.value = v;
+});
+</script>
 {% endblock %}

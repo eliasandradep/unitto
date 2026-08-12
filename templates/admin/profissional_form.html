@@ -183,6 +183,12 @@
               <input type="text" name="username" value="{{ p.user.username if p.user else '' }}"
                      placeholder="nome.usuario" autocomplete="off" />
             </div>
+            <div class="form-group">
+              <label>CPF</label>
+              <input type="text" name="cpf" id="cpfInput" value="{{ p.user.cpf if p.user else '' }}"
+                     placeholder="000.000.000-00" maxlength="14" autocomplete="off" />
+              <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional. Pode ser usado para login, junto com o usuário e o telefone.</p>
+            </div>
             <p style="font-size:.78rem;color:var(--text-muted);margin:.4rem 0 1rem;line-height:1.4">
               Login {{ 'ativo' if p.ativo else 'inativo (profissional marcado como inativo)' }}.
               {% if p.user and p.user.password_hash %}Senha já definida.{% else %}Senha ainda não gerada — o profissional não consegue acessar até que uma senha seja gerada.{% endif %}
@@ -432,6 +438,14 @@ document.querySelectorAll('.ptab-btn').forEach(function(btn) {
 });
 
 // ── Acesso ao Sistema ──────────────────────────────────────────────────────
+document.getElementById('cpfInput')?.addEventListener('input', function() {
+  let v = this.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d+)/, '$1.$2');
+  this.value = v;
+});
+
 function gerarSenha() {
   if (!_PROF_ID) return;
   if (!confirm('Gerar uma nova senha de acesso? A senha atual (se houver) deixará de funcionar.')) return;
