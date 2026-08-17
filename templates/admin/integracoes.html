@@ -94,4 +94,43 @@
 </p>
 {% endif %}
 
+<h3 style="font-size:1rem;margin:1.6rem 0 .4rem">Captura de leads pelo site do cliente</h3>
+<p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1.2rem">
+  Capture leads direto do{% if empresa and empresa.website %} <a href="{{ empresa.website }}" target="_blank" rel="noopener">site do cliente</a>{% else %} site do cliente{% endif %}
+  (cadastre o site em Configurações → Perfil da Empresa) colando o widget abaixo, ou integrando com um formulário próprio via o endpoint para desenvolvedores.
+</p>
+
+<div class="card" style="padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem">
+  <span style="font-weight:600;font-size:.95rem">Widget (uso recomendado)</span>
+  <p style="font-size:.82rem;color:var(--text-muted);margin:0">
+    Cole esta linha em qualquer página do site do cliente (antes do fechamento de <code>&lt;/body&gt;</code>).
+    Ela adiciona um botão flutuante "Fale conosco" com um mini-formulário, incluindo a lista de serviços disponíveis.
+  </p>
+  <pre id="lw-snippet" style="background:#F8F9FA;border:1px solid var(--border);border-radius:var(--radius);
+              padding:.7rem .9rem;font-size:.78rem;overflow-x:auto;margin:0"><code>&lt;script src="https://{{ base_domain }}/static/js/lead-widget.js" data-slug="{{ empresa.slug }}" async&gt;&lt;/script&gt;</code></pre>
+  <button type="button" class="btn-secondary" style="width:100%"
+          onclick="navigator.clipboard.writeText(document.getElementById('lw-snippet').innerText).then(()=>{this.textContent='Copiado!';setTimeout(()=>{this.textContent='Copiar código';},1500);})">
+    Copiar código
+  </button>
+</div>
+
+<details class="card" style="padding:1.1rem 1.2rem">
+  <summary style="font-weight:600;font-size:.95rem;cursor:pointer">Para desenvolvedores (endpoint cru)</summary>
+  <div style="margin-top:.8rem;display:flex;flex-direction:column;gap:.5rem;font-size:.82rem;color:var(--text-muted)">
+    <p style="margin:0">
+      Prefere plugar num formulário de contato já existente no site? Aponte o <code>action</code> dele para:
+    </p>
+    <pre style="background:#F8F9FA;border:1px solid var(--border);border-radius:var(--radius);
+                padding:.7rem .9rem;font-size:.78rem;overflow-x:auto;margin:0"><code>POST https://{{ base_domain }}/{{ empresa.slug }}/lead-capture</code></pre>
+    <p style="margin:0">Campos aceitos (todos como <code>application/x-www-form-urlencoded</code>):</p>
+    <ul style="margin:0;padding-left:1.2rem">
+      <li><code>nome</code> — obrigatório</li>
+      <li><code>telefone</code> — obrigatório</li>
+      <li><code>servico</code> — opcional</li>
+      <li><code>mensagem</code> — opcional</li>
+      <li><code>_redirect</code> — opcional, URL para onde redirecionar após o envio (formulário sem JavaScript)</li>
+    </ul>
+  </div>
+</details>
+
 {% endblock %}

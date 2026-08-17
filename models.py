@@ -23,6 +23,7 @@ LEAD_SOURCES = [
     ('whatsapp_meta','WhatsApp (auto)'),
     ('instagram',    'Instagram Direct'),
     ('messenger',    'Messenger'),
+    ('site',         'Site do Cliente'),
 ]
 
 META_CANAIS = [
@@ -66,6 +67,7 @@ class Empresa(db.Model):
     trial_ends_at = db.Column(db.Date,        nullable=True)
     telefone      = db.Column(db.String(20))
     email         = db.Column(db.String(120))
+    website       = db.Column(db.String(250))  # site do cliente — informativo, usado na tela de Integrações
     whatsapp_automacao = db.Column(db.String(20))  # fallback manual — só usado quando não há IntegracaoMeta whatsapp conectada
     whatsapp_humano    = db.Column(db.String(20))  # nunca exibido publicamente; só enviado no handoff do bot
     logo_url      = db.Column(db.String(250))

@@ -352,6 +352,7 @@ body.sidebar--collapsed .sidebar__nav {
 .badge--source-whatsapp_meta { background: #E9F7EF; color: #1A7A42; }
 .badge--source-instagram    { background: #FDEDF3; color: #B0248A; }
 .badge--source-messenger    { background: #EBF0FE; color: #3557DB; }
+.badge--source-site         { background: #FEF5E7; color: #B9770E; }
 
 /* ── Forms ───────────────────────────────────────────────── */
 .form-group { margin-bottom: 1rem; }

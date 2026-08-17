@@ -2,7 +2,7 @@ from datetime import date, time
 
 from flask import render_template, request, redirect, url_for, jsonify, abort, flash, g
 
-from models import db, Servico, Agendamento
+from models import db, Servico, Agendamento, Lead
 from admin.tenant import tq
 
 from . import public_bp
@@ -138,3 +138,67 @@ def confirmado(slug, agendamento_id):
     if not agendamento:
         abort(404)
     return render_template('public/confirmado.html', empresa=g.empresa, agendamento=agendamento)
+
+
+@public_bp.route('/<slug>/servicos.json')
+def servicos_json(slug):
+    """Lista de serviços para popular o <select> do widget de captura de leads
+    (static/js/lead-widget.js), embutido no site externo do cliente."""
+    empresa = g.empresa
+    nomes = []
+    if empresa.is_ativa():
+        nomes = [s.nome for s in tq(Servico).filter_by(ativo=True, agendamento_online=True)
+                 .order_by(Servico.nome).all()]
+    resp = jsonify(servicos=nomes)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+@public_bp.route('/<slug>/lead-capture', methods=['POST'])
+def lead_capture(slug):
+    """Cria um Lead a partir do site externo do cliente — via widget (fetch,
+    Accept: application/json) ou via um <form> cru apontando o action pra cá
+    (navegação normal, sem CORS envolvido)."""
+    empresa = g.empresa
+    quer_json = 'application/json' in (request.headers.get('Accept') or '')
+
+    def _responder(ok, erro=None, status=200):
+        if quer_json:
+            resp = jsonify(ok=ok, erro=erro)
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            return resp, status
+        redirect_to = request.form.get('_redirect', '').strip()
+        if ok:
+            if redirect_to.startswith(('http://', 'https://')):
+                return redirect(redirect_to)
+            return redirect(url_for('public.lead_capture_obrigado', slug=slug))
+        flash(erro or 'Não foi possível enviar. Tente novamente.', 'error')
+        return redirect(redirect_to if redirect_to.startswith(('http://', 'https://'))
+                         else request.referrer or url_for('public.vitrine', slug=slug))
+
+    if not empresa.is_ativa():
+        return _responder(False, 'Indisponível no momento.', 404)
+
+    # honeypot anti-spam: campo invisível no widget — bot preenche, humano não
+    if (request.form.get('assunto') or '').strip():
+        return _responder(True)  # finge sucesso, não grava nada
+
+    nome     = request.form.get('nome', '').strip()
+    telefone = request.form.get('telefone', '').strip()
+    if not nome or not telefone:
+        return _responder(False, 'Preencha nome e telefone.', 400)
+
+    lead = Lead(
+        name=nome, phone=telefone,
+        service=request.form.get('servico', '').strip() or None,
+        message=request.form.get('mensagem', '').strip() or None,
+        source='site', status='novo', empresa_id=empresa.id,
+    )
+    db.session.add(lead)
+    db.session.commit()
+    return _responder(True)
+
+
+@public_bp.route('/<slug>/lead-capture/obrigado')
+def lead_capture_obrigado(slug):
+    return render_template('public/lead_obrigado.html', empresa=g.empresa)

@@ -1,0 +1,12 @@
+{% extends 'public/_base.html' %}
+
+{% block content %}
+<div class="pub-confirm">
+  <div class="pub-confirm__icon">&#10003;</div>
+  <h1>Obrigado!</h1>
+  <p class="pub-confirm__contact">
+    Recebemos sua mensagem. {{ empresa.nome }} vai entrar em contato em breve.
+  </p>
+  <a href="{{ url_for('public.vitrine', slug=empresa.slug) }}" class="pub-btn pub-btn--secondary">Voltar ao site</a>
+</div>
+{% endblock %}

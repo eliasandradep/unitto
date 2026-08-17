@@ -71,6 +71,15 @@
       </p>
     </div>
 
+    <div class="form-group">
+      <label>Site do cliente</label>
+      <input type="text" name="website" value="{{ empresa.website if empresa else '' }}"
+             placeholder="https://www.exemplo.com.br" />
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+        Usado apenas como referência na tela de Integrações, ao lado do código do widget de captura de leads.
+      </p>
+    </div>
+
     {# Logo ── só visível para planos pagos #}
     <div class="form-group">
       <label>Logomarca</label>

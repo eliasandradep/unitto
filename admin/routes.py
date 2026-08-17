@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from . import admin_bp
-from .tenant import tq, get_setting, save_setting
+from .tenant import tq, get_setting, save_setting, BASE_DOMAIN
 from .auth import require_role
 from .permissions import (agenda_scope, comissoes_scope, financeiro_scope,
                            current_profissional, is_administrador)
@@ -664,6 +664,8 @@ def configuracoes():
             empresa.whatsapp_automacao = whatsapp_automacao or None
             whatsapp_humano = request.form.get('whatsapp_humano', '').strip()
             empresa.whatsapp_humano = whatsapp_humano or None
+            website = request.form.get('website', '').strip()
+            empresa.website = website or None
 
             logo_file = request.files.get('logo')
             if logo_file and logo_file.filename:
@@ -748,7 +750,8 @@ def integracoes():
     conexoes = {c.canal: c for c in tq(IntegracaoMeta).filter_by(status='conectado').all()}
     contas_ads = tq(IntegracaoMetaAds).filter_by(status='conectado').all()
     return render_template('admin/integracoes.html', canais=META_CANAIS, conexoes=conexoes,
-                            meta_configurado=meta_client.configurado(), contas_ads=contas_ads)
+                            meta_configurado=meta_client.configurado(), contas_ads=contas_ads,
+                            base_domain=BASE_DOMAIN)
 
 
 @admin_bp.route('/integracoes/meta/conectar/<canal>')

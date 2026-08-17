@@ -446,6 +446,7 @@ with app.app_context():
     _safe_add_col('empresas',      'logo_mime', 'VARCHAR(50)')
     _safe_add_col('empresas',        'whatsapp_automacao', 'VARCHAR(20)')
     _safe_add_col('empresas',        'whatsapp_humano',    'VARCHAR(20)')
+    _safe_add_col('empresas',        'website',            'VARCHAR(250)')
     _safe_add_col('integracoes_meta','numero_whatsapp',    'VARCHAR(30)')
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")
