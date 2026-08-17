@@ -1,0 +1,134 @@
+{% extends 'admin/base.html' %}
+{% block title %}Atendimento por IA{% endblock %}
+{% block page_title %}Atendimento por IA{% endblock %}
+
+{% block content %}
+
+{% if not tem_whatsapp_conectado %}
+<div style="display:flex;align-items:center;gap:.6rem;background:#FEF9E7;
+            border:1px solid #F0CA4D;border-radius:var(--radius);
+            padding:.6rem .9rem;font-size:.82rem;color:#7D6608;margin-bottom:1.2rem">
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <circle cx="12" cy="16" r=".5" fill="currentColor"/>
+  </svg>
+  Nenhum WhatsApp conectado ainda em <a href="{{ url_for('admin.integracoes') }}">Integrações</a> — o menu de IA só
+  responde depois de conectar um número.
+</div>
+{% endif %}
+
+{# ── Ativação ─────────────────────────────────────────────────────────────── #}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Ativação</h3>
+  </div>
+  <form method="POST" action="{{ url_for('admin.atendimento_ia') }}">
+    <input type="hidden" name="section" value="toggle" />
+    <div class="form-group" style="display:flex;align-items:center;gap:.5rem">
+      <input type="checkbox" id="atendimento_ia_ativo" name="atendimento_ia_ativo"
+             {{ 'checked' if empresa.atendimento_ia_ativo else '' }} />
+      <label for="atendimento_ia_ativo" style="margin:0">Atendimento por IA ativo no WhatsApp</label>
+    </div>
+    <p style="font-size:.8rem;color:var(--text-muted);margin:.3rem 0 1rem">
+      Quando ativo, o WhatsApp conectado passa a usar o menu inteligente de 5 opções abaixo em vez do menu padrão.
+      A opção "Falar com atendente" sempre funciona quando o cliente pede, mesmo que você a desative no menu.
+    </p>
+    <button type="submit" class="btn-primary">Salvar</button>
+  </form>
+</div>
+
+{# ── Menu ─────────────────────────────────────────────────────────────────── #}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Menu inicial</h3>
+  </div>
+  <form method="POST" action="{{ url_for('admin.atendimento_ia') }}">
+    <input type="hidden" name="section" value="menu" />
+    <div class="form-group">
+      <label>Título do menu</label>
+      <input type="text" name="titulo" value="{{ menu_config.titulo }}" />
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead>
+        <tr style="text-align:left;border-bottom:1px solid var(--border)">
+          <th style="padding:.4rem .3rem">Opção</th>
+          <th style="padding:.4rem .3rem">Texto exibido</th>
+          <th style="padding:.4rem .3rem;width:70px">Ordem</th>
+          <th style="padding:.4rem .3rem;width:60px">Ativa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for opcao in menu_config.opcoes|sort(attribute='ordem') %}
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.4rem .3rem;color:var(--text-muted)">
+            <code style="font-size:.75rem">{{ opcao.intent }}</code>
+          </td>
+          <td style="padding:.4rem .3rem">
+            <input type="text" name="label_{{ opcao.intent }}" value="{{ opcao.label }}" style="width:100%" />
+          </td>
+          <td style="padding:.4rem .3rem">
+            <input type="number" name="ordem_{{ opcao.intent }}" value="{{ opcao.ordem }}" min="0" style="width:100%" />
+          </td>
+          <td style="padding:.4rem .3rem;text-align:center">
+            <input type="checkbox" name="ativo_{{ opcao.intent }}" {{ 'checked' if opcao.ativo else '' }} />
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:1rem">
+      <button type="submit" class="btn-primary">Salvar menu</button>
+    </div>
+  </form>
+</div>
+
+{# ── Informações do estabelecimento ──────────────────────────────────────── #}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Informações do estabelecimento</h3>
+  </div>
+  <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 1rem">
+    Usadas pela opção "Informações" do menu. A IA só responde com o que estiver preenchido aqui — nunca inventa
+    endereço, horário ou forma de pagamento.
+  </p>
+  <form method="POST" action="{{ url_for('admin.atendimento_ia') }}">
+    <input type="hidden" name="section" value="informacoes" />
+    <div class="form-group">
+      <label>Endereço</label>
+      <input type="text" name="endereco" value="{{ info.endereco or '' }}" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Cidade</label>
+        <input type="text" name="cidade" value="{{ info.cidade or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>UF</label>
+        <input type="text" name="estado" maxlength="2" value="{{ info.estado or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>CEP</label>
+        <input type="text" name="cep" value="{{ info.cep or '' }}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Horário de funcionamento</label>
+      <textarea name="horario_funcionamento" rows="3"
+                placeholder="Seg-Sex 9h-19h&#10;Sáb 9h-13h">{{ info.horario_funcionamento or '' }}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Formas de pagamento</label>
+      <input type="text" name="formas_pagamento_texto" value="{{ info.formas_pagamento_texto or '' }}"
+             placeholder="Pix, cartão de crédito/débito, dinheiro" />
+    </div>
+    <div class="form-group">
+      <label>Observações (estacionamento, política de cancelamento etc)</label>
+      <textarea name="observacoes" rows="3">{{ info.observacoes or '' }}</textarea>
+    </div>
+    <button type="submit" class="btn-primary">Salvar informações</button>
+  </form>
+</div>
+
+{% endblock %}

@@ -3,13 +3,17 @@ import hashlib
 import os
 import re
 
-from flask import request, jsonify, current_app, url_for
+from flask import request, jsonify, current_app, url_for, g
 
 from . import meta_webhook_bp
 from .parsers import parse_whatsapp, parse_messenger, parse_instagram
+from .phone_utils import somente_digitos as _somente_digitos
 from models import db, IntegracaoMeta, Lead, Servico, Cliente, ContatoIgnorado, META_CANAL_SOURCE
 import meta_client
 from crypto_utils import decrypt_token
+from ai_attendance.gating import ia_disponivel
+from ai_attendance.orquestrador import processar_mensagem
+from ai_attendance.logging_ia import log_evento_ia
 
 _PARSERS = {
     'whatsapp_business_account': parse_whatsapp,
@@ -92,8 +96,82 @@ def _texto_atendente_whatsapp(empresa):
     return 'Um atendente vai continuar seu atendimento por aqui em breve.'
 
 
-def _somente_digitos(texto):
-    return re.sub(r'\D', '', texto or '')
+def _processar_turno_whatsapp(integracao, evento, lead, fallback):
+    """Roteamento de cada mensagem de WhatsApp (Lead novo OU existente) entre o
+    atendimento por IA (tenants PRO com o módulo ativo) e `fallback` — o
+    comportamento padrão de sempre, preservado sem nenhuma mudança para quem
+    não é elegível. `fallback` é diferente pra Lead novo (saudação fixa) vs.
+    Lead existente (classificação por regex) — ver chamadas abaixo. Checagem
+    de elegibilidade é sempre a primeira coisa, antes de qualquer chamada à
+    Anthropic — tenants não elegíveis nunca tocam código novo."""
+    empresa = integracao.empresa
+    if ia_disponivel(empresa):
+        # meta_webhook_bp não passa por set_tenant_context() (só admin_bp/
+        # billing_bp) — precisa popular g.empresa/g.empresa_id manualmente pra
+        # tq() e as funções de disponibilidade/conflito reaproveitadas de
+        # admin/public funcionarem corretamente dentro do webhook.
+        g.empresa, g.empresa_id = empresa, empresa.id
+        try:
+            token = decrypt_token(integracao.access_token_enc)
+            textos = processar_mensagem(empresa, lead, evento['external_thread_id'],
+                                         evento['mensagem'], token)
+            for texto in textos:
+                meta_client.enviar_mensagem_whatsapp(
+                    integracao.identificador_externo, evento['external_thread_id'], texto, token)
+        except Exception:
+            current_app.logger.exception('Falha no atendimento por IA — caindo pro fluxo padrão')
+            log_evento_ia(empresa, 'AI_ERROR', lead_id=lead.id,
+                          detalhes='exception no orquestrador do atendimento IA')
+            fallback(integracao, evento, lead)
+    else:
+        fallback(integracao, evento, lead)
+
+
+def _boas_vindas_whatsapp(integracao, evento, lead):
+    """Saudação fixa enviada na primeira mensagem de um contato novo — mesmo
+    texto/comportamento de sempre para tenants sem o atendimento por IA."""
+    try:
+        token = decrypt_token(integracao.access_token_enc)
+        meta_client.enviar_mensagem_whatsapp(
+            integracao.identificador_externo, evento['external_thread_id'],
+            _MENU_WHATSAPP.format(empresa=integracao.empresa.nome), token)
+        lead.contato_etapa = 'wa_menu'
+    except Exception:
+        current_app.logger.exception('Falha ao enviar menu automático de WhatsApp')
+
+
+def _fluxo_regex_whatsapp(integracao, evento, lead):
+    """Menu de 3 opções por regex — comportamento padrão do WhatsApp para
+    contatos que já receberam a saudação, quando o tenant não tem o
+    atendimento por IA (fora do plano PRO, ou toggle desligado). Também usada
+    como fallback quando o atendimento por IA falha/expira nesse caso, pra
+    nunca deixar o cliente sem resposta."""
+    intent = _classificar_intent_whatsapp(evento['mensagem'])
+    try:
+        token = decrypt_token(integracao.access_token_enc)
+        if intent == 'atendente':
+            meta_client.enviar_mensagem_whatsapp(
+                integracao.identificador_externo, evento['external_thread_id'],
+                _texto_atendente_whatsapp(integracao.empresa), token)
+            lead.contato_etapa = 'transferido'
+        elif intent == 'agendamento':
+            link = url_for('public.vitrine', slug=integracao.empresa.slug, _external=True)
+            meta_client.enviar_mensagem_whatsapp(
+                integracao.identificador_externo, evento['external_thread_id'],
+                f'Agende seu horário aqui: {link}', token)
+            lead.contato_etapa = 'wa_menu'
+        elif intent == 'servicos':
+            meta_client.enviar_mensagem_whatsapp(
+                integracao.identificador_externo, evento['external_thread_id'],
+                _texto_servicos_whatsapp(integracao.empresa_id), token)
+            lead.contato_etapa = 'wa_menu'
+        else:
+            meta_client.enviar_mensagem_whatsapp(
+                integracao.identificador_externo, evento['external_thread_id'],
+                _SEM_MATCH_WHATSAPP, token)
+            lead.contato_etapa = 'wa_menu'
+    except Exception:
+        current_app.logger.exception('Falha ao processar resposta automática de WhatsApp')
 
 
 def _e_cliente_existente(empresa_id, telefone):
@@ -312,32 +390,7 @@ def _upsert_lead(integracao, evento):
                     lead.contato_etapa = None
                     lead.aguardando_contato = False
         elif evento['canal'] == 'whatsapp' and lead.contato_etapa != 'transferido':
-            intent = _classificar_intent_whatsapp(evento['mensagem'])
-            try:
-                token = decrypt_token(integracao.access_token_enc)
-                if intent == 'atendente':
-                    meta_client.enviar_mensagem_whatsapp(
-                        integracao.identificador_externo, evento['external_thread_id'],
-                        _texto_atendente_whatsapp(integracao.empresa), token)
-                    lead.contato_etapa = 'transferido'
-                elif intent == 'agendamento':
-                    link = url_for('public.vitrine', slug=integracao.empresa.slug, _external=True)
-                    meta_client.enviar_mensagem_whatsapp(
-                        integracao.identificador_externo, evento['external_thread_id'],
-                        f'Agende seu horário aqui: {link}', token)
-                    lead.contato_etapa = 'wa_menu'
-                elif intent == 'servicos':
-                    meta_client.enviar_mensagem_whatsapp(
-                        integracao.identificador_externo, evento['external_thread_id'],
-                        _texto_servicos_whatsapp(integracao.empresa_id), token)
-                    lead.contato_etapa = 'wa_menu'
-                else:
-                    meta_client.enviar_mensagem_whatsapp(
-                        integracao.identificador_externo, evento['external_thread_id'],
-                        _SEM_MATCH_WHATSAPP, token)
-                    lead.contato_etapa = 'wa_menu'
-            except Exception:
-                current_app.logger.exception('Falha ao processar resposta automática de WhatsApp')
+            _processar_turno_whatsapp(integracao, evento, lead, _fluxo_regex_whatsapp)
         lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
@@ -364,6 +417,9 @@ def _upsert_lead(integracao, evento):
         ad_title=evento.get('ad_title'),
     )
     db.session.add(lead)
+    db.session.flush()  # popula lead.id — necessário pro atendimento por IA
+                         # associar corretamente AtendimentoIAConversa/Evento
+                         # já na primeira mensagem de um contato novo.
 
     if evento['canal'] in _CANAIS_SEM_TELEFONE and not lead.phone:
         servicos_obj = Servico.query.filter_by(empresa_id=integracao.empresa_id, ativo=True) \
@@ -385,13 +441,6 @@ def _upsert_lead(integracao, evento):
         except Exception:
             current_app.logger.exception('Falha ao enviar pergunta automática de contato')
     elif evento['canal'] == 'whatsapp':
-        try:
-            token = decrypt_token(integracao.access_token_enc)
-            meta_client.enviar_mensagem_whatsapp(
-                integracao.identificador_externo, evento['external_thread_id'],
-                _MENU_WHATSAPP.format(empresa=integracao.empresa.nome), token)
-            lead.contato_etapa = 'wa_menu'
-        except Exception:
-            current_app.logger.exception('Falha ao enviar menu automático de WhatsApp')
+        _processar_turno_whatsapp(integracao, evento, lead, _boas_vindas_whatsapp)
 
     db.session.commit()

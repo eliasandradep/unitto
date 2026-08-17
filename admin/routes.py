@@ -28,6 +28,9 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
                     META_CANAIS)
 from themes import THEMES
+from ai_attendance.gating import ia_disponivel
+from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
+from ai_attendance.informacoes import get_or_create_info, atualizar_info
 import meta_client
 from crypto_utils import encrypt_token
 
@@ -749,9 +752,40 @@ def _meta_state_serializer():
 def integracoes():
     conexoes = {c.canal: c for c in tq(IntegracaoMeta).filter_by(status='conectado').all()}
     contas_ads = tq(IntegracaoMetaAds).filter_by(status='conectado').all()
+    empresa = g.get('empresa')
     return render_template('admin/integracoes.html', canais=META_CANAIS, conexoes=conexoes,
                             meta_configurado=meta_client.configurado(), contas_ads=contas_ads,
-                            base_domain=BASE_DOMAIN)
+                            base_domain=BASE_DOMAIN,
+                            atendimento_ia_disponivel=ia_disponivel(empresa),
+                            atendimento_ia_plano_pro=bool(empresa) and empresa.plano_familia == 'pro')
+
+
+@admin_bp.route('/atendimento-ia', methods=['GET', 'POST'])
+@login_required
+def atendimento_ia():
+    empresa = g.get('empresa')
+    if not empresa or empresa.plano_familia != 'pro':
+        abort(404)
+
+    if request.method == 'POST':
+        section = request.form.get('section', '')
+        if section == 'toggle':
+            empresa.atendimento_ia_ativo = 'atendimento_ia_ativo' in request.form
+            db.session.commit()
+            flash('Atendimento por IA ' + ('ativado.' if empresa.atendimento_ia_ativo else 'desativado.'), 'success')
+        elif section == 'menu':
+            atualizar_opcoes(empresa, request.form)
+            flash('Menu atualizado.', 'success')
+        elif section == 'informacoes':
+            atualizar_info(empresa, request.form)
+            flash('Informações do estabelecimento atualizadas.', 'success')
+        return redirect(url_for('admin.atendimento_ia'))
+
+    menu_config = get_or_create_menu_config(empresa)
+    info = get_or_create_info(empresa)
+    tem_whatsapp_conectado = tq(IntegracaoMeta).filter_by(canal='whatsapp', status='conectado').first() is not None
+    return render_template('admin/atendimento_ia.html', empresa=empresa, menu_config=menu_config, info=info,
+                            tem_whatsapp_conectado=tem_whatsapp_conectado)
 
 
 @admin_bp.route('/integracoes/meta/conectar/<canal>')

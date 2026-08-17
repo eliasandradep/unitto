@@ -91,6 +91,7 @@ def empresa_edit(empresa_id):
         emp.status        = request.form.get('status', emp.status)
         emp.telefone      = request.form.get('telefone', '').strip() or None
         emp.email         = request.form.get('email', '').strip() or None
+        emp.atendimento_ia_ativo = 'atendimento_ia_ativo' in request.form
         trial_s           = request.form.get('trial_ends_at', '').strip()
         emp.trial_ends_at = date.fromisoformat(trial_s) if trial_s else emp.trial_ends_at
         db.session.commit()

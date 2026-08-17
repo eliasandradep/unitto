@@ -70,6 +70,7 @@ class Empresa(db.Model):
     website       = db.Column(db.String(250))  # site do cliente — informativo, usado na tela de Integrações
     whatsapp_automacao = db.Column(db.String(20))  # fallback manual — só usado quando não há IntegracaoMeta whatsapp conectada
     whatsapp_humano    = db.Column(db.String(20))  # nunca exibido publicamente; só enviado no handoff do bot
+    atendimento_ia_ativo = db.Column(db.Boolean, default=False)  # menu de atendimento por IA no WhatsApp — plano PRO
     logo_url      = db.Column(db.String(250))
     logo_data     = db.Column(db.LargeBinary)
     logo_mime     = db.Column(db.String(50))
@@ -99,6 +100,13 @@ class Empresa(db.Model):
     def tem_agendamento_online(self):
         """Página pública de agendamento é um recurso dos planos Avançado e Profissional."""
         return self.plano_familia in ('pro', 'black')
+
+    def tem_atendimento_ia(self):
+        """Menu de atendimento por IA no WhatsApp — recurso do plano PRO, com toggle
+        de ativação (`atendimento_ia_ativo`) que tanto o tenant quanto o saas_admin
+        podem ligar/desligar. Propositalmente não inclui 'black' (diferente de
+        tem_agendamento_online) porque o requisito de produto pede 'PRO' literalmente."""
+        return self.plano_familia == 'pro' and bool(self.atendimento_ia_ativo)
 
     @property
     def dias_trial_restantes(self):
@@ -1044,3 +1052,120 @@ class VendaPacoteItem(db.Model):
     @property
     def quantidade_restante(self):
         return self.quantidade_total - self.quantidade_usada
+
+
+# ── Atendimento por IA (WhatsApp, plano PRO) ────────────────────────────────
+
+INTENTS_MENU_IA = [
+    ('BOOKING',                'Agendar horário'),
+    ('APPOINTMENT_MANAGEMENT', 'Meu agendamento'),
+    ('SERVICES',               'Serviços e valores'),
+    ('INFORMATION',            'Informações'),
+    ('HUMAN_HANDOFF',          'Falar com atendente'),
+]
+
+EVENTOS_IA_TIPOS = [
+    'AI_MENU_DISPLAYED', 'AI_MENU_OPTION_SELECTED',
+    'AI_BOOKING_STARTED', 'AI_BOOKING_COMPLETED',
+    'AI_APPOINTMENT_VIEWED', 'AI_APPOINTMENT_RESCHEDULED', 'AI_APPOINTMENT_CANCELLED',
+    'AI_SERVICES_VIEWED', 'AI_INFORMATION_VIEWED',
+    'AI_HUMAN_HANDOFF', 'AI_ERROR', 'AI_FALLBACK_REGRA',
+]
+
+
+class InformacaoEstabelecimento(db.Model):
+    """Dados do estabelecimento exibidos pelo intent INFORMATION do atendimento por
+    IA. 1:1 com Empresa. Textos livres de propósito geral — sem campos específicos
+    de segmento (salão/clínica/barbearia), pra manter o motor genérico."""
+    __tablename__ = 'informacoes_estabelecimento'
+    id                      = db.Column(db.Integer, primary_key=True)
+    empresa_id              = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False, unique=True)
+    endereco                = db.Column(db.String(250))
+    cidade                  = db.Column(db.String(80))
+    estado                  = db.Column(db.String(2))
+    cep                     = db.Column(db.String(9))
+    horario_funcionamento   = db.Column(db.Text)   # texto livre, ex: "Seg-Sex 9h-19h\nSáb 9h-13h"
+    formas_pagamento_texto  = db.Column(db.Text)   # texto livre, ex: "Pix, cartão de crédito/débito, dinheiro"
+    observacoes             = db.Column(db.Text)   # estacionamento, política de cancelamento, wifi etc
+    updated_at              = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    empresa = db.relationship('Empresa', backref=db.backref('info_estabelecimento', uselist=False))
+
+
+class AtendimentoIAMenuConfig(db.Model):
+    """Configuração do menu de atendimento por IA de uma empresa (1:1)."""
+    __tablename__ = 'atendimento_ia_menu_config'
+    id         = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False, unique=True)
+    titulo     = db.Column(db.String(200), default='Olá! 👋 Como posso ajudar?')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    empresa = db.relationship('Empresa', backref=db.backref('ia_menu_config', uselist=False))
+    opcoes  = db.relationship('AtendimentoIAMenuOpcao', backref='menu_config',
+                               cascade='all, delete-orphan', order_by='AtendimentoIAMenuOpcao.ordem')
+
+
+class AtendimentoIAMenuOpcao(db.Model):
+    """Uma opção do menu de atendimento por IA. `intent` é a CHAVE INTERNA fixa
+    (um dos valores de INTENTS_MENU_IA) — nunca editável pelo tenant. `label`,
+    `ordem` e `ativo` são o que o painel admin edita."""
+    __tablename__ = 'atendimento_ia_menu_opcoes'
+    id             = db.Column(db.Integer, primary_key=True)
+    menu_config_id = db.Column(db.Integer, db.ForeignKey('atendimento_ia_menu_config.id'), nullable=False)
+    intent         = db.Column(db.String(30), nullable=False)
+    label          = db.Column(db.String(100), nullable=False)
+    ordem          = db.Column(db.Integer, default=0)
+    ativo          = db.Column(db.Boolean, default=True)
+
+    __table_args__ = (db.UniqueConstraint('menu_config_id', 'intent', name='uq_menu_opcao_intent'),)
+
+
+class AtendimentoIAConversa(db.Model):
+    """Estado da conversa ativa de atendimento por IA entre um telefone e um
+    tenant. 1 linha por (empresa_id, telefone) — WhatsApp é inerentemente 1:1
+    telefone<->conversa."""
+    __tablename__ = 'atendimento_ia_conversas'
+    id             = db.Column(db.Integer, primary_key=True)
+    empresa_id     = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    lead_id        = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True)
+    telefone       = db.Column(db.String(20), nullable=False)
+    intent_ativo   = db.Column(db.String(30), nullable=True)   # None = está no menu principal
+    estado         = db.Column(db.String(30), nullable=True)   # sub-etapa livre, ex: 'aguardando_data'
+    contexto_json  = db.Column(db.Text)   # json.dumps({...slots coletados...})
+    criado_em      = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('empresa_id', 'telefone', name='uq_ia_conversa_empresa_telefone'),)
+
+    lead = db.relationship('Lead')
+
+    def get_contexto(self) -> dict:
+        import json
+        return json.loads(self.contexto_json) if self.contexto_json else {}
+
+    def set_contexto(self, d: dict) -> None:
+        import json
+        self.contexto_json = json.dumps(d, ensure_ascii=False)
+
+
+class AtendimentoIAEvento(db.Model):
+    """Log de auditoria dos eventos do atendimento por IA — um evento de negócio
+    por linha (AI_MENU_DISPLAYED, AI_BOOKING_COMPLETED etc), sempre associado ao
+    tenant. Sem FKs obrigatórios além de empresa_id (cliente pode não estar
+    cadastrado, agendamento só existe em alguns eventos)."""
+    __tablename__ = 'atendimento_ia_eventos'
+    id             = db.Column(db.Integer, primary_key=True)
+    empresa_id     = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    lead_id        = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True)
+    cliente_id     = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
+    agendamento_id = db.Column(db.Integer, db.ForeignKey('agendamentos.id'), nullable=True)
+    conversa_id    = db.Column(db.Integer, db.ForeignKey('atendimento_ia_conversas.id'), nullable=True)
+    tipo           = db.Column(db.String(40), nullable=False)
+    intent         = db.Column(db.String(30), nullable=True)
+    detalhes       = db.Column(db.Text)
+    criado_em      = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_ia_evento_empresa_criado', 'empresa_id', 'criado_em'),
+        db.Index('ix_ia_evento_empresa_tipo', 'empresa_id', 'tipo'),
+    )

@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_landing.py)",
+      "Bash(python -c \"import sys; print\\(sys.path\\)\")",
+      "Bash(PYTHONPATH=/d/projetos/unitto python C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_landing.py)",
+      "WebSearch",
+      "WebFetch(domain:docs.infinitepay.io)",
+      "WebFetch(domain:ajuda.infinitepay.io)",
+      "WebFetch(domain:www.infinitepay.io)",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_infinitepay.py)",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python -c \"import py_compile; py_compile.compile\\('billing/routes.py', doraise=True\\); py_compile.compile\\('billing/infinitepay.py', doraise=True\\); py_compile.compile\\('models.py', doraise=True\\); py_compile.compile\\('app.py', doraise=True\\); print\\('OK'\\)\")",
+      "WebFetch(domain:app.infinitepay.io)",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python -c \"import py_compile; py_compile.compile\\('billing/infinitepay.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python -c ' *)",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python -c \"import py_compile; py_compile.compile\\('signup.py', doraise=True\\); py_compile.compile\\('admin/routes.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_signup_username.py)",
+      "Bash(cat > *)",
+      "Bash(PYTHONPATH=/d/projetos/unitto FLASK_DEBUG=1 .venv/Scripts/python \"C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_checkout_infinitepay.py\")",
+      "Bash(.venv/Scripts/python -m py_compile billing/routes.py)",
+      "Bash(PYTHONPATH=/d/projetos/unitto .venv/Scripts/python \"C:/Users/elias/AppData/Local/Temp/claude/d--projetos-unitto/98ebe796-db3f-4e83-83bc-c953e0d72174/scratchpad/test_checkout_infinitepay.py\")",
+      "Bash(python -m py_compile admin/routes.py admin/__init__.py admin/permissions.py models.py app.py)",
+      "Bash(python -c ' *)",
+      "Bash(python -m py_compile admin/routes.py)",
+      "Bash(python \"C:\\\\Users\\\\elias\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--projetos-unitto\\\\98ebe796-db3f-4e83-83bc-c953e0d72174\\\\scratchpad\\\\test_perfis.py\")",
+      "Bash(python \"C:\\\\Users\\\\elias\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--projetos-unitto\\\\98ebe796-db3f-4e83-83bc-c953e0d72174\\\\scratchpad\\\\test_backfill.py\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

@@ -4,6 +4,24 @@
 
 {% block content %}
 
+{% if atendimento_ia_plano_pro %}
+<div class="card" style="padding:1.1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;
+                          gap:1rem;margin-bottom:1.2rem;border-left:3px solid var(--gold-dark)">
+  <div>
+    <span style="font-weight:600;font-size:.95rem">Atendimento por IA no WhatsApp</span>
+    <p style="font-size:.82rem;color:var(--text-muted);margin:.2rem 0 0">
+      Menu inteligente de 5 opções, com agendamento, consulta/remarcação/cancelamento e informações direto no chat.
+    </p>
+  </div>
+  <div style="display:flex;align-items:center;gap:.6rem;flex-shrink:0">
+    <span class="badge {{ 'badge--convertido' if atendimento_ia_disponivel else 'badge--perdido' }}">
+      {{ 'Ativo' if atendimento_ia_disponivel else 'Inativo' }}
+    </span>
+    <a href="{{ url_for('admin.atendimento_ia') }}" class="btn-secondary">Configurar</a>
+  </div>
+</div>
+{% endif %}
+
 {% if not meta_configurado %}
 <div style="display:flex;align-items:center;gap:.6rem;background:#FEF9E7;
             border:1px solid #F0CA4D;border-radius:var(--radius);
