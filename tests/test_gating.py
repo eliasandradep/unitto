@@ -9,7 +9,8 @@ from tests.conftest import make_empresa
 @pytest.mark.parametrize('plano,ativo,esperado', [
     ('pro',   True,  True),
     ('pro',   False, False),
-    ('black', True,  False),   # propositalmente fora — só 'pro' libera (decisão de produto)
+    ('black', True,  True),    # 'black' (Profissional) libera igual a 'pro' (Avançado)
+    ('black', False, False),
     ('free',  True,  False),
     ('trial', True,  False),
     ('pro-anual', True, True),  # plano_familia remove o sufixo -anual

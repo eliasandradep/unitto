@@ -102,11 +102,11 @@ class Empresa(db.Model):
         return self.plano_familia in ('pro', 'black')
 
     def tem_atendimento_ia(self):
-        """Menu de atendimento por IA no WhatsApp — recurso do plano PRO, com toggle
-        de ativação (`atendimento_ia_ativo`) que tanto o tenant quanto o saas_admin
-        podem ligar/desligar. Propositalmente não inclui 'black' (diferente de
-        tem_agendamento_online) porque o requisito de produto pede 'PRO' literalmente."""
-        return self.plano_familia == 'pro' and bool(self.atendimento_ia_ativo)
+        """Menu de atendimento por IA no WhatsApp — recurso dos planos Avançado e
+        Profissional (slugs 'pro'/'black' — mesmo critério de tem_agendamento_online),
+        com toggle de ativação (`atendimento_ia_ativo`) que tanto o tenant quanto o
+        saas_admin podem ligar/desligar."""
+        return self.plano_familia in ('pro', 'black') and bool(self.atendimento_ia_ativo)
 
     @property
     def dias_trial_restantes(self):

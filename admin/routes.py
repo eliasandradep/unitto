@@ -763,7 +763,7 @@ def integracoes():
                             meta_configurado=meta_client.configurado(), contas_ads=contas_ads,
                             base_domain=BASE_DOMAIN,
                             atendimento_ia_disponivel=ia_disponivel(empresa),
-                            atendimento_ia_plano_pro=bool(empresa) and empresa.plano_familia == 'pro')
+                            atendimento_ia_plano_pro=bool(empresa) and empresa.plano_familia in ('pro', 'black'))
 
 
 @admin_bp.route('/atendimento-ia', methods=['GET', 'POST'])
