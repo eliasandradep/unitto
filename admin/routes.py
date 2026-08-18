@@ -68,7 +68,11 @@ def _buscar_user_por_login(identificador):
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
+    # Só redireciona quem já está logado no GET (acessar a página sem enviar
+    # nada). Um POST sempre processa as credenciais enviadas — mesmo com uma
+    # sessão antiga ainda ativa no navegador — em vez de ignorá-las
+    # silenciosamente e mandar de volta pra sessão anterior.
+    if request.method == 'GET' and current_user.is_authenticated:
         if current_user.role == 'saas_admin':
             return redirect(url_for('saas_admin.dashboard'))
         return redirect(url_for('admin.dashboard'))
@@ -81,6 +85,8 @@ def login():
         password = request.form.get('password', '')
         user = _buscar_user_por_login(identificador)
         if user and user.is_active and user.check_password(password):
+            if current_user.is_authenticated and current_user.id != user.id:
+                logout_user()
             login_user(user)
             if user.role == 'saas_admin':
                 return redirect(url_for('saas_admin.dashboard'))
