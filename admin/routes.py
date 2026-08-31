@@ -26,7 +26,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     CategoriaProduto, Produto, IntegracaoMeta, ContatoIgnorado,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
-                    META_CANAIS)
+                    META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento)
 from themes import THEMES
 from ai_attendance.gating import ia_disponivel
 from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
@@ -377,10 +377,21 @@ def lead_convert(lead_id):
 @login_required
 def lead_delete(lead_id):
     lead = db.get_or_404(Lead, lead_id)
+    _soltar_referencias_ia(lead)
     db.session.delete(lead)
     db.session.commit()
     flash('Lead removido.', 'success')
     return redirect(url_for('admin.leads'))
+
+
+def _soltar_referencias_ia(lead):
+    """Solta as referências do atendimento por IA antes de apagar um Lead —
+    sem isso o delete falha com violação de FK (leads.id é referenciado por
+    atendimento_ia_conversas/eventos, sem ON DELETE SET NULL no banco).
+    Conversa é estado ativo (não faz sentido preservar pra um Lead apagado) —
+    apaga junto. Evento é log/auditoria — mantém, só solta a FK."""
+    AtendimentoIAConversa.query.filter_by(lead_id=lead.id).delete()
+    AtendimentoIAEvento.query.filter_by(lead_id=lead.id).update({'lead_id': None})
 
 
 def _ignorar_lead(lead, motivo):
@@ -397,6 +408,7 @@ def _ignorar_lead(lead, motivo):
                 criado_por_user_id=current_user.id))
         elif ja_existe.motivo != motivo:
             ja_existe.motivo = motivo
+    _soltar_referencias_ia(lead)
     db.session.delete(lead)
     db.session.commit()
 
