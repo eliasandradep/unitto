@@ -18,7 +18,28 @@ os.environ.setdefault('META_APP_SECRET', 'test-meta-app-secret')
 os.environ.setdefault('META_TOKEN_ENCRYPTION_KEY', 'zGX2s6Yt4qk8xW3vB1nJcQ7fH9dP0mR5uL6oT2eA4iY=')
 os.environ.setdefault('ANTHROPIC_API_KEY', '')  # propositalmente vazia — testes nunca devem chamar a API real
 
+import sqlite3
 import pytest
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+# Registrado ANTES de importar app.py de propósito: o import de app.py já
+# dispara a primeira conexão real (roda as migrations no app_context de
+# módulo) — se o listener entrasse depois, essa primeira conexão (que o pool
+# do SQLite tende a reaproveitar durante todo o teste) nunca recebia a
+# pragma, e os testes voltavam a não pegar violação de FK nenhuma.
+@event.listens_for(Engine, 'connect')
+def _sqlite_enforce_foreign_keys(dbapi_connection, connection_record):
+    """SQLite não aplica FK por padrão — sem isso, os testes não pegam
+    violação de FK que só estoura em produção (Postgres sempre aplica).
+    Bug real: delete de Lead quebrava em produção mas passava aqui até essa
+    pragma ser ligada."""
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.close()
+
+
 from datetime import date, time, timedelta
 
 from app import app as flask_app

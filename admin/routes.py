@@ -389,9 +389,18 @@ def _soltar_referencias_ia(lead):
     sem isso o delete falha com violação de FK (leads.id é referenciado por
     atendimento_ia_conversas/eventos, sem ON DELETE SET NULL no banco).
     Conversa é estado ativo (não faz sentido preservar pra um Lead apagado) —
-    apaga junto. Evento é log/auditoria — mantém, só solta a FK."""
-    AtendimentoIAConversa.query.filter_by(lead_id=lead.id).delete()
-    AtendimentoIAEvento.query.filter_by(lead_id=lead.id).update({'lead_id': None})
+    apaga junto. Evento é log/auditoria — mantém, só solta a FK.
+
+    Ordem importa: atendimento_ia_eventos.conversa_id também referencia
+    atendimento_ia_conversas.id, então essa FK precisa ser solta ANTES de
+    apagar as conversas — senão o delete da conversa quebra do mesmo jeito
+    que o do Lead quebrava (bug real observado em produção)."""
+    conversa_ids = [c.id for c in AtendimentoIAConversa.query.filter_by(lead_id=lead.id).all()]
+    if conversa_ids:
+        AtendimentoIAEvento.query.filter(AtendimentoIAEvento.conversa_id.in_(conversa_ids)) \
+            .update({'conversa_id': None}, synchronize_session=False)
+    AtendimentoIAEvento.query.filter_by(lead_id=lead.id).update({'lead_id': None}, synchronize_session=False)
+    AtendimentoIAConversa.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
 
 
 def _ignorar_lead(lead, motivo):

@@ -18,8 +18,14 @@ def _login(client, empresa):
 def _lead_com_ia_associada(empresa, integracao):
     lead = make_lead(empresa, integracao)
     conversa = AtendimentoIAConversa(empresa_id=empresa.id, lead_id=lead.id, telefone=lead.phone)
-    evento = AtendimentoIAEvento(empresa_id=empresa.id, lead_id=lead.id, tipo='AI_MENU_DISPLAYED')
-    db.session.add_all([conversa, evento])
+    db.session.add(conversa)
+    db.session.flush()  # precisa do conversa.id pra referenciar no evento abaixo
+    # evento com AMBAS as FKs setadas (lead_id e conversa_id) — é exatamente
+    # essa combinação que reproduzia o 500 em produção: soltar só lead_id e
+    # depois apagar a conversa ainda quebrava via conversa_id.
+    evento = AtendimentoIAEvento(empresa_id=empresa.id, lead_id=lead.id,
+                                  conversa_id=conversa.id, tipo='AI_MENU_DISPLAYED')
+    db.session.add(evento)
     db.session.commit()
     return lead, conversa, evento
 
@@ -41,8 +47,9 @@ def test_marcar_spam_nao_quebra_com_conversa_e_evento_ia_associados(client):
     assert db.session.get(Lead, lead_id) is None
     assert db.session.get(AtendimentoIAConversa, conversa_id) is None  # conversa some junto
     evento_restante = db.session.get(AtendimentoIAEvento, evento_id)
-    assert evento_restante is not None      # log/auditoria é preservado
-    assert evento_restante.lead_id is None  # só a referência é solta
+    assert evento_restante is not None          # log/auditoria é preservado
+    assert evento_restante.lead_id is None      # só a referência é solta
+    assert evento_restante.conversa_id is None  # idem pra FK de conversa
 
 
 def test_marcar_pessoal_nao_quebra_com_conversa_e_evento_ia_associados(client):
