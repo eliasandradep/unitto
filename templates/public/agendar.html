@@ -11,13 +11,39 @@
   </p>
 </section>
 
-{% if not profissionais %}
+{% if profissionais is none %}
+{# Mais de uma unidade e nenhuma escolhida ainda — pede pra escolher antes de mostrar profissionais #}
+<div class="pub-step">
+  <h2 class="pub-step__title">Em qual unidade você quer ser atendido(a)?</h2>
+  <div class="pub-services">
+    {% for u in unidades %}
+    <a href="{{ url_for('public.agendar', slug=empresa.slug, servico_id=servico.id, unidade_id=u.id) }}"
+       class="pub-service-card">
+      <h3 class="pub-service-card__name">{{ u.label() }}</h3>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% elif not profissionais %}
 <div class="pub-notice">Nenhum profissional disponível para este serviço no momento.</div>
+
 {% else %}
 <form method="post" action="{{ url_for('public.agendar_submit', slug=empresa.slug, servico_id=servico.id) }}" class="pub-form" id="agendarForm">
+  {% if unidade_id %}<input type="hidden" name="unidade_id" value="{{ unidade_id }}">{% endif %}
+
+  {% if unidades|length > 1 %}
+  <div class="pub-step">
+    <h2 class="pub-step__title">Unidade</h2>
+    <p>
+      {% for u in unidades %}{% if u.id == unidade_id %}{{ u.label() }}{% endif %}{% endfor %}
+      · <a href="{{ url_for('public.agendar', slug=empresa.slug, servico_id=servico.id) }}">trocar</a>
+    </p>
+  </div>
+  {% endif %}
 
   <div class="pub-step">
-    <h2 class="pub-step__title">1. Profissional</h2>
+    <h2 class="pub-step__title">{{ '2' if unidades|length > 1 else '1' }}. Profissional</h2>
     <div class="pub-prof-grid">
       {% for p in profissionais %}
       <label class="pub-prof-card">
@@ -29,12 +55,12 @@
   </div>
 
   <div class="pub-step">
-    <h2 class="pub-step__title">2. Data</h2>
+    <h2 class="pub-step__title">{{ '3' if unidades|length > 1 else '2' }}. Data</h2>
     <input type="date" name="data" id="dataInput" class="pub-date-input" min="{{ hoje }}" required>
   </div>
 
   <div class="pub-step">
-    <h2 class="pub-step__title">3. Horário</h2>
+    <h2 class="pub-step__title">{{ '4' if unidades|length > 1 else '3' }}. Horário</h2>
     <div class="pub-slots-grid" id="slotsGrid">
       <p class="pub-slots-empty">Escolha um profissional e uma data para ver os horários.</p>
     </div>
@@ -42,7 +68,7 @@
   </div>
 
   <div class="pub-step">
-    <h2 class="pub-step__title">4. Seus dados</h2>
+    <h2 class="pub-step__title">{{ '5' if unidades|length > 1 else '4' }}. Seus dados</h2>
     <input type="text" name="nome_cliente" placeholder="Seu nome" class="pub-input" required>
     <input type="tel" name="telefone" placeholder="Seu telefone (WhatsApp)" class="pub-input" required>
   </div>
@@ -59,6 +85,7 @@
   var slotsGrid = document.getElementById('slotsGrid');
   var horaInput = document.getElementById('horaInicioInput');
   var slotsUrl = "{{ url_for('public.slots_json', slug=empresa.slug, servico_id=servico.id) }}";
+  var unidadeId = {{ (unidade_id or '')|tojson }};
 
   function profissionalSelecionado() {
     var r = form.querySelector('input[name="profissional_id"]:checked');
@@ -74,7 +101,9 @@
       return;
     }
     slotsGrid.innerHTML = '<p class="pub-slots-empty">Carregando…</p>';
-    fetch(slotsUrl + '?profissional_id=' + encodeURIComponent(profId) + '&data=' + encodeURIComponent(data))
+    var url = slotsUrl + '?profissional_id=' + encodeURIComponent(profId) + '&data=' + encodeURIComponent(data);
+    if (unidadeId) url += '&unidade_id=' + encodeURIComponent(unidadeId);
+    fetch(url)
       .then(function(r) { return r.json(); })
       .then(function(json) {
         var slots = json.slots || [];

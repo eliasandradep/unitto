@@ -7,7 +7,7 @@ import unicodedata
 from datetime import date, time as _time
 
 from admin.tenant import tq
-from models import db, Servico, Agendamento, Profissional
+from models import db, Servico, Agendamento, Profissional, Unidade
 from public.availability import eligible_profissionais, get_available_slots
 from .logging_ia import log_evento_ia
 from .conversa import salvar_conversa, resetar_conversa
@@ -23,6 +23,10 @@ def _normalizar(texto):
 
 def servicos_bookable(empresa):
     return tq(Servico).filter_by(ativo=True, agendamento_online=True).order_by(Servico.nome).all()
+
+
+def unidades_ativas(empresa):
+    return tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
 
 
 def _casar_servico(servicos, texto_mencionado):
@@ -84,16 +88,29 @@ def processar(empresa, lead, telefone, conversa, nlu_result, mensagem) -> list:
             return [_texto_lista_servicos(servicos)]
         contexto['servico_id'] = servico.id
         contexto['servico_nome'] = servico.nome
-        return _avancar_para_profissional(empresa, lead, conversa, contexto, servico)
+        return _avancar_para_unidade(empresa, lead, conversa, contexto, servico)
 
     servico = db.session.get(Servico, contexto.get('servico_id'))
     if not servico:
         resetar_conversa(conversa)
         return ['Esse serviço não está mais disponível. Vamos recomeçar — ' + _texto_lista_servicos(servicos)]
 
+    # ── Etapa: unidade (só quando a empresa tem mais de uma) ─────────────
+    if estado == 'aguardando_unidade':
+        unidades = unidades_ativas(empresa)
+        unidade = _selecionar_por_indice_ou_nome(mensagem, unidades, [u.label() for u in unidades])
+        if unidade is None:
+            salvar_conversa(conversa, 'BOOKING', 'aguardando_unidade', contexto)
+            linhas = ['Em qual unidade você quer ser atendido(a)?']
+            linhas += [f'{i}. {u.label()}' for i, u in enumerate(unidades, start=1)]
+            return ['\n'.join(linhas)]
+        contexto['unidade_id'] = unidade.id
+        contexto['unidade_nome'] = unidade.label()
+        return _avancar_para_profissional(empresa, lead, conversa, contexto, servico)
+
     # ── Etapa: profissional ──────────────────────────────────────────────
     if estado == 'aguardando_profissional':
-        profissionais = eligible_profissionais(servico)
+        profissionais = eligible_profissionais(servico, unidade_id=contexto.get('unidade_id'))
         prof = _selecionar_por_indice_ou_nome(mensagem, profissionais, [p.nome for p in profissionais])
         if prof is None:
             salvar_conversa(conversa, 'BOOKING', 'aguardando_profissional', contexto)
@@ -135,11 +152,26 @@ def processar(empresa, lead, telefone, conversa, nlu_result, mensagem) -> list:
     return [_texto_lista_servicos(servicos)]
 
 
+def _avancar_para_unidade(empresa, lead, conversa, contexto, servico):
+    unidades = unidades_ativas(empresa)
+    if len(unidades) <= 1:
+        # Empresa com 0 ou 1 unidade — não faz sentido perguntar, pula direto
+        # (mesmo padrão de "pula a pergunta" já usado quando há só 1 profissional).
+        contexto['unidade_id'] = unidades[0].id if unidades else None
+        contexto['unidade_nome'] = unidades[0].label() if unidades else None
+        return _avancar_para_profissional(empresa, lead, conversa, contexto, servico)
+    salvar_conversa(conversa, 'BOOKING', 'aguardando_unidade', contexto)
+    linhas = ['Em qual unidade você quer ser atendido(a)?']
+    linhas += [f'{i}. {u.label()}' for i, u in enumerate(unidades, start=1)]
+    return ['\n'.join(linhas)]
+
+
 def _avancar_para_profissional(empresa, lead, conversa, contexto, servico):
-    profissionais = eligible_profissionais(servico)
+    profissionais = eligible_profissionais(servico, unidade_id=contexto.get('unidade_id'))
     if not profissionais:
         resetar_conversa(conversa)
-        return [f'No momento não há profissional disponível para {servico.nome} no agendamento online. '
+        msg_unidade = f' na unidade {contexto["unidade_nome"]}' if contexto.get('unidade_nome') else ''
+        return [f'No momento não há profissional disponível para {servico.nome}{msg_unidade} no agendamento online. '
                 'Posso te transferir para um atendente, se quiser.']
     if len(profissionais) == 1:
         contexto['profissional_id'] = profissionais[0].id
@@ -202,7 +234,8 @@ def _parse_hora(hora_mencionada):
 
 def _avancar_para_hora(empresa, conversa, contexto, servico):
     data_val = date.fromisoformat(contexto['data'])
-    slots = get_available_slots(contexto['profissional_id'], servico, data_val)
+    slots = get_available_slots(contexto['profissional_id'], servico, data_val,
+                                 unidade_id=contexto.get('unidade_id'))
     if not slots:
         salvar_conversa(conversa, 'BOOKING', 'aguardando_data', {**contexto, 'data': None})
         return [f'Não encontrei horários disponíveis para {data_val.strftime("%d/%m")}. '
@@ -251,9 +284,11 @@ def _apresentar_confirmacao(conversa, contexto, servico):
     preco = ''
     if servico.exibir_preco_online and servico.preco:
         preco = f' (R$ {servico.preco:.2f})'.replace('.', ',')
+    linha_unidade = f'• Unidade: {contexto["unidade_nome"]}\n' if contexto.get('unidade_nome') else ''
     resumo = (
         f'Confirmando:\n'
         f'• Serviço: {contexto["servico_nome"]}{preco}\n'
+        f'{linha_unidade}'
         f'• Profissional: {contexto["profissional_nome"]}\n'
         f'• Data: {data_val.strftime("%d/%m/%Y")} às {contexto["hora"]}\n\n'
         'Posso confirmar? (responda SIM ou NÃO)'
@@ -274,7 +309,8 @@ def _tratar_confirmacao(empresa, lead, telefone, conversa, contexto, servico, me
     # escolha do horário e a confirmação (outro cliente pode ter pego o horário).
     data_val = date.fromisoformat(contexto['data'])
     hora_val = _parse_hora(contexto['hora'])
-    slots_atuais = get_available_slots(contexto['profissional_id'], servico, data_val)
+    slots_atuais = get_available_slots(contexto['profissional_id'], servico, data_val,
+                                        unidade_id=contexto.get('unidade_id'))
     if hora_val not in slots_atuais:
         contexto.pop('horarios_oferecidos', None)
         contexto.pop('hora', None)
@@ -293,7 +329,7 @@ def _tratar_confirmacao(empresa, lead, telefone, conversa, contexto, servico, me
         profissional_id=contexto['profissional_id'],
         servico_id=servico.id,
         servicos_lista=[servico],
-        unidade_id=profissional.unidade_id if profissional else None,
+        unidade_id=contexto.get('unidade_id') or (profissional.unidade_id if profissional else None),
         data=data_val,
         hora_inicio=hora_val,
         duracao_min=duracao_min,

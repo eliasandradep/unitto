@@ -2,11 +2,30 @@ from datetime import date, time
 
 from flask import render_template, request, redirect, url_for, jsonify, abort, flash, g
 
-from models import db, Servico, Agendamento, Lead
+from models import db, Servico, Agendamento, Lead, Unidade
 from admin.tenant import tq
 
 from . import public_bp
 from .availability import eligible_profissionais, get_available_slots
+
+
+def _unidades_ativas(empresa):
+    return tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
+
+
+def _resolver_unidade(empresa, unidade_id_str):
+    """None se a empresa tem 0 ou 1 unidade ativa (não precisa perguntar —
+    comportamento de sempre). Com mais de uma, exige um unidade_id válido."""
+    unidades = _unidades_ativas(empresa)
+    if len(unidades) <= 1:
+        return (unidades[0].id if unidades else None), unidades
+    try:
+        escolhida_id = int(unidade_id_str) if unidade_id_str else None
+    except (TypeError, ValueError):
+        escolhida_id = None
+    if escolhida_id not in {u.id for u in unidades}:
+        return None, unidades
+    return escolhida_id, unidades
 
 
 def _agendamento_online_disponivel(empresa):
@@ -36,9 +55,20 @@ def agendar(slug, servico_id):
     servico = tq(Servico).filter_by(id=servico_id, ativo=True, agendamento_online=True).first()
     if not servico:
         abort(404)
-    profissionais = eligible_profissionais(servico)
+
+    unidade_id, unidades = _resolver_unidade(g.empresa, request.args.get('unidade_id'))
+    if unidade_id is None and len(unidades) > 1:
+        # Mais de uma unidade e nenhuma escolhida ainda — pede pra escolher
+        # antes de listar profissionais (senão aparece gente escalada pra
+        # outra unidade como opção, sem o cliente saber pra onde está indo).
+        return render_template('public/agendar.html', empresa=g.empresa, servico=servico,
+                                unidades=unidades, unidade_id=None, profissionais=None,
+                                hoje=date.today().isoformat())
+
+    profissionais = eligible_profissionais(servico, unidade_id=unidade_id)
     return render_template('public/agendar.html', empresa=g.empresa, servico=servico,
-                            profissionais=profissionais, hoje=date.today().isoformat())
+                            unidades=unidades, unidade_id=unidade_id, profissionais=profissionais,
+                            hoje=date.today().isoformat())
 
 
 @public_bp.route('/<slug>/agendar/<int:servico_id>/slots')
@@ -49,8 +79,10 @@ def slots_json(slug, servico_id):
     if not servico:
         abort(404)
 
+    unidade_id, _ = _resolver_unidade(g.empresa, request.args.get('unidade_id'))
     profissional_id = request.args.get('profissional_id', type=int)
-    profissional = next((p for p in eligible_profissionais(servico) if p.id == profissional_id), None)
+    profissional = next((p for p in eligible_profissionais(servico, unidade_id=unidade_id)
+                          if p.id == profissional_id), None)
     if not profissional:
         return jsonify(slots=[])
 
@@ -61,7 +93,7 @@ def slots_json(slug, servico_id):
     if data_sel < date.today():
         return jsonify(slots=[])
 
-    slots = get_available_slots(profissional.id, servico, data_sel)
+    slots = get_available_slots(profissional.id, servico, data_sel, unidade_id=unidade_id)
     return jsonify(slots=[s.strftime('%H:%M') for s in slots])
 
 
@@ -73,14 +105,18 @@ def agendar_submit(slug, servico_id):
     if not servico:
         abort(404)
 
+    unidade_id, unidades = _resolver_unidade(g.empresa, request.form.get('unidade_id'))
     profissional_id = request.form.get('profissional_id', type=int)
     nome_cliente = request.form.get('nome_cliente', '').strip()
     telefone = request.form.get('telefone', '').strip()
 
-    profissional = next((p for p in eligible_profissionais(servico) if p.id == profissional_id), None)
+    profissional = next((p for p in eligible_profissionais(servico, unidade_id=unidade_id)
+                          if p.id == profissional_id), None)
 
     erro = None
-    if not profissional:
+    if unidade_id is None and len(unidades) > 1:
+        erro = 'Escolha a unidade.'
+    elif not profissional:
         erro = 'Profissional inválido para este serviço.'
     elif not nome_cliente:
         erro = 'Informe seu nome.'
@@ -104,13 +140,13 @@ def agendar_submit(slug, servico_id):
             erro = 'Horário inválido.'
 
     if not erro:
-        disponiveis = get_available_slots(profissional.id, servico, data_val)
+        disponiveis = get_available_slots(profissional.id, servico, data_val, unidade_id=unidade_id)
         if hora_val not in disponiveis:
             erro = 'Esse horário não está mais disponível. Escolha outro.'
 
     if erro:
         flash(erro, 'error')
-        return redirect(url_for('public.agendar', slug=slug, servico_id=servico_id))
+        return redirect(url_for('public.agendar', slug=slug, servico_id=servico_id, unidade_id=unidade_id))
 
     duracao_min = max(15, (servico.duracao_horas or 0) * 60 + (servico.duracao_minutos or 0))
     agendamento = Agendamento(
@@ -119,7 +155,7 @@ def agendar_submit(slug, servico_id):
         profissional_id=profissional.id,
         servico_id=servico.id,
         servicos_lista=[servico],
-        unidade_id=profissional.unidade_id,
+        unidade_id=unidade_id if unidade_id is not None else profissional.unidade_id,
         data=data_val,
         hora_inicio=hora_val,
         duracao_min=duracao_min,

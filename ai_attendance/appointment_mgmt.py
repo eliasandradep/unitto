@@ -147,7 +147,7 @@ def _reschedule_aguardando_data(empresa, conversa, contexto, nlu_result, mensage
 
     agendamento = db.session.get(Agendamento, contexto['agendamento_id'])
     slots = get_available_slots(agendamento.profissional_id, agendamento.servico, data_val,
-                                 exclude_ag_id=agendamento.id)
+                                 unidade_id=agendamento.unidade_id, exclude_ag_id=agendamento.id)
     if not slots:
         salvar_conversa(conversa, 'APPOINTMENT_MANAGEMENT', 'reschedule_aguardando_data', contexto)
         return [f'Não há horários livres em {data_val.strftime("%d/%m")} com {agendamento.profissional.nome}. '
@@ -198,7 +198,7 @@ def _reschedule_confirmar(empresa, lead, conversa, contexto, mensagem):
     hora_val = _time(h, m)
 
     slots_atuais = get_available_slots(agendamento.profissional_id, agendamento.servico, data_val,
-                                        exclude_ag_id=agendamento.id)
+                                        unidade_id=agendamento.unidade_id, exclude_ag_id=agendamento.id)
     if hora_val not in slots_atuais:
         resetar_conversa(conversa)
         return ['Esse horário acabou de ficar indisponível. Se quiser, chame de novo pra escolher outro.']

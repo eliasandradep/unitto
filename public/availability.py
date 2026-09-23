@@ -1,13 +1,36 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
-from models import db, Profissional, Agendamento, ExpedienteDia
+from models import db, Profissional, Agendamento, ExpedienteDia, EscalaProfissionalUnidade
 from admin.routes import _find_expediente_conflict, _find_escala_conflict, _find_bloqueio_conflict
 
 
-def eligible_profissionais(servico):
+def unidade_efetiva_id(profissional, data=None):
+    """Unidade em que o profissional está efetivamente atuando numa data (hoje,
+    por padrão): a escala vigente pra essa data, se houver, senão a unidade
+    padrão do cadastro (profissional.unidade_id). Mesma fonte de verdade que
+    _find_escala_conflict já usa, só que respondendo "em qual unidade" em vez
+    de "há conflito com uma unidade específica"."""
+    data = data or date.today()
+    escala = EscalaProfissionalUnidade.query.filter(
+        EscalaProfissionalUnidade.profissional_id == profissional.id,
+        EscalaProfissionalUnidade.data_inicio <= data,
+        EscalaProfissionalUnidade.data_fim >= data,
+    ).first()
+    return escala.unidade_id if escala else profissional.unidade_id
+
+
+def eligible_profissionais(servico, unidade_id=None):
+    """Profissionais aptos a atender `servico`. Quando `unidade_id` é informado
+    (empresa com mais de uma unidade — cliente escolheu onde quer ser
+    atendido), filtra também por quem está efetivamente atuando ali hoje
+    (unidade_efetiva_id) — sem isso, um profissional escalado pra outra
+    unidade aparecia como opção mesmo lá não podendo atender."""
     pool = set(servico.categoria.profissionais) if servico.categoria else set()
     pool.update(servico.profissionais_adicionais)
-    return sorted((p for p in pool if p.ativo and p.agendamento_online), key=lambda p: p.nome)
+    elegiveis = (p for p in pool if p.ativo and p.agendamento_online)
+    if unidade_id is not None:
+        elegiveis = (p for p in elegiveis if unidade_efetiva_id(p) == unidade_id)
+    return sorted(elegiveis, key=lambda p: p.nome)
 
 
 def _find_agendamento_overlap(profissional_id, data, hora_inicio, duracao_min, agendamentos_do_dia, exclude_ag_id=None):
@@ -30,8 +53,16 @@ def _find_agendamento_overlap(profissional_id, data, hora_inicio, duracao_min, a
     return None
 
 
-def get_available_slots(profissional_id, servico, data, exclude_ag_id=None):
+def get_available_slots(profissional_id, servico, data, unidade_id=None, exclude_ag_id=None):
     """Retorna lista de `time` livres para `servico` com `profissional_id` em `data`.
+
+    `unidade_id`: unidade que o cliente escolheu (ou a do próprio agendamento,
+    ao remarcar). Quando informado, valida a escala contra ELA — não contra a
+    unidade padrão do profissional — senão alguém escalado hoje pra outra
+    unidade "conflitava" com o próprio cadastro e sempre voltava vazio, mesmo
+    estando disponível de verdade na unidade escolhida. None (comportamento
+    antigo, ainda usado por quem não passa unidade) cai de volta pra
+    prof.unidade_id.
 
     `exclude_ag_id` ignora um agendamento existente na checagem de overlap —
     usado ao remarcar (o próprio horário atual do agendamento não deve contar
@@ -47,7 +78,8 @@ def get_available_slots(profissional_id, servico, data, exclude_ag_id=None):
 
     duracao_min = max(15, (servico.duracao_horas or 0) * 60 + (servico.duracao_minutos or 0))
 
-    if _find_escala_conflict(profissional_id, prof.unidade_id, data):
+    unidade_ref = unidade_id if unidade_id is not None else prof.unidade_id
+    if _find_escala_conflict(profissional_id, unidade_ref, data):
         return []
 
     agendamentos_do_dia = Agendamento.query.filter(
