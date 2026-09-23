@@ -65,8 +65,18 @@ def _selecionar_por_indice_ou_nome(texto, itens, nomes):
 def processar(empresa, lead, telefone, conversa, nlu_result, mensagem) -> list:
     contexto = conversa.get_contexto()
     estado = conversa.estado
+    # True só na mensagem que TROUXE o cliente pro fluxo de agendamento (ex:
+    # "1" no menu principal, ou "quero marcar um corte" em texto livre) — essa
+    # mensagem já foi consumida pra selecionar o intent BOOKING, então não
+    # pode ser reaproveitada como resposta a uma pergunta que ainda nem foi
+    # feita. Sem essa guarda, um "1" que selecionou "Agendar horário" no menu
+    # virava, por coincidência de índice, "serviço 1" — agendando um serviço
+    # que o cliente nunca escolheu. servico_mencionado da IA continua valendo
+    # mesmo nessa mensagem (é extração por entendimento, não reaproveite cego
+    # de dígito).
+    entrando_agora = conversa.intent_ativo != 'BOOKING' or estado is None
 
-    if conversa.intent_ativo != 'BOOKING' or estado is None:
+    if entrando_agora:
         log_evento_ia(empresa, 'AI_BOOKING_STARTED', lead_id=lead.id if lead else None,
                        conversa_id=conversa.id, intent='BOOKING')
         contexto = {}
@@ -81,7 +91,7 @@ def processar(empresa, lead, telefone, conversa, nlu_result, mensagem) -> list:
     # ── Etapa: serviço ───────────────────────────────────────────────────
     if estado == 'aguardando_servico':
         servico = _casar_servico(servicos, nlu_result.get('servico_mencionado'))
-        if servico is None:
+        if servico is None and not entrando_agora:
             servico = _selecionar_por_indice_ou_nome(mensagem, servicos, [s.nome for s in servicos])
         if servico is None:
             salvar_conversa(conversa, 'BOOKING', 'aguardando_servico', contexto)
