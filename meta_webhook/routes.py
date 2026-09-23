@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import os
 import re
+from datetime import datetime, timedelta
 
 from flask import request, jsonify, current_app, url_for, g
 
@@ -94,6 +95,23 @@ def _texto_atendente_whatsapp(empresa):
     if numero:
         return f'Você pode falar direto com um de nossos atendentes por aqui: https://wa.me/{numero}'
     return 'Um atendente vai continuar seu atendimento por aqui em breve.'
+
+
+HANDOFF_REATIVACAO_HORAS = 1
+
+
+def _handoff_expirado(lead):
+    """True se o contato está transferido pra humano E ficou mais de
+    HANDOFF_REATIVACAO_HORAS em silêncio total desde a última atividade
+    (lead.updated_at avança a cada mensagem nova, mesmo enquanto transferido —
+    então uma troca contínua com o atendente nunca "expira" no meio). Sem
+    isso, uma vez transferido o bot nunca mais respondia esse contato,
+    permanentemente — mesmo semanas depois, numa conversa totalmente nova."""
+    if lead.contato_etapa != 'transferido':
+        return False
+    if not lead.updated_at:
+        return True
+    return datetime.utcnow() - lead.updated_at > timedelta(hours=HANDOFF_REATIVACAO_HORAS)
 
 
 def _processar_turno_whatsapp(integracao, evento, lead, fallback):
@@ -389,7 +407,9 @@ def _upsert_lead(integracao, evento):
                 if lead.phone and (lead.service or not servicos):
                     lead.contato_etapa = None
                     lead.aguardando_contato = False
-        elif evento['canal'] == 'whatsapp' and lead.contato_etapa != 'transferido':
+        elif evento['canal'] == 'whatsapp' and (lead.contato_etapa != 'transferido' or _handoff_expirado(lead)):
+            if lead.contato_etapa == 'transferido':
+                lead.contato_etapa = None  # reativa: mais de 1h em silêncio desde a transferência
             _processar_turno_whatsapp(integracao, evento, lead, _fluxo_regex_whatsapp)
         lead.message = evento['mensagem']
         if not lead.name and nome:
