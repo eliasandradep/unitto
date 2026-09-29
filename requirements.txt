@@ -1,3 +1,6 @@
+# cache-bust 2026-09-29: força o Nixpacks a reinstalar tudo do zero (build
+# anterior reaproveitou uma venv cacheada sem psycopg2 instalado, derrubando
+# a aplicação em produção com ModuleNotFoundError)
 APScheduler==3.11.2
 tzlocal==5.3.1
 tzdata==2026.2
