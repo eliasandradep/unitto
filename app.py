@@ -11,6 +11,13 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'unitto-dev-secret-2025')
 _db_url = os.getenv('DATABASE_URL', 'sqlite:///unitto.db')
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+if _db_url.startswith('postgresql://'):
+    # Força o driver psycopg2 explicitamente — sem isso, o SQLAlchemy escolhe
+    # o driver do Postgres automaticamente, e versões diferentes (SQLAlchemy
+    # não é pinado no requirements.txt) podem escolher 'psycopg' (v3) em vez
+    # de 'psycopg2' (o que de fato instalamos), derrubando a aplicação com
+    # ModuleNotFoundError assim que o cache de build muda.
+    _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI']        = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
