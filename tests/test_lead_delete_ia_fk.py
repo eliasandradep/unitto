@@ -12,7 +12,7 @@ def _login(client, empresa):
     user.set_password('senha123')
     db.session.add(user)
     db.session.commit()
-    client.post('/admin/login', data={'username': user.username, 'password': 'senha123'})
+    client.post('/admin/login', data={'email': user.email, 'password': 'senha123'})
 
 
 def _lead_com_ia_associada(empresa, integracao):

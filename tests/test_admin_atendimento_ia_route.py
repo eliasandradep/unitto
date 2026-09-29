@@ -10,7 +10,7 @@ def _login(client, empresa, role='empresa_admin'):
     user.set_password('senha123')
     db.session.add(user)
     db.session.commit()
-    resp = client.post('/admin/login', data={'username': user.username, 'password': 'senha123'},
+    resp = client.post('/admin/login', data={'email': user.email, 'password': 'senha123'},
                         follow_redirects=True)
     assert resp.status_code == 200
     return user

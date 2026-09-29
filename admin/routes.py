@@ -43,27 +43,14 @@ def index():
 
 
 def _buscar_user_por_login(identificador):
-    """Aceita usuário, CPF ou telefone no mesmo campo. Usuário é o único
-    identificador único de verdade no banco (email/telefone não têm
-    constraint de unicidade), então CPF e telefone comparam dígito a dígito
-    (ignorando pontuação/DDI) em vez de query direta."""
-    identificador = (identificador or '').strip()
+    """Login é exclusivamente por e-mail — o único identificador com
+    constraint de unicidade E obrigatoriedade de verdade no banco
+    (User.email, unique+not null). Username/CPF/telefone não autenticam mais
+    (decisão de produto: e-mail único jeito de entrar)."""
+    identificador = (identificador or '').strip().lower()
     if not identificador:
         return None
-    user = User.query.filter(db.func.lower(User.username) == identificador.lower()).first()
-    if user:
-        return user
-    digitos = re.sub(r'\D', '', identificador)
-    if len(digitos) == 11:  # CPF e celular com DDD têm o mesmo tamanho — tenta CPF primeiro
-        for u in User.query.filter(User.cpf.isnot(None)).all():
-            if re.sub(r'\D', '', u.cpf) == digitos:
-                return u
-    if len(digitos) >= 8:
-        alvo = digitos[-8:]
-        for u in User.query.filter(User.phone.isnot(None)).all():
-            if re.sub(r'\D', '', u.phone)[-8:] == alvo:
-                return u
-    return None
+    return User.query.filter(db.func.lower(User.email) == identificador).first()
 
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
@@ -81,7 +68,7 @@ def login():
         return redirect(url_for('admin.setup'))
 
     if request.method == 'POST':
-        identificador = request.form.get('username', '').strip()
+        identificador = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         user = _buscar_user_por_login(identificador)
         if user and user.is_active and user.check_password(password):
@@ -94,7 +81,7 @@ def login():
             if not is_administrador():
                 return redirect(url_for('admin.agenda'))
             return redirect(url_for('admin.dashboard'))
-        flash('Usuário, CPF, telefone ou senha incorretos.', 'error')
+        flash('E-mail ou senha incorretos.', 'error')
 
     return render_template('admin/login.html')
 
