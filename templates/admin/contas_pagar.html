@@ -36,6 +36,17 @@
         <option value="cancelado" {% if status_f == 'cancelado' %}selected{% endif %}>Cancelado</option>
       </select>
     </div>
+    {% if unidades_list|length > 1 %}
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Unidade</label>
+      <select name="unidade">
+        <option value="">Todas</option>
+        {% for u in unidades_list %}
+        <option value="{{ u.id }}" {% if unidade_f == u.id|string %}selected{% endif %}>{{ u.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <div style="display:flex;gap:.5rem">
       <button type="submit" class="btn-primary">Buscar</button>
       <a href="{{ url_for('admin.contas_pagar') }}" class="btn-secondary">Limpar</a>
@@ -60,6 +71,7 @@
         <th>Descrição</th>
         <th>Fornecedor</th>
         <th>Categoria</th>
+        {% if unidades_list|length > 1 %}<th>Unidade</th>{% endif %}
         <th>Vencimento</th>
         <th style="text-align:right">Valor</th>
         <th>Status</th>
@@ -74,6 +86,7 @@
         <td>{{ cp.descricao }}</td>
         <td>{{ cp.fornecedor or '—' }}</td>
         <td>{{ cp.categoria_financeira.nome if cp.categoria_financeira else (cp.categoria or '—') }}</td>
+        {% if unidades_list|length > 1 %}<td>{{ cp.unidade.label() if cp.unidade else '—' }}</td>{% endif %}
         <td>
           {{ cp.vencimento.strftime('%d/%m/%Y') }}
           {% if cp.status == 'pendente' and cp.vencimento.isoformat() < hoje %}
@@ -158,6 +171,17 @@
           <input type="text" name="fornecedor" placeholder="Nome do fornecedor..." />
         </div>
       </div>
+      {% if unidades_list|length > 1 %}
+      <div class="form-group">
+        <label>Unidade</label>
+        <select name="unidade_id">
+          <option value="">— Selecionar —</option>
+          {% for u in unidades_list %}
+          <option value="{{ u.id }}">{{ u.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="form-group">
         <label>Observações</label>
         <textarea name="observacoes" rows="2" placeholder="Opcional..."></textarea>

@@ -458,6 +458,8 @@ with app.app_context():
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('contas_pagar',   'categoria_id', 'INTEGER')
     _safe_add_col('contas_receber', 'categoria_id', 'INTEGER')
+    _safe_add_col('contas_pagar',   'unidade_id',   'INTEGER')
+    _safe_add_col('contas_receber', 'unidade_id',   'INTEGER')
     _safe_add_col('integracoes_meta','numero_whatsapp',    'VARCHAR(30)')
     _safe_add_col('profissionais', 'obs',                 'TEXT')
     _safe_add_col('profissionais', 'perfil_acesso',       "VARCHAR(20) DEFAULT 'profissional'")

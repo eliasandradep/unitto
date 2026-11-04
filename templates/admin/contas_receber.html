@@ -36,6 +36,17 @@
         <option value="cancelado" {% if status_f == 'cancelado' %}selected{% endif %}>Cancelado</option>
       </select>
     </div>
+    {% if unidades_list|length > 1 %}
+    <div class="form-group" style="margin:0">
+      <label style="font-size:.8rem">Unidade</label>
+      <select name="unidade">
+        <option value="">Todas</option>
+        {% for u in unidades_list %}
+        <option value="{{ u.id }}" {% if unidade_f == u.id|string %}selected{% endif %}>{{ u.label() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <div style="display:flex;gap:.5rem">
       <button type="submit" class="btn-primary">Buscar</button>
       <a href="{{ url_for('admin.contas_receber') }}" class="btn-secondary">Limpar</a>
@@ -60,6 +71,7 @@
         <th>Descrição</th>
         <th>Cliente</th>
         <th>Categoria</th>
+        {% if unidades_list|length > 1 %}<th>Unidade</th>{% endif %}
         <th>Comanda</th>
         <th>Vencimento</th>
         <th style="text-align:right">Valor</th>
@@ -79,6 +91,7 @@
           {% else %}—{% endif %}
         </td>
         <td>{{ cr.categoria_financeira.nome if cr.categoria_financeira else '—' }}</td>
+        {% if unidades_list|length > 1 %}<td>{{ cr.unidade.label() if cr.unidade else '—' }}</td>{% endif %}
         <td>
           {% if cr.comanda_id %}
             <a href="{{ url_for('admin.comanda_detalhe', comanda_id=cr.comanda_id) }}" style="color:var(--gold)">#{{ cr.comanda.codigo if cr.comanda else cr.comanda_id }}</a>
@@ -173,6 +186,17 @@
           {% endif %}
         </div>
       </div>
+      {% if unidades_list|length > 1 %}
+      <div class="form-group">
+        <label>Unidade</label>
+        <select name="unidade_id">
+          <option value="">— Selecionar —</option>
+          {% for u in unidades_list %}
+          <option value="{{ u.id }}">{{ u.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="form-group">
         <label>Observações</label>
         <textarea name="observacoes" rows="2" placeholder="Opcional..."></textarea>

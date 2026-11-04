@@ -2859,6 +2859,7 @@ def _sync_conta_receber(c):
             if cr:
                 cr.valor = saldo_dev
                 cr.cliente_id = c.cliente_id
+                cr.unidade_id = c.unidade_id
             else:
                 already_received = tq(ContaReceber).filter_by(
                     comanda_id=c.id, status='recebido').first()
@@ -2869,6 +2870,7 @@ def _sync_conta_receber(c):
                         vencimento=c.data,
                         cliente_id=c.cliente_id,
                         comanda_id=c.id,
+                        unidade_id=c.unidade_id,
                     ))
         else:
             for cr in tq(ContaReceber).filter_by(comanda_id=c.id, status='pendente').all():
@@ -3218,6 +3220,7 @@ def contas_pagar():
             valor_s  = request.form.get('valor', '').strip().replace(',', '.')
             venc_s   = request.form.get('vencimento', '').strip()
             cat_id_s = request.form.get('categoria_id', '').strip()
+            uni_id_s = request.form.get('unidade_id', '').strip()
             forn     = request.form.get('fornecedor', '').strip() or None
             obs      = request.form.get('observacoes', '').strip() or None
             if not desc or not valor_s or not venc_s:
@@ -3229,6 +3232,7 @@ def contas_pagar():
                         descricao=desc, valor=Decimal(valor_s),
                         vencimento=_date.fromisoformat(venc_s),
                         categoria_id=int(cat_id_s) if cat_id_s else None,
+                        unidade_id=int(uni_id_s) if uni_id_s else None,
                         fornecedor=forn, observacoes=obs,
                     ))
                     db.session.commit()
@@ -3241,9 +3245,15 @@ def contas_pagar():
     status_f  = request.args.get('status', '')
     dt_ini_s  = request.args.get('dt_ini', '')
     dt_fim_s  = request.args.get('dt_fim', '')
+    unidade_f = request.args.get('unidade', '')
     q = tq(ContaPagar)
     if status_f:
         q = q.filter_by(status=status_f)
+    if unidade_f:
+        try:
+            q = q.filter_by(unidade_id=int(unidade_f))
+        except ValueError:
+            pass
     if dt_ini_s:
         try:
             q = q.filter(ContaPagar.vencimento >= _date.fromisoformat(dt_ini_s))
@@ -3258,11 +3268,12 @@ def contas_pagar():
     total_pendente = sum(cp.valor for cp in contas if cp.status == 'pendente')
     total_pago     = sum(cp.valor for cp in contas if cp.status == 'pago')
     categorias_fin = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
+    unidades_list  = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     return render_template('admin/contas_pagar.html', contas=contas,
-                           status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s,
+                           status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s, unidade_f=unidade_f,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
                            total_pendente=total_pendente, total_pago=total_pago,
-                           categorias_fin=categorias_fin)
+                           categorias_fin=categorias_fin, unidades_list=unidades_list)
 
 
 @admin_bp.route('/financeiro/contas-a-pagar/<int:conta_id>/pagar', methods=['POST'])
@@ -3310,6 +3321,7 @@ def contas_receber():
             venc_s    = request.form.get('vencimento', '').strip()
             cli_s     = request.form.get('cliente_id', '').strip()
             cat_id_s  = request.form.get('categoria_id', '').strip()
+            uni_id_s  = request.form.get('unidade_id', '').strip()
             obs       = request.form.get('observacoes', '').strip() or None
             if not desc or not valor_s or not venc_s:
                 flash('Preencha descrição, valor e vencimento.', 'error')
@@ -3321,6 +3333,7 @@ def contas_receber():
                         vencimento=_date.fromisoformat(venc_s),
                         cliente_id=int(cli_s) if cli_s else None,
                         categoria_id=int(cat_id_s) if cat_id_s else None,
+                        unidade_id=int(uni_id_s) if uni_id_s else None,
                         observacoes=obs,
                     ))
                     db.session.commit()
@@ -3333,9 +3346,15 @@ def contas_receber():
     status_f  = request.args.get('status', '')
     dt_ini_s  = request.args.get('dt_ini', '')
     dt_fim_s  = request.args.get('dt_fim', '')
+    unidade_f = request.args.get('unidade', '')
     q = tq(ContaReceber)
     if status_f:
         q = q.filter_by(status=status_f)
+    if unidade_f:
+        try:
+            q = q.filter_by(unidade_id=int(unidade_f))
+        except ValueError:
+            pass
     if dt_ini_s:
         try:
             q = q.filter(ContaReceber.vencimento >= _date.fromisoformat(dt_ini_s))
@@ -3351,11 +3370,12 @@ def contas_receber():
     total_recebido  = sum(cr.valor for cr in contas if cr.status == 'recebido')
     clientes_list   = tq(Cliente).order_by(Cliente.nome).all()
     categorias_fin  = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
+    unidades_list   = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     return render_template('admin/contas_receber.html', contas=contas,
-                           status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s,
+                           status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s, unidade_f=unidade_f,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
                            total_pendente=total_pendente, total_recebido=total_recebido,
-                           clientes_list=clientes_list, categorias_fin=categorias_fin)
+                           clientes_list=clientes_list, categorias_fin=categorias_fin, unidades_list=unidades_list)
 
 
 @admin_bp.route('/financeiro/contas-a-receber/<int:conta_id>/receber', methods=['POST'])
