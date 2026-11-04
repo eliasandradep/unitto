@@ -23,7 +23,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     Pacote, PacoteItem, VendaPacote, VendaPacoteItem,
                     EscalaProfissionalUnidade, RecebimentoCliente,
                     ContaPagar, ContaReceber, FormaPagamento,
-                    CategoriaProduto, Produto, IntegracaoMeta, ContatoIgnorado,
+                    CategoriaProduto, CategoriaFinanceira, Produto, IntegracaoMeta, ContatoIgnorado,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
                     META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento)
@@ -3159,6 +3159,52 @@ def comanda_excluir(comanda_id):
     return redirect(url_for('admin.financeiro_comandas'))
 
 
+# ── Categorias Financeiras (Contas a Pagar/Receber) ───────────────────────────
+
+@admin_bp.route('/financeiro/categorias', methods=['GET', 'POST'])
+@login_required
+def financeiro_categorias():
+    if request.method == 'POST':
+        action  = request.form.get('action')
+        cat_id  = request.form.get('id', '')
+        nome    = request.form.get('nome', '').strip()
+        descr   = request.form.get('descricao', '').strip() or None
+
+        if action == 'save':
+            if not nome:
+                flash('Nome é obrigatório.', 'error')
+            elif cat_id:
+                c = db.get_or_404(CategoriaFinanceira, int(cat_id))
+                c.nome, c.descricao = nome, descr
+                db.session.commit()
+                flash('Categoria atualizada.', 'success')
+            else:
+                db.session.add(CategoriaFinanceira(nome=nome, descricao=descr))
+                db.session.commit()
+                flash('Categoria criada.', 'success')
+
+        elif action == 'delete' and cat_id:
+            c = db.get_or_404(CategoriaFinanceira, int(cat_id))
+            em_uso = (tq(ContaPagar).filter_by(categoria_id=c.id).first()
+                      or tq(ContaReceber).filter_by(categoria_id=c.id).first())
+            if em_uso:
+                flash('Categoria está em uso e não pode ser excluída.', 'error')
+            else:
+                db.session.delete(c)
+                db.session.commit()
+                flash('Categoria excluída.', 'success')
+
+        elif action == 'toggle' and cat_id:
+            c = db.get_or_404(CategoriaFinanceira, int(cat_id))
+            c.ativo = not c.ativo
+            db.session.commit()
+
+        return redirect(url_for('admin.financeiro_categorias'))
+
+    all_cats = tq(CategoriaFinanceira).order_by(CategoriaFinanceira.nome).all()
+    return render_template('admin/financeiro_categorias.html', categorias=all_cats)
+
+
 # ── Contas a Pagar ────────────────────────────────────────────────────────────
 
 @admin_bp.route('/financeiro/contas-a-pagar', methods=['GET', 'POST'])
@@ -3171,7 +3217,7 @@ def contas_pagar():
             desc     = request.form.get('descricao', '').strip()
             valor_s  = request.form.get('valor', '').strip().replace(',', '.')
             venc_s   = request.form.get('vencimento', '').strip()
-            categ    = request.form.get('categoria', '').strip() or None
+            cat_id_s = request.form.get('categoria_id', '').strip()
             forn     = request.form.get('fornecedor', '').strip() or None
             obs      = request.form.get('observacoes', '').strip() or None
             if not desc or not valor_s or not venc_s:
@@ -3182,7 +3228,8 @@ def contas_pagar():
                     db.session.add(ContaPagar(
                         descricao=desc, valor=Decimal(valor_s),
                         vencimento=_date.fromisoformat(venc_s),
-                        categoria=categ, fornecedor=forn, observacoes=obs,
+                        categoria_id=int(cat_id_s) if cat_id_s else None,
+                        fornecedor=forn, observacoes=obs,
                     ))
                     db.session.commit()
                     flash('Conta a pagar criada.', 'success')
@@ -3210,10 +3257,12 @@ def contas_pagar():
     contas = q.order_by(ContaPagar.vencimento.asc()).all()
     total_pendente = sum(cp.valor for cp in contas if cp.status == 'pendente')
     total_pago     = sum(cp.valor for cp in contas if cp.status == 'pago')
+    categorias_fin = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
     return render_template('admin/contas_pagar.html', contas=contas,
                            status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
-                           total_pendente=total_pendente, total_pago=total_pago)
+                           total_pendente=total_pendente, total_pago=total_pago,
+                           categorias_fin=categorias_fin)
 
 
 @admin_bp.route('/financeiro/contas-a-pagar/<int:conta_id>/pagar', methods=['POST'])
@@ -3260,6 +3309,7 @@ def contas_receber():
             valor_s   = request.form.get('valor', '').strip().replace(',', '.')
             venc_s    = request.form.get('vencimento', '').strip()
             cli_s     = request.form.get('cliente_id', '').strip()
+            cat_id_s  = request.form.get('categoria_id', '').strip()
             obs       = request.form.get('observacoes', '').strip() or None
             if not desc or not valor_s or not venc_s:
                 flash('Preencha descrição, valor e vencimento.', 'error')
@@ -3270,6 +3320,7 @@ def contas_receber():
                         descricao=desc, valor=Decimal(valor_s),
                         vencimento=_date.fromisoformat(venc_s),
                         cliente_id=int(cli_s) if cli_s else None,
+                        categoria_id=int(cat_id_s) if cat_id_s else None,
                         observacoes=obs,
                     ))
                     db.session.commit()
@@ -3299,11 +3350,12 @@ def contas_receber():
     total_pendente  = sum(cr.valor for cr in contas if cr.status == 'pendente')
     total_recebido  = sum(cr.valor for cr in contas if cr.status == 'recebido')
     clientes_list   = tq(Cliente).order_by(Cliente.nome).all()
+    categorias_fin  = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
     return render_template('admin/contas_receber.html', contas=contas,
                            status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
                            total_pendente=total_pendente, total_recebido=total_recebido,
-                           clientes_list=clientes_list)
+                           clientes_list=clientes_list, categorias_fin=categorias_fin)
 
 
 @admin_bp.route('/financeiro/contas-a-receber/<int:conta_id>/receber', methods=['POST'])

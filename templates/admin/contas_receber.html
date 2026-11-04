@@ -59,6 +59,7 @@
       <tr>
         <th>Descrição</th>
         <th>Cliente</th>
+        <th>Categoria</th>
         <th>Comanda</th>
         <th>Vencimento</th>
         <th style="text-align:right">Valor</th>
@@ -77,6 +78,7 @@
             <a href="{{ url_for('admin.cliente_detalhe', cliente_id=cr.cliente_id) }}" style="color:var(--gold)">{{ cr.cliente.nome }}</a>
           {% else %}—{% endif %}
         </td>
+        <td>{{ cr.categoria_financeira.nome if cr.categoria_financeira else '—' }}</td>
         <td>
           {% if cr.comanda_id %}
             <a href="{{ url_for('admin.comanda_detalhe', comanda_id=cr.comanda_id) }}" style="color:var(--gold)">#{{ cr.comanda.codigo if cr.comanda else cr.comanda_id }}</a>
@@ -146,14 +148,30 @@
           <input type="date" name="vencimento" required value="{{ hoje }}" />
         </div>
       </div>
-      <div class="form-group">
-        <label>Cliente</label>
-        <select name="cliente_id">
-          <option value="">— Nenhum —</option>
-          {% for cl in clientes_list %}
-          <option value="{{ cl.id }}">{{ cl.nome }}</option>
-          {% endfor %}
-        </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+        <div class="form-group">
+          <label>Cliente</label>
+          <select name="cliente_id">
+            <option value="">— Nenhum —</option>
+            {% for cl in clientes_list %}
+            <option value="{{ cl.id }}">{{ cl.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select name="categoria_id">
+            <option value="">— Selecionar —</option>
+            {% for cat in categorias_fin %}
+            <option value="{{ cat.id }}">{{ cat.nome }}</option>
+            {% endfor %}
+          </select>
+          {% if not categorias_fin %}
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+            Nenhuma categoria cadastrada ainda — <a href="{{ url_for('admin.financeiro_categorias') }}">cadastre aqui</a>.
+          </p>
+          {% endif %}
+        </div>
       </div>
       <div class="form-group">
         <label>Observações</label>

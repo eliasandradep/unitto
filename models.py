@@ -496,6 +496,18 @@ class CategoriaProduto(db.Model):
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
 
 
+class CategoriaFinanceira(db.Model):
+    """Categoria de Contas a Pagar/Receber — mesma lista usada nos dois,
+    como no Gendo (ex: Aluguel, Fornecedores, Serviços, Vendas...)."""
+    __tablename__ = 'categorias_financeiras'
+    id         = db.Column(db.Integer, primary_key=True)
+    nome       = db.Column(db.String(100), nullable=False)
+    descricao  = db.Column(db.String(200))
+    ativo      = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+
+
 class Produto(db.Model):
     __tablename__ = 'produtos'
     id              = db.Column(db.Integer, primary_key=True)
@@ -881,7 +893,8 @@ class ContaPagar(db.Model):
     descricao       = db.Column(db.String(200), nullable=False)
     valor           = db.Column(db.Numeric(10, 2), nullable=False)
     vencimento      = db.Column(db.Date, nullable=False)
-    categoria       = db.Column(db.String(100))
+    categoria       = db.Column(db.String(100))  # legado (texto livre) — mantido só pra não perder dados antigos; novas contas usam categoria_id
+    categoria_id    = db.Column(db.Integer, db.ForeignKey('categorias_financeiras.id'), nullable=True)
     fornecedor      = db.Column(db.String(100))
     status          = db.Column(db.String(20), default='pendente')  # pendente, pago, cancelado
     forma_pagamento = db.Column(db.String(30))
@@ -889,6 +902,8 @@ class ContaPagar(db.Model):
     observacoes     = db.Column(db.Text)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id      = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    categoria_financeira = db.relationship('CategoriaFinanceira', foreign_keys=[categoria_id],
+                                            backref='contas_pagar')
 
 
 class ContaReceber(db.Model):
@@ -897,6 +912,7 @@ class ContaReceber(db.Model):
     descricao        = db.Column(db.String(200), nullable=False)
     valor            = db.Column(db.Numeric(10, 2), nullable=False)
     vencimento       = db.Column(db.Date, nullable=False)
+    categoria_id     = db.Column(db.Integer, db.ForeignKey('categorias_financeiras.id'), nullable=True)
     cliente_id       = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
     comanda_id       = db.Column(db.Integer, db.ForeignKey('comandas.id'), nullable=True)
     status           = db.Column(db.String(20), default='pendente')  # pendente, recebido, cancelado
@@ -907,6 +923,8 @@ class ContaReceber(db.Model):
     empresa_id       = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
     cliente          = db.relationship('Cliente', backref='contas_receber')
     comanda          = db.relationship('Comanda', backref='contas_receber', foreign_keys=[comanda_id])
+    categoria_financeira = db.relationship('CategoriaFinanceira', foreign_keys=[categoria_id],
+                                            backref='contas_receber')
 
 
 class AnamneseCorporal(db.Model):
