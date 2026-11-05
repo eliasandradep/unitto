@@ -1246,6 +1246,10 @@ body.sidebar--collapsed .snav-link[data-tooltip]:hover::after { opacity: 1; }
 }
 /* Horário indisponível (expediente) */
 .ag-indisponivel {
+  /* Só indica visualmente que é fora do expediente cadastrado — não bloqueia
+     o clique. Expediente restringe só o agendamento online; recepção e
+     profissional podem marcar aqui pelo painel interno normalmente, então
+     o clique passa direto pra célula de baixo (pointer-events:none). */
   position: absolute; left: 0; right: 0; z-index: 3;
   background: repeating-linear-gradient(
     -45deg,
@@ -1253,8 +1257,7 @@ body.sidebar--collapsed .snav-link[data-tooltip]:hover::after { opacity: 1; }
     transparent 4px, transparent 10px
   );
   background-color: rgba(120,120,120,.09);
-  pointer-events: auto;
-  cursor: not-allowed;
+  pointer-events: none;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
