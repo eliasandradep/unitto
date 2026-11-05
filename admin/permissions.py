@@ -65,7 +65,9 @@ def is_administrador():
 
 def tem_acesso_catalogo():
     """Telas de catálogo (Serviços, Categorias, Produtos, Profissionais,
-    Unidades, Expedientes, Pacotes) — administrador e atendente têm acesso
-    de leitura/escrita; exclusão continua restrita a administrador, checada
-    em cada rota (ver admin/__init__.py)."""
-    return current_perfil() in ('administrador', 'atendente')
+    Unidades, Expedientes, Pacotes) — administrador, atendente e recepção
+    têm acesso de leitura/escrita; exclusão continua restrita a
+    administrador, checada em cada rota (ver admin/__init__.py). Usuários,
+    Configurações, Financeiro e Integrações continuam fora — são cadastros
+    estratégicos, não de catálogo."""
+    return current_perfil() in ('administrador', 'atendente', 'recepcao')
