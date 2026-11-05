@@ -150,21 +150,21 @@
             <label>Data Início <span class="required">*</span></label>
             <input type="date" name="data_inicio" id="blDtIni" required />
           </div>
-          <div class="form-group" id="blHiWrap">
-            <label>Hora Início</label>
-            <input type="time" name="hora_inicio" id="blHi" step="900" />
-          </div>
-        </div>
-
-        <div class="form-row">
           <div class="form-group">
             <label>Data Fim <span class="required">*</span></label>
             <input type="date" name="data_fim" id="blDtFim" required />
           </div>
-          <div class="form-group" id="blHfWrap">
-            <label>Hora Fim</label>
-            <input type="time" name="hora_fim" id="blHf" step="900" />
-          </div>
+        </div>
+
+        <div class="form-group" id="blHorariosWrap">
+          <label>Horário(s) do bloqueio</label>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:.1rem 0 .5rem">
+            Repete todos os dias dentro do período acima. Use "Adicionar outro horário" para
+            bloquear mais de uma janela por dia (ex: almoço e pausa da tarde).
+          </p>
+          <div id="blHorarios"></div>
+          <button type="button" class="btn-secondary" id="blAddHorario" onclick="addHorarioRow()"
+                  style="font-size:.82rem;padding:.4rem .8rem">+ Adicionar outro horário</button>
         </div>
 
         <div class="form-group">
@@ -215,20 +215,48 @@ function closeModal() {
   document.getElementById('modalBackdrop').classList.remove('open');
   resetForm();
 }
+function addHorarioRow(hi, hf) {
+  var wrap = document.getElementById('blHorarios');
+  var isFirst = wrap.children.length === 0;
+  var row = document.createElement('div');
+  row.className = 'bl-horario-row';
+  row.style.cssText = 'display:flex;gap:.6rem;align-items:flex-end;margin-bottom:.6rem';
+  row.innerHTML =
+    '<div class="form-group" style="margin:0;flex:1">' +
+      '<label style="font-size:.8rem">Hora Início</label>' +
+      '<input type="time" name="hora_inicio[]" step="900" required value="' + (hi || '') + '" />' +
+    '</div>' +
+    '<div class="form-group" style="margin:0;flex:1">' +
+      '<label style="font-size:.8rem">Hora Fim</label>' +
+      '<input type="time" name="hora_fim[]" step="900" required value="' + (hf || '') + '" />' +
+    '</div>' +
+    (isFirst ? '' :
+      '<button type="button" class="btn-icon btn-icon--danger" title="Remover horário" ' +
+      'onclick="this.closest(\'.bl-horario-row\').remove()" style="margin-bottom:.35rem">' +
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">' +
+      '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>');
+  wrap.appendChild(row);
+}
+function resetHorarios() {
+  document.getElementById('blHorarios').innerHTML = '';
+  addHorarioRow();
+}
 function resetForm() {
   document.getElementById('blForm').action = NEW_URL;
   document.getElementById('modalTitle').textContent = 'Criar novo Bloqueio de Agenda';
-  ['blProf','blDtIni','blDtFim','blHi','blHf','blMotivo'].forEach(function(id) {
+  ['blProf','blDtIni','blDtFim','blMotivo'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('blDiaInteiro').checked = false;
+  resetHorarios();
+  document.getElementById('blAddHorario').style.display = '';
   toggleDiaInteiro(false);
 }
 function toggleDiaInteiro(on) {
-  document.getElementById('blHiWrap').style.visibility = on ? 'hidden' : 'visible';
-  document.getElementById('blHfWrap').style.visibility = on ? 'hidden' : 'visible';
-  document.getElementById('blHi').required = !on;
-  document.getElementById('blHf').required = !on;
+  document.getElementById('blHorariosWrap').style.display = on ? 'none' : '';
+  document.querySelectorAll('#blHorarios input[type="time"]').forEach(function(inp) {
+    inp.required = !on;
+  });
 }
 function editBloqueio(btn) {
   var d = btn.dataset;
@@ -237,9 +265,10 @@ function editBloqueio(btn) {
   document.getElementById('blProf').value   = d.prof;
   document.getElementById('blDtIni').value  = d.ini;
   document.getElementById('blDtFim').value  = d.fim;
-  document.getElementById('blHi').value     = d.hi;
-  document.getElementById('blHf').value     = d.hf;
   document.getElementById('blMotivo').value = d.motivo;
+  document.getElementById('blHorarios').innerHTML = '';
+  addHorarioRow(d.hi, d.hf);
+  document.getElementById('blAddHorario').style.display = 'none';
   var diaInt = d.dia === '1';
   document.getElementById('blDiaInteiro').checked = diaInt;
   toggleDiaInteiro(diaInt);
@@ -264,6 +293,7 @@ function submitBulkDelete() {
   document.getElementById('bulkForm').submit();
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+resetHorarios();
 </script>
 
 {% endblock %}

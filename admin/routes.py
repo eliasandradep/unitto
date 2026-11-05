@@ -2011,8 +2011,17 @@ def expediente_excluir(exp_id):
 
 # ── Bloqueios de Agenda ───────────────────────────────────────────────────────
 
-def _build_bloqueio(b):
-    from datetime import date, time as _time
+def _parse_hora_bloqueio(valor):
+    from datetime import time as _time
+    h, m = map(int, valor.split(':'))
+    return _time(h, m)
+
+
+def _validar_bloqueio_base(b):
+    """Preenche profissional/data/dia_inteiro/motivo a partir do form. Não
+    toca em hora_inicio/hora_fim — isso fica a cargo de cada caminho (edição
+    de um único bloqueio vs. criação com múltiplas janelas de horário)."""
+    from datetime import date
     prof_id     = request.form.get('profissional_id', '').strip()
     data_ini    = request.form.get('data_inicio', '').strip()
     data_fim    = request.form.get('data_fim', '').strip()
@@ -2037,24 +2046,34 @@ def _build_bloqueio(b):
     b.profissional_id = int(prof_id) if prof_id else None
     b.dia_inteiro     = dia_inteiro
     b.motivo          = motivo
+    return True
 
-    if dia_inteiro:
+
+def _build_bloqueio(b):
+    """Cria/edita um único bloqueio — usado na edição, que sempre lida com
+    uma única janela de horário (a criação aceita múltiplas, ver
+    agenda_bloqueios())."""
+    if not _validar_bloqueio_base(b):
+        return False
+
+    if b.dia_inteiro:
         b.hora_inicio = None
         b.hora_fim    = None
-    else:
-        hi = request.form.get('hora_inicio', '').strip()
-        hf = request.form.get('hora_fim', '').strip()
-        if not hi or not hf:
-            flash('Informe hora início e fim.', 'error')
-            return False
-        try:
-            hi_h, hi_m = map(int, hi.split(':'))
-            hf_h, hf_m = map(int, hf.split(':'))
-            b.hora_inicio = _time(hi_h, hi_m)
-            b.hora_fim    = _time(hf_h, hf_m)
-        except Exception:
-            flash('Hora inválida.', 'error')
-            return False
+        return True
+
+    horas_ini = request.form.getlist('hora_inicio[]')
+    horas_fim = request.form.getlist('hora_fim[]')
+    hi = (horas_ini[0] if horas_ini else '').strip()
+    hf = (horas_fim[0] if horas_fim else '').strip()
+    if not hi or not hf:
+        flash('Informe hora início e fim.', 'error')
+        return False
+    try:
+        b.hora_inicio = _parse_hora_bloqueio(hi)
+        b.hora_fim    = _parse_hora_bloqueio(hf)
+    except Exception:
+        flash('Hora inválida.', 'error')
+        return False
 
     return True
 
@@ -2079,11 +2098,52 @@ def agenda_bloqueios():
                 flash(f'{len(ids)} bloqueio(s) removido(s).', 'success')
             return redirect(url_for('admin.agenda_bloqueios'))
 
-        b = BloqueioAgenda()
-        if _build_bloqueio(b):
-            db.session.add(b)
+        base = BloqueioAgenda()
+        if not _validar_bloqueio_base(base):
+            return redirect(url_for('admin.agenda_bloqueios'))
+
+        if base.dia_inteiro:
+            db.session.add(base)
             db.session.commit()
             flash('Bloqueio criado com sucesso.', 'success')
+            return redirect(url_for('admin.agenda_bloqueios'))
+
+        horas_ini = request.form.getlist('hora_inicio[]')
+        horas_fim = request.form.getlist('hora_fim[]')
+        pares = [(hi.strip(), hf.strip()) for hi, hf in zip(horas_ini, horas_fim)
+                 if hi.strip() and hf.strip()]
+        if not pares:
+            flash('Informe pelo menos um horário de início e fim.', 'error')
+            return redirect(url_for('admin.agenda_bloqueios'))
+
+        criados = 0
+        for hi, hf in pares:
+            try:
+                hora_ini_t = _parse_hora_bloqueio(hi)
+                hora_fim_t = _parse_hora_bloqueio(hf)
+            except Exception:
+                flash(f'Horário inválido: {hi} - {hf}.', 'error')
+                continue
+            if hora_fim_t <= hora_ini_t:
+                flash(f'Hora fim deve ser depois da hora início ({hi} - {hf}).', 'error')
+                continue
+            db.session.add(BloqueioAgenda(
+                profissional_id=base.profissional_id,
+                data_inicio=base.data_inicio,
+                data_fim=base.data_fim,
+                dia_inteiro=False,
+                motivo=base.motivo,
+                hora_inicio=hora_ini_t,
+                hora_fim=hora_fim_t,
+            ))
+            criados += 1
+
+        if criados:
+            db.session.commit()
+            if criados == 1:
+                flash('Bloqueio criado com sucesso.', 'success')
+            else:
+                flash(f'{criados} bloqueios criados com sucesso (um para cada horário informado).', 'success')
         return redirect(url_for('admin.agenda_bloqueios'))
 
     # Filtros
