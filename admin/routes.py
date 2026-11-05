@@ -455,6 +455,9 @@ def user_new():
         if requested_role == 'saas_admin' and current_user.role != 'saas_admin':
             flash('Você não tem permissão para atribuir o papel SaaS Admin.', 'error')
             return render_template('admin/user_form.html', user=None, roles=ROLES)
+        if requested_role == 'profissional':
+            flash('Contas de profissional são criadas pelo cadastro de Profissionais, não por aqui.', 'error')
+            return render_template('admin/user_form.html', user=None, roles=ROLES)
 
         error = _validate_user(name, username, email, password, confirm)
         if error:
@@ -507,6 +510,9 @@ def user_edit(user_id):
             requested_role = request.form.get('role', user.role)
             if requested_role == 'saas_admin' and current_user.role != 'saas_admin':
                 flash('Você não tem permissão para atribuir o papel SaaS Admin.', 'error')
+                return render_template('admin/user_form.html', user=user, roles=ROLES)
+            if requested_role == 'profissional' and user.role != 'profissional':
+                flash('Contas de profissional são criadas pelo cadastro de Profissionais, não por aqui.', 'error')
                 return render_template('admin/user_form.html', user=user, roles=ROLES)
 
             user.name     = name

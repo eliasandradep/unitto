@@ -21,12 +21,12 @@
     <div class="form-group">
       <label>Telefone para contato</label>
       <input type="tel" name="phone" value="{{ user.phone if user else '' }}" />
-      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Pode ser usado para login, além do usuário.</p>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional, uso interno — o login é feito só por e-mail.</p>
     </div>
     <div class="form-group">
       <label>CPF</label>
       <input type="text" name="cpf" id="cpfInput" value="{{ user.cpf if user else '' }}" placeholder="000.000.000-00" maxlength="14" />
-      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional. Pode ser usado para login, além do usuário.</p>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional, uso interno — o login é feito só por e-mail.</p>
     </div>
     <div class="form-group">
       <label>{{ 'Nova senha' if user else 'Senha' }} {% if not user %}<span class="required">*</span>{% endif %}</label>
@@ -37,18 +37,36 @@
       <label>Confirmar senha</label>
       <input type="password" name="confirm" />
     </div>
-    {% if current_user.has_role('empresa_admin', 'saas_admin') %}
+    {% if user and user.role == 'profissional' %}
+    <div class="form-group">
+      <label>Papel (nível de acesso)</label>
+      <p style="font-size:.85rem;color:var(--text-muted);margin:.2rem 0 0">
+        Profissional — vinculado ao cadastro de
+        {% if user.profissional %}
+        <a href="{{ url_for('admin.profissional_detalhe', prof_id=user.profissional_id) }}">{{ user.profissional.nome }}</a>.
+        {% else %}
+        um profissional.
+        {% endif %}
+        O papel não é editável por aqui; gerencie pelo cadastro de Profissionais.
+      </p>
+    </div>
+    {% elif current_user.has_role('empresa_admin', 'saas_admin') %}
     <div class="form-group">
       <label>Papel (nível de acesso)</label>
       <select name="role">
         {% for role_val, role_label in roles %}
           {% if role_val != 'saas_admin' or current_user.role == 'saas_admin' %}
-          <option value="{{ role_val }}" {{ 'selected' if user and user.role == role_val else '' }}>
-            {{ role_label }}
-          </option>
+            {% if role_val != 'profissional' %}
+            <option value="{{ role_val }}" {{ 'selected' if user and user.role == role_val else '' }}>
+              {{ role_label }}
+            </option>
+            {% endif %}
           {% endif %}
         {% endfor %}
       </select>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+        Contas de profissional (com agenda própria) são criadas pelo cadastro de Profissionais, não por aqui.
+      </p>
     </div>
     {% endif %}
     <div class="form-actions">
