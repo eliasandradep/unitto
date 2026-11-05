@@ -67,6 +67,17 @@ def test_perfil_leitura_continua_bloqueado_do_catalogo(client):
     assert resp2.status_code == 403
 
 
+def test_atendente_nao_acessa_cadastro_de_usuarios(client):
+    """Usuários é uma tela de gestão de contas de acesso, não de catálogo —
+    atendente continua sem acesso, só administrador."""
+    empresa = make_empresa()
+    _login_atendente(client, empresa)
+
+    for url in ('/admin/users', '/admin/users/new'):
+        resp = client.get(url)
+        assert resp.status_code == 403, f'{url} deveria ser 403 pro atendente, veio {resp.status_code}'
+
+
 def test_atendente_pode_criar_e_editar_servico_mas_nao_excluir(client):
     empresa = make_empresa()
     _login_atendente(client, empresa)
