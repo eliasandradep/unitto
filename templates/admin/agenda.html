@@ -33,47 +33,56 @@
 
 <!-- Grade do calendário -->
 <div class="ag-scroll" id="agScroll">
-  <!-- Header fixo com nomes dos profissionais -->
-  <div class="ag-header" id="agHeader">
-    <div class="ag-corner"></div>
-    {% for p in profissionais %}
-    <div class="ag-prof-head">
-      {% if p.foto_data %}
-      <img class="ag-prof-head-avatar" src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="" />
-      {% else %}
-      <div class="ag-prof-head-avatar ag-prof-head-avatar--fallback" style="background:{{ p.avatar_cor() }}">{{ p.avatar_iniciais() }}</div>
-      {% endif %}
-      <div class="ag-prof-head-name">{{ p.nome }}</div>
-      {% if p.cargo %}<div class="ag-prof-head-cargo">{{ p.cargo }}</div>{% endif %}
+  <!-- Header fixo com nomes dos profissionais — sticky de verdade (relativo
+       à página, não a uma caixa própria); overflow:hidden aqui não mostra
+       barra de rolagem, o scroll horizontal dele só é espelhado via JS do
+       corpo abaixo, pra ambos andarem juntos. -->
+  <div class="ag-header-wrap" id="agHeaderWrap">
+    <div class="ag-header" id="agHeader">
+      <div class="ag-corner"></div>
+      {% for p in profissionais %}
+      <div class="ag-prof-head">
+        {% if p.foto_data %}
+        <img class="ag-prof-head-avatar" src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="" />
+        {% else %}
+        <div class="ag-prof-head-avatar ag-prof-head-avatar--fallback" style="background:{{ p.avatar_cor() }}">{{ p.avatar_iniciais() }}</div>
+        {% endif %}
+        <div class="ag-prof-head-name">{{ p.nome }}</div>
+        {% if p.cargo %}<div class="ag-prof-head-cargo">{{ p.cargo }}</div>{% endif %}
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
   </div>
 
-  <!-- Corpo: coluna de horários + colunas dos profissionais -->
-  <div class="ag-body" id="agBody">
-    <!-- Coluna de horários (sticky à esquerda) -->
-    <div class="ag-time-col">
-      {% for h in range(7, 22) %}
-        <div class="ag-time-label">{{ '%02d:00'|format(h) }}</div>
-        <div class="ag-time-label ag-time-label--half"></div>
-      {% endfor %}
-    </div>
+  <!-- Corpo: coluna de horários + colunas dos profissionais. Única barra de
+       rolagem própria da grade: a horizontal (quando há mais profissionais
+       do que cabem na largura) — a vertical é a da página mesmo. -->
+  <div class="ag-body-wrap" id="agBodyWrap">
+    <div class="ag-body" id="agBody">
+      <!-- Coluna de horários (sticky à esquerda) -->
+      <div class="ag-time-col">
+        {% for h in range(7, 22) %}
+          <div class="ag-time-label">{{ '%02d:00'|format(h) }}</div>
+          <div class="ag-time-label ag-time-label--half"></div>
+        {% endfor %}
+      </div>
 
-    <!-- Colunas por profissional -->
-    {% for p in profissionais %}
-    <div class="ag-prof-col" id="agCol-{{ p.id }}" data-prof="{{ p.id }}">
-      {% for h in range(7, 22) %}
-        <div class="ag-bg-slot"
-             data-prof="{{ p.id }}"
-             data-time="{{ '%02d:00'|format(h) }}"
-             onclick="openNewAg(this.dataset.time, parseInt(this.dataset.prof))"></div>
-        <div class="ag-bg-slot ag-bg-slot--half"
-             data-prof="{{ p.id }}"
-             data-time="{{ '%02d:30'|format(h) }}"
-             onclick="openNewAg(this.dataset.time, parseInt(this.dataset.prof))"></div>
+      <!-- Colunas por profissional -->
+      {% for p in profissionais %}
+      <div class="ag-prof-col" id="agCol-{{ p.id }}" data-prof="{{ p.id }}">
+        {% for h in range(7, 22) %}
+          <div class="ag-bg-slot"
+               data-prof="{{ p.id }}"
+               data-time="{{ '%02d:00'|format(h) }}"
+               onclick="openNewAg(this.dataset.time, parseInt(this.dataset.prof))"></div>
+          <div class="ag-bg-slot ag-bg-slot--half"
+               data-prof="{{ p.id }}"
+               data-time="{{ '%02d:30'|format(h) }}"
+               onclick="openNewAg(this.dataset.time, parseInt(this.dataset.prof))"></div>
+        {% endfor %}
+      </div>
       {% endfor %}
     </div>
-    {% endfor %}
   </div>
 </div>
 
@@ -667,24 +676,33 @@
 .ag-today-btn { padding: .42rem .9rem; }
 
 /* ── Agenda — grade ─────────────────────────────────────────
-   Continua sendo a própria caixa que rola (overflow:auto + altura
-   limitada) — precisa disso pro cabeçalho sticky e o scroll horizontal
-   (quando há mais profissionais do que cabem na largura) funcionarem
-   juntos; um ancestral sem altura limitada quebraria o sticky. O que
-   mudou foi só a aparência: sem borda/sombra/cantos arredondados, pra
-   não parecer uma "caixa dentro da página" — só a barra de rolagem
-   vertical dela fica visível, igual ao calendário do Gendo. */
+   Sem caixa própria: a grade flui na página, que fica com uma única
+   barra de rolagem vertical (a do navegador) — igual ao calendário do
+   Gendo. Pra isso sem perder o cabeçalho fixo nem o scroll horizontal
+   (quando há mais profissionais do que cabem na largura), o cabeçalho
+   (ag-header-wrap) e o corpo (ag-body-wrap) viraram duas caixas
+   separadas: só o corpo tem overflow-x:auto (com barra visível só
+   quando precisa); o cabeçalho fica oculto (overflow:hidden, sem
+   barra) e é sticky de verdade relativo à página, com seu scroll
+   horizontal espelhado via JS a partir do corpo (ver DOMContentLoaded
+   no fim do arquivo) — se dependesse de um ancestral com overflow,
+   o sticky pararia de reagir ao scroll vertical da página. */
 .ag-scroll {
-  overflow: auto;
-  max-height: calc(100vh - 230px);
   background: var(--card-bg);
+}
+
+.ag-header-wrap {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 10;
+  overflow: hidden;
+}
+.ag-body-wrap {
+  overflow-x: auto;
 }
 
 .ag-header {
   display: flex;
-  position: sticky;
-  top: 0;
-  z-index: 10;
   background: #f2ede8;
   border-bottom: 2px solid var(--border);
   min-width: max-content;
@@ -1774,10 +1792,31 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// Scroll automático para 08:00 ao carregar
+// Espelha o scroll horizontal do corpo no cabeçalho (que fica com
+// overflow:hidden, sem barra própria, só pra acompanhar visualmente).
+(function() {
+  var headerWrap = document.getElementById('agHeaderWrap');
+  var bodyWrap   = document.getElementById('agBodyWrap');
+  if (headerWrap && bodyWrap) {
+    bodyWrap.addEventListener('scroll', function() {
+      headerWrap.scrollLeft = bodyWrap.scrollLeft;
+    });
+  }
+})();
+
+// Scroll automático para 08:00 ao carregar — agora quem rola verticalmente
+// é a página inteira, então calculamos a posição absoluta do slot e
+// descontamos a altura do cabeçalho sticky + topbar pra ele ficar logo
+// abaixo deles, não escondido atrás.
 document.addEventListener('DOMContentLoaded', function() {
-  var scroll = document.getElementById('agScroll');
-  if (scroll) scroll.scrollTop = 2 * SLOT_H; // 08:00 = 2 slots × 48px = 96px
+  var bodyEl = document.getElementById('agBody');
+  var headerWrap = document.getElementById('agHeaderWrap');
+  if (bodyEl) {
+    var headerH = headerWrap ? headerWrap.getBoundingClientRect().height : 0;
+    var topbarH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 60;
+    var targetY = bodyEl.getBoundingClientRect().top + window.scrollY + 2 * SLOT_H - headerH - topbarH;
+    window.scrollTo({ top: Math.max(0, targetY) });
+  }
 
   // Sobrepõe link "Novo Agendamento" do menu + Criar para abrir o modal
   var criarAg = document.getElementById('criarAgendamento');
