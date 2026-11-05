@@ -2567,10 +2567,10 @@ def agenda_novo():
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
             abort(403)
-    exp_err = _find_expediente_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
-    if exp_err:
-        flash(f'Não é possível agendar: {exp_err}.', 'error')
-        return redirect(url_for('admin.agenda', data=data_str))
+    # Expediente (dias/horários de trabalho cadastrados) só restringe o
+    # agendamento online — recepção e profissional podem agendar fora dele
+    # pelo painel interno. Bloqueio manual e escala por unidade continuam
+    # valendo pra qualquer canal.
     if a.unidade_id:
         escala_err = _find_escala_conflict(a.profissional_id, a.unidade_id, a.data)
         if escala_err:
@@ -2605,10 +2605,8 @@ def agenda_editar(ag_id):
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
             abort(403)
-    exp_err = _find_expediente_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
-    if exp_err:
-        flash(f'Não é possível agendar: {exp_err}.', 'error')
-        return redirect(url_for('admin.agenda', data=data_str))
+    # Expediente só restringe o agendamento online (ver comentário em
+    # agenda_novo) — não barra edição feita pelo painel interno.
     if a.unidade_id:
         escala_err = _find_escala_conflict(a.profissional_id, a.unidade_id, a.data)
         if escala_err:
