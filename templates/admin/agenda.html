@@ -693,6 +693,12 @@
      .admin-content nas laterais e embaixo), pra não sobrar respiro em
      branco ao redor dela — igual ao calendário do Gendo. */
   margin: 0 -1.8rem -1.8rem;
+  /* Garante que o fundo branco da grade preencha pelo menos a tela toda,
+     mesmo quando os horários (07:00–21:30) não enchem a altura disponível
+     em telas maiores — senão sobra fundo cinza da página embaixo, visível
+     ao rolar até o fim. Em conteúdo mais alto que isso, não limita nada,
+     só segue crescendo (o scroll continua sendo o da página). */
+  min-height: calc(100vh - 230px);
 }
 
 .ag-header-wrap {
