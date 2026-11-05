@@ -32,7 +32,7 @@
 {% if profissionais %}
 
 <!-- Grade do calendário -->
-<div class="ag-scroll card" id="agScroll">
+<div class="ag-scroll" id="agScroll">
   <!-- Header fixo com nomes dos profissionais -->
   <div class="ag-header" id="agHeader">
     <div class="ag-corner"></div>
@@ -666,12 +666,17 @@
 }
 .ag-today-btn { padding: .42rem .9rem; }
 
-/* ── Agenda — grade ────────────────────────────────────────── */
+/* ── Agenda — grade ─────────────────────────────────────────
+   Continua sendo a própria caixa que rola (overflow:auto + altura
+   limitada) — precisa disso pro cabeçalho sticky e o scroll horizontal
+   (quando há mais profissionais do que cabem na largura) funcionarem
+   juntos; um ancestral sem altura limitada quebraria o sticky. O que
+   mudou foi só a aparência: sem borda/sombra/cantos arredondados, pra
+   não parecer uma "caixa dentro da página" — só a barra de rolagem
+   vertical dela fica visível, igual ao calendário do Gendo. */
 .ag-scroll {
   overflow: auto;
   max-height: calc(100vh - 230px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   background: var(--card-bg);
 }
 
