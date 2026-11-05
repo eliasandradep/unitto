@@ -1591,6 +1591,19 @@ def _save_profissional(p):
                 flash(f'CPF "{novo_cpf}" já está em uso por outro usuário.', 'error')
             else:
                 p.user.cpf = novo_cpf or None
+
+    if request.form.get('remover_foto'):
+        p.foto_data = None
+        p.foto_mime = None
+    foto_file = request.files.get('foto')
+    if foto_file and foto_file.filename:
+        ext = os.path.splitext(secure_filename(foto_file.filename))[1].lower()
+        if ext in _LOGO_EXTS:
+            p.foto_data = foto_file.read()
+            p.foto_mime = foto_file.mimetype or 'application/octet-stream'
+        else:
+            flash('Formato de foto não suportado. Use JPG, PNG, WebP, GIF ou SVG.', 'error')
+
     return True
 
 

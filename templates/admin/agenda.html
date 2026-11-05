@@ -38,6 +38,11 @@
     <div class="ag-corner"></div>
     {% for p in profissionais %}
     <div class="ag-prof-head">
+      {% if p.foto_data %}
+      <img class="ag-prof-head-avatar" src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="" />
+      {% else %}
+      <div class="ag-prof-head-avatar ag-prof-head-avatar--fallback" style="background:{{ p.avatar_cor() }}">{{ p.avatar_iniciais() }}</div>
+      {% endif %}
       <div class="ag-prof-head-name">{{ p.nome }}</div>
       {% if p.cargo %}<div class="ag-prof-head-cargo">{{ p.cargo }}</div>{% endif %}
     </div>
@@ -695,9 +700,29 @@
   padding: .55rem .5rem;
   text-align: center;
   border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
 }
-.ag-prof-head-name  { font-size: .83rem; font-weight: 600; color: var(--dark); }
-.ag-prof-head-cargo { font-size: .74rem; color: var(--text-muted); margin-top: .1rem; }
+.ag-prof-head-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ag-prof-head-avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #fff;
+}
+.ag-prof-head-name  { font-size: .83rem; font-weight: 600; color: var(--dark); line-height: 1.25; }
+.ag-prof-head-cargo { font-size: .74rem; color: var(--text-muted); margin-top: 0; }
 
 .ag-body {
   display: flex;

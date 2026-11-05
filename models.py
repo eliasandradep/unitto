@@ -546,6 +546,12 @@ class Unidade(db.Model):
         return self.nome
 
 
+_AVATAR_PALETTE = [
+    '#c9a97a', '#6b9bd1', '#e08e79', '#7fb88f',
+    '#b07cc6', '#d4a24c', '#5ca8a8', '#d17a9e',
+]
+
+
 class Profissional(db.Model):
     __tablename__ = 'profissionais'
     id                  = db.Column(db.Integer, primary_key=True)
@@ -564,6 +570,10 @@ class Profissional(db.Model):
     ativo        = db.Column(db.Boolean, default=True)
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id   = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    # Foto do profissional — guardada no banco (não no disco: em produção o
+    # filesystem é efêmero e some a cada deploy), mesmo padrão de Empresa.logo_data.
+    foto_data    = db.Column(db.LargeBinary)
+    foto_mime    = db.Column(db.String(50))
     unidade      = db.relationship('Unidade',      backref='profissionais')
     expediente   = db.relationship('Expediente',   backref='profissionais_vinculados',
                                    foreign_keys=[expediente_id])
@@ -573,6 +583,20 @@ class Profissional(db.Model):
     # relação M2M — backref 'profissionais' em Categoria
     categorias   = db.relationship('Categoria', secondary='profissional_categorias',
                                    backref='profissionais')
+
+    def avatar_cor(self):
+        """Cor de fundo do avatar-fallback (sem foto) — determinística por
+        profissional (mesma pessoa sempre com a mesma cor, mas a escolha em
+        si é arbitrária/"aleatória" entre o cadastro de cada profissional)."""
+        return _AVATAR_PALETTE[(self.id or 0) % len(_AVATAR_PALETTE)]
+
+    def avatar_iniciais(self):
+        partes = (self.nome or '').strip().split()
+        if not partes:
+            return '?'
+        if len(partes) == 1:
+            return partes[0][0].upper()
+        return (partes[0][0] + partes[-1][0]).upper()
 
 
 class Servico(db.Model):

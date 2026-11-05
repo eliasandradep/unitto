@@ -47,7 +47,20 @@
       <tbody>
         {% for p in profissionais %}
         <tr>
-          <td style="font-weight:500">{{ p.nome }}</td>
+          <td style="font-weight:500">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              {% if p.foto_data %}
+              <img src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt=""
+                   style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0" />
+              {% else %}
+              <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+                          justify-content:center;font-size:.72rem;font-weight:700;color:#fff;background:{{ p.avatar_cor() }}">
+                {{ p.avatar_iniciais() }}
+              </div>
+              {% endif %}
+              <span>{{ p.nome }}</span>
+            </div>
+          </td>
           <td style="font-size:.83rem">{{ p.cargo or '—' }}</td>
           <td>
             {% if p.categorias %}

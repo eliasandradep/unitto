@@ -471,6 +471,8 @@ with app.app_context():
                   'INTEGER REFERENCES unidades(id)'    if _pg else 'INTEGER')
     _safe_add_col('profissionais', 'expediente_id',
                   'INTEGER REFERENCES expedientes(id)' if _pg else 'INTEGER')
+    _safe_add_col('profissionais', 'foto_data', 'BYTEA' if _pg else 'BLOB')
+    _safe_add_col('profissionais', 'foto_mime', 'VARCHAR(50)')
     _safe_add_col('agendamentos',  'unidade_id',      'INTEGER REFERENCES unidades(id)')
     _safe_add_col('clientes',      'saldo',           'NUMERIC(10,2) DEFAULT 0')
     _safe_add_col('comandas',      'saldo_ajustado',  'NUMERIC(10,2)')
@@ -604,6 +606,17 @@ def logo_serve(empresa_id):
     if not empresa or not empresa.logo_data:
         abort(404)
     resp = Response(empresa.logo_data, mimetype=empresa.logo_mime or 'application/octet-stream')
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
+
+
+@app.route('/profissional-foto/<int:prof_id>')
+def profissional_foto_serve(prof_id):
+    """Serve a foto do profissional a partir do banco — mesmo motivo do logo."""
+    prof = db.session.get(Profissional, prof_id)
+    if not prof or not prof.foto_data:
+        abort(404)
+    resp = Response(prof.foto_data, mimetype=prof.foto_mime or 'application/octet-stream')
     resp.headers['Cache-Control'] = 'public, max-age=86400'
     return resp
 

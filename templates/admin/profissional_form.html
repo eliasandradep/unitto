@@ -23,7 +23,7 @@
 </div>
 
 <!-- Formulário principal -->
-<form method="POST"
+<form method="POST" enctype="multipart/form-data"
       action="{{ url_for('admin.profissional_detalhe', prof_id=p.id) if p else url_for('admin.profissional_novo') }}"
       id="profForm">
 
@@ -35,6 +35,37 @@
       <!-- Dados básicos -->
       <div class="card" style="padding:1.5rem;margin-bottom:1rem">
         <h4 class="pform-sec">Dados do Profissional</h4>
+
+        <div class="form-group" style="display:flex;gap:1rem;align-items:center">
+          {% if p and p.foto_data %}
+          <img src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="Foto"
+               style="width:64px;height:64px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" />
+          {% elif p %}
+          <div style="width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+                      justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;background:{{ p.avatar_cor() }}">
+            {{ p.avatar_iniciais() }}
+          </div>
+          {% else %}
+          <div style="width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+                      justify-content:center;font-size:.72rem;color:var(--text-muted);background:var(--content-bg);
+                      border:1px dashed var(--border);text-align:center;line-height:1.2">
+            sem<br/>foto
+          </div>
+          {% endif %}
+          <div style="flex:1">
+            <label style="font-size:.82rem">Foto do profissional</label>
+            <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif,.svg" />
+            <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">
+              {% if p and p.foto_data %}
+              <label style="display:inline-flex;align-items:center;gap:.3rem;cursor:pointer;margin:0">
+                <input type="checkbox" name="remover_foto" value="1" style="cursor:pointer" /> Remover foto atual
+              </label>
+              {% else %}
+              Sem foto, um avatar é gerado automaticamente com as iniciais do nome.
+              {% endif %}
+            </p>
+          </div>
+        </div>
 
         <div class="form-group">
           <label>Nome <span class="required">*</span></label>
