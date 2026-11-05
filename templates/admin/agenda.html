@@ -689,6 +689,10 @@
    o sticky pararia de reagir ao scroll vertical da página. */
 .ag-scroll {
   background: var(--card-bg);
+  /* Estica a grade até as bordas da área de conteúdo (cancela o padding de
+     .admin-content nas laterais e embaixo), pra não sobrar respiro em
+     branco ao redor dela — igual ao calendário do Gendo. */
+  margin: 0 -1.8rem -1.8rem;
 }
 
 .ag-header-wrap {
