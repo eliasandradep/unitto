@@ -2020,14 +2020,32 @@ def _parse_hora_bloqueio(valor):
 def _validar_bloqueio_base(b):
     """Preenche profissional/data/dia_inteiro/motivo a partir do form. Não
     toca em hora_inicio/hora_fim — isso fica a cargo de cada caminho (edição
-    de um único bloqueio vs. criação com múltiplas janelas de horário)."""
-    from datetime import date
-    prof_id     = request.form.get('profissional_id', '').strip()
-    data_ini    = request.form.get('data_inicio', '').strip()
-    data_fim    = request.form.get('data_fim', '').strip()
-    dia_inteiro = bool(request.form.get('dia_inteiro'))
-    motivo      = request.form.get('motivo', '').strip() or None
+    de um único bloqueio vs. criação com múltiplas janelas de horário).
 
+    Modo 'diário' (recorrente_diario=1): não pede data_inicio/data_fim do
+    usuário — o bloqueio vale a partir de hoje, indefinidamente. Como o
+    modelo não tem data_fim opcional, usamos um horizonte bem distante
+    (10 anos) como 'sem término' pra reaproveitar a mesma checagem de
+    conflito (_find_bloqueio_conflict), que já trata o período como
+    recorrência diária do horário."""
+    from datetime import date, timedelta
+    prof_id            = request.form.get('profissional_id', '').strip()
+    dia_inteiro        = bool(request.form.get('dia_inteiro'))
+    recorrente_diario  = bool(request.form.get('recorrente_diario'))
+    motivo             = request.form.get('motivo', '').strip() or None
+
+    b.profissional_id   = int(prof_id) if prof_id else None
+    b.dia_inteiro        = dia_inteiro
+    b.recorrente_diario  = recorrente_diario
+    b.motivo             = motivo
+
+    if recorrente_diario:
+        b.data_inicio = date.today()
+        b.data_fim    = date.today() + timedelta(days=3650)
+        return True
+
+    data_ini = request.form.get('data_inicio', '').strip()
+    data_fim = request.form.get('data_fim', '').strip()
     if not data_ini or not data_fim:
         flash('Data de início e fim são obrigatórias.', 'error')
         return False
@@ -2043,9 +2061,6 @@ def _validar_bloqueio_base(b):
         flash('Data fim não pode ser anterior à data início.', 'error')
         return False
 
-    b.profissional_id = int(prof_id) if prof_id else None
-    b.dia_inteiro     = dia_inteiro
-    b.motivo          = motivo
     return True
 
 
@@ -2132,6 +2147,7 @@ def agenda_bloqueios():
                 data_inicio=base.data_inicio,
                 data_fim=base.data_fim,
                 dia_inteiro=False,
+                recorrente_diario=base.recorrente_diario,
                 motivo=base.motivo,
                 hora_inicio=hora_ini_t,
                 hora_fim=hora_fim_t,

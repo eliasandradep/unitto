@@ -473,6 +473,8 @@ with app.app_context():
                   'INTEGER REFERENCES expedientes(id)' if _pg else 'INTEGER')
     _safe_add_col('profissionais', 'foto_data', 'BYTEA' if _pg else 'BLOB')
     _safe_add_col('profissionais', 'foto_mime', 'VARCHAR(50)')
+    _safe_add_col('bloqueios_agenda', 'recorrente_diario',
+                  'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('agendamentos',  'unidade_id',      'INTEGER REFERENCES unidades(id)')
     _safe_add_col('clientes',      'saldo',           'NUMERIC(10,2) DEFAULT 0')
     _safe_add_col('comandas',      'saldo_ajustado',  'NUMERIC(10,2)')

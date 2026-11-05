@@ -678,6 +678,7 @@ class BloqueioAgenda(db.Model):
     data_fim        = db.Column(db.Date, nullable=False)
     hora_fim        = db.Column(db.Time, nullable=True)
     dia_inteiro     = db.Column(db.Boolean, default=False)
+    recorrente_diario = db.Column(db.Boolean, default=False)
     motivo          = db.Column(db.String(200))
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id      = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)

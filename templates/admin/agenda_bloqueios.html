@@ -71,9 +71,9 @@
             <td style="font-weight:500">
               {{ b.profissional.nome if b.profissional else 'Todos os profissionais' }}
             </td>
-            <td>{{ b.data_inicio.strftime('%d/%m/%Y') }}</td>
+            <td>{{ 'Diário' if b.recorrente_diario else b.data_inicio.strftime('%d/%m/%Y') }}</td>
             <td>{{ b.hora_inicio.strftime('%H:%M') if b.hora_inicio else '— dia inteiro' }}</td>
-            <td>{{ b.data_fim.strftime('%d/%m/%Y') }}</td>
+            <td>{{ 'sem término' if b.recorrente_diario else b.data_fim.strftime('%d/%m/%Y') }}</td>
             <td>{{ b.hora_fim.strftime('%H:%M') if b.hora_fim else '— dia inteiro' }}</td>
             <td style="font-size:.83rem;color:var(--text-muted)">{{ b.motivo or '—' }}</td>
             <td>
@@ -86,6 +86,7 @@
                         data-hi="{{ b.hora_inicio.strftime('%H:%M') if b.hora_inicio else '' }}"
                         data-hf="{{ b.hora_fim.strftime('%H:%M') if b.hora_fim else '' }}"
                         data-dia="{{ '1' if b.dia_inteiro else '' }}"
+                        data-diario="{{ '1' if b.recorrente_diario else '' }}"
                         data-motivo="{{ b.motivo or '' }}"
                         onclick="editBloqueio(this)">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -138,6 +139,15 @@
 
         <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">
           <label class="bl-toggle-wrap">
+            <input type="checkbox" name="recorrente_diario" id="blModoDiario"
+                   onchange="toggleModoDiario(this.checked)" />
+            <span class="bl-toggle-track"></span>
+          </label>
+          <span style="font-size:.85rem;font-weight:500" id="blModoDiarioLabel">Bloqueio por período específico</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">
+          <label class="bl-toggle-wrap">
             <input type="checkbox" name="dia_inteiro" id="blDiaInteiro"
                    onchange="toggleDiaInteiro(this.checked)" />
             <span class="bl-toggle-track"></span>
@@ -145,7 +155,7 @@
           <span style="font-size:.85rem;font-weight:500">Bloquear dia inteiro</span>
         </div>
 
-        <div class="form-row">
+        <div class="form-row" id="blDatasWrap">
           <div class="form-group">
             <label>Data Início <span class="required">*</span></label>
             <input type="date" name="data_inicio" id="blDtIni" required />
@@ -158,7 +168,7 @@
 
         <div class="form-group" id="blHorariosWrap">
           <label>Horário(s) do bloqueio</label>
-          <p style="font-size:.78rem;color:var(--text-muted);margin:.1rem 0 .5rem">
+          <p style="font-size:.78rem;color:var(--text-muted);margin:.1rem 0 .5rem" id="blHorariosHelp">
             Repete todos os dias dentro do período acima. Use "Adicionar outro horário" para
             bloquear mais de uma janela por dia (ex: almoço e pausa da tarde).
           </p>
@@ -248,9 +258,22 @@ function resetForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('blDiaInteiro').checked = false;
+  document.getElementById('blModoDiario').checked = false;
   resetHorarios();
   document.getElementById('blAddHorario').style.display = '';
+  toggleModoDiario(false);
   toggleDiaInteiro(false);
+}
+function toggleModoDiario(diario) {
+  document.getElementById('blDatasWrap').style.display = diario ? 'none' : '';
+  document.getElementById('blDtIni').required = !diario;
+  document.getElementById('blDtFim').required = !diario;
+  document.getElementById('blModoDiarioLabel').textContent = diario
+    ? 'Bloqueio diário (repete todos os dias, sem data de término)'
+    : 'Bloqueio por período específico';
+  document.getElementById('blHorariosHelp').textContent = diario
+    ? 'Repete todos os dias, indefinidamente. Use "Adicionar outro horário" para bloquear mais de uma janela por dia (ex: almoço e pausa da tarde).'
+    : 'Repete todos os dias dentro do período acima. Use "Adicionar outro horário" para bloquear mais de uma janela por dia (ex: almoço e pausa da tarde).';
 }
 function toggleDiaInteiro(on) {
   document.getElementById('blHorariosWrap').style.display = on ? 'none' : '';
@@ -269,6 +292,9 @@ function editBloqueio(btn) {
   document.getElementById('blHorarios').innerHTML = '';
   addHorarioRow(d.hi, d.hf);
   document.getElementById('blAddHorario').style.display = 'none';
+  var diario = d.diario === '1';
+  document.getElementById('blModoDiario').checked = diario;
+  toggleModoDiario(diario);
   var diaInt = d.dia === '1';
   document.getElementById('blDiaInteiro').checked = diaInt;
   toggleDiaInteiro(diaInt);

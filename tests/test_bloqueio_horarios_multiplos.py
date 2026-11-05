@@ -126,6 +126,38 @@ def test_dia_inteiro_ignora_janelas_de_horario(client):
     assert bloqueios[0].hora_inicio is None
 
 
+def test_bloqueio_diario_nao_exige_datas_e_vale_indefinidamente(client):
+    """Toggle 'recorrente_diario' dispensa data_inicio/data_fim do usuário —
+    o bloqueio recebe um horizonte bem distante (hoje + 10 anos) como
+    'sem término', e vale a partir de hoje em qualquer dia futuro."""
+    empresa = make_empresa()
+    _login_admin(client, empresa)
+    prof = Profissional(nome='Profissional Diário', empresa_id=empresa.id, ativo=True)
+    db.session.add(prof)
+    db.session.commit()
+    prof_id = prof.id
+
+    resp = client.post('/admin/agenda/bloqueios', data={
+        'profissional_id': str(prof_id),
+        'recorrente_diario': 'on',
+        'motivo': 'Almoço',
+        'hora_inicio[]': ['12:30'],
+        'hora_fim[]': ['13:30'],
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+
+    bloqueios = BloqueioAgenda.query.filter_by(profissional_id=prof_id).all()
+    assert len(bloqueios) == 1
+    b = bloqueios[0]
+    assert b.recorrente_diario is True
+    assert b.data_inicio == date.today()
+    assert b.data_fim >= date.today() + timedelta(days=365 * 5)
+
+    um_ano_no_futuro = date.today() + timedelta(days=365)
+    conflito = _find_bloqueio_conflict(prof_id, um_ano_no_futuro, time(13, 0), 30)
+    assert conflito is not None
+
+
 def test_editar_bloqueio_continua_aceitando_uma_unica_janela(client):
     empresa = make_empresa()
     _login_admin(client, empresa)
