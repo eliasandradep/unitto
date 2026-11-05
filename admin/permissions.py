@@ -61,3 +61,11 @@ def financeiro_scope():
 
 def is_administrador():
     return current_perfil() == 'administrador'
+
+
+def tem_acesso_catalogo():
+    """Telas de catálogo (Serviços, Categorias, Produtos, Profissionais,
+    Unidades, Expedientes, Pacotes) — administrador e atendente têm acesso
+    de leitura/escrita; exclusão continua restrita a administrador, checada
+    em cada rota (ver admin/__init__.py)."""
+    return current_perfil() in ('administrador', 'atendente')

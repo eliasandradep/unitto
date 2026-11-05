@@ -707,49 +707,14 @@ def configuracoes():
                 _save_setting('birthday_message', msg[:200])
             flash('Configurações salvas com sucesso.', 'success')
 
-        elif section == 'unidades':
-            action = request.form.get('action')
-            uid    = request.form.get('id', '')
-
-            if action == 'save':
-                nome     = request.form.get('nome', '').strip()
-                cidade   = request.form.get('cidade', '').strip() or None
-                estado   = request.form.get('estado', '').strip() or None
-                telefone = request.form.get('telefone', '').strip() or None
-                if not nome:
-                    flash('Nome da unidade é obrigatório.', 'error')
-                else:
-                    u = db.get_or_404(Unidade, int(uid)) if uid else Unidade()
-                    if not uid:
-                        db.session.add(u)
-                    u.nome     = nome
-                    u.cidade   = cidade
-                    u.estado   = estado
-                    u.telefone = telefone
-                    db.session.commit()
-                    flash('Unidade salva com sucesso.', 'success')
-
-            elif action == 'toggle' and uid:
-                u = db.get_or_404(Unidade, int(uid))
-                u.ativo = not u.ativo
-                db.session.commit()
-
-            elif action == 'delete' and uid:
-                u = db.get_or_404(Unidade, int(uid))
-                db.session.delete(u)
-                db.session.commit()
-                flash('Unidade excluída.', 'success')
-
         return redirect(url_for('admin.configuracoes'))
 
     birthday_message  = _get_setting('birthday_message', _DEFAULT_BIRTHDAY_MSG)
-    todas_unidades    = tq(Unidade).order_by(Unidade.nome).all()
     logo_habilitado   = empresa and empresa.plano not in ('trial', 'free')
     integracao_whatsapp = tq(IntegracaoMeta).filter_by(canal='whatsapp', status='conectado').first()
 
     return render_template('admin/configuracoes.html',
         birthday_message=birthday_message,
-        unidades=todas_unidades,
         logo_habilitado=logo_habilitado,
         integracao_whatsapp=integracao_whatsapp,
     )
@@ -1240,6 +1205,8 @@ def servico_detalhe(servico_id):
     s = db.get_or_404(Servico, servico_id)
     if request.method == 'POST':
         if request.form.get('action') == 'excluir':
+            if not is_administrador():
+                abort(403)
             db.session.delete(s)
             db.session.commit()
             flash('Serviço excluído.', 'success')
@@ -1315,6 +1282,8 @@ def categorias():
                 flash('Categoria criada.', 'success')
 
         elif action == 'delete' and cat_id:
+            if not is_administrador():
+                abort(403)
             c = db.get_or_404(Categoria, int(cat_id))
             if c.servicos or c.profissionais:
                 flash('Categoria está em uso e não pode ser excluída.', 'error')
@@ -1373,6 +1342,8 @@ def produto_detalhe(produto_id):
     p = db.get_or_404(Produto, produto_id)
     if request.method == 'POST':
         if request.form.get('action') == 'excluir':
+            if not is_administrador():
+                abort(403)
             db.session.delete(p)
             db.session.commit()
             flash('Produto excluído.', 'success')
@@ -1456,6 +1427,8 @@ def produto_categorias():
                 flash('Categoria criada.', 'success')
 
         elif action == 'delete' and cat_id:
+            if not is_administrador():
+                abort(403)
             c = db.get_or_404(CategoriaProduto, int(cat_id))
             if c.produtos:
                 flash('Categoria está em uso e não pode ser excluída.', 'error')
@@ -1485,6 +1458,8 @@ def profissionais():
         prof_id = request.form.get('id', '')
 
         if action == 'delete' and prof_id:
+            if not is_administrador():
+                abort(403)
             try:
                 p = db.get_or_404(Profissional, int(prof_id))
                 n_ag = len(p.agendamentos)
@@ -1856,12 +1831,54 @@ def profissional_escala_delete(prof_id, escala_id):
     return jsonify({'ok': True})
 
 
-# ── Unidades — redirecionado para Configurações da Empresa ───────────────────
+# ── Unidades ──────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/unidades', methods=['GET', 'POST'])
 @login_required
 def unidades():
-    return redirect(url_for('admin.configuracoes'))
+    if request.method == 'POST':
+        action = request.form.get('action')
+        uid    = request.form.get('id', '')
+
+        if action == 'save':
+            nome     = request.form.get('nome', '').strip()
+            cidade   = request.form.get('cidade', '').strip() or None
+            estado   = request.form.get('estado', '').strip() or None
+            telefone = request.form.get('telefone', '').strip() or None
+            if not nome:
+                flash('Nome da unidade é obrigatório.', 'error')
+            else:
+                u = db.get_or_404(Unidade, int(uid)) if uid else Unidade()
+                if not uid:
+                    db.session.add(u)
+                u.nome     = nome
+                u.cidade   = cidade
+                u.estado   = estado
+                u.telefone = telefone
+                db.session.commit()
+                flash('Unidade salva com sucesso.', 'success')
+
+        elif action == 'toggle' and uid:
+            u = db.get_or_404(Unidade, int(uid))
+            u.ativo = not u.ativo
+            db.session.commit()
+
+        elif action == 'delete' and uid:
+            if not is_administrador():
+                abort(403)
+            u = db.get_or_404(Unidade, int(uid))
+            if (u.profissionais or u.agendamentos or u.escalas or u.comandas
+                    or u.contas_pagar or u.contas_receber):
+                flash('Unidade está em uso e não pode ser excluída.', 'error')
+            else:
+                db.session.delete(u)
+                db.session.commit()
+                flash('Unidade excluída.', 'success')
+
+        return redirect(url_for('admin.unidades'))
+
+    todas_unidades = tq(Unidade).order_by(Unidade.nome).all()
+    return render_template('admin/unidades.html', unidades=todas_unidades)
 
 
 # ── Expedientes ───────────────────────────────────────────────────────────────
@@ -4065,6 +4082,8 @@ def api_pacote_detalhe(pacote_id):
         })
 
     if request.method == 'DELETE':
+        if not is_administrador():
+            return jsonify({'ok': False, 'erro': 'Sem permissão para excluir.'}), 403
         if p.vendas:
             return jsonify({'ok': False, 'erro': 'Pacote possui vendas e não pode ser excluído'}), 400
         db.session.delete(p)

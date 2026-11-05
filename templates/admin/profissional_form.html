@@ -133,9 +133,13 @@
         <div class="ptab-nav">
           <button type="button" class="ptab-btn active" data-tab="perfil">Perfil de Acesso</button>
           <button type="button" class="ptab-btn" data-tab="acesso">Acesso ao Sistema</button>
+          {% if perm.admin %}
           <button type="button" class="ptab-btn" data-tab="comissoes">Comissões</button>
+          {% endif %}
           <button type="button" class="ptab-btn" data-tab="restricoes">Restrições</button>
+          {% if perm.admin %}
           <button type="button" class="ptab-btn" data-tab="escalas">Escalas</button>
+          {% endif %}
         </div>
 
         <!-- ABA: Perfil de Acesso -->
@@ -187,15 +191,17 @@
               <label>CPF</label>
               <input type="text" name="cpf" id="cpfInput" value="{{ p.user.cpf if p.user else '' }}"
                      placeholder="000.000.000-00" maxlength="14" autocomplete="off" />
-              <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional. Pode ser usado para login, junto com o usuário e o telefone.</p>
+              <p style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0">Opcional, uso interno — o login é feito só por e-mail.</p>
             </div>
             <p style="font-size:.78rem;color:var(--text-muted);margin:.4rem 0 1rem;line-height:1.4">
               Login {{ 'ativo' if p.ativo else 'inativo (profissional marcado como inativo)' }}.
               {% if p.user and p.user.password_hash %}Senha já definida.{% else %}Senha ainda não gerada — o profissional não consegue acessar até que uma senha seja gerada.{% endif %}
             </p>
+            {% if perm.admin %}
             <button type="button" class="btn-secondary" onclick="gerarSenha()">
               {{ 'Gerar nova senha' if p.user and p.user.password_hash else 'Gerar senha de acesso' }}
             </button>
+            {% endif %}
             {% else %}
             <p style="font-size:.82rem;color:var(--text-muted);line-height:1.4">
               Usuário e senha de acesso serão gerados automaticamente ao salvar o cadastro,
@@ -206,10 +212,12 @@
           </div>
         </div>
 
+        {% if perm.admin %}
         <!-- ABA: Comissões (renderizada via JS) -->
         <div class="ptab-pane" id="ptab-comissoes" style="display:none">
           <div id="comissoes-mount"></div>
         </div>
+        {% endif %}
 
         <!-- ABA: Restrições -->
         <div class="ptab-pane" id="ptab-restricoes" style="display:none">
@@ -242,6 +250,7 @@
           </div>
         </div>
 
+        {% if perm.admin %}
         <!-- ABA: Escalas por unidade -->
         <div class="ptab-pane" id="ptab-escalas" style="display:none">
           <div style="padding:1rem">
@@ -267,6 +276,7 @@
             {% endif %}
           </div>
         </div>
+        {% endif %}
 
       </div><!-- .card -->
     </div><!-- .pform-right -->

@@ -159,7 +159,7 @@
         Salvar
       </button>
       <a href="{{ url_for('admin.servicos') }}" class="btn-secondary">Cancelar</a>
-      {% if s %}
+      {% if s and perm.admin %}
       <button type="submit" name="action" value="excluir" class="btn-danger"
         onclick="return confirm('Excluir este serviço? Esta ação não pode ser desfeita.')">
         Excluir serviço

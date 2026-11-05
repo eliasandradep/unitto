@@ -100,7 +100,7 @@
   <div style="display:flex;gap:.7rem;align-items:center">
     <button type="submit" class="btn-primary">Salvar</button>
     <a href="{{ url_for('admin.expedientes') }}" class="btn-secondary">Cancelar</a>
-    {% if e %}
+    {% if e and perm.admin %}
     <form method="POST" action="{{ url_for('admin.expediente_excluir', exp_id=e.id) }}"
           style="margin-left:auto"
           onsubmit="return confirm('Excluir este expediente permanentemente?')">

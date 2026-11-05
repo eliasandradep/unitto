@@ -25,11 +25,10 @@
       {% set in_clientes   = 'lead' in ep or 'cliente' in ep or ep == 'admin.aniversariantes' %}
       {% set in_servicos   = ep in ['admin.servicos','admin.servico_novo','admin.servico_detalhe','admin.categorias','admin.pacotes'] %}
       {% set in_produtos   = ep in ['admin.produtos','admin.produto_novo','admin.produto_detalhe','admin.produto_categorias'] %}
-      {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe'] %}
+      {% set in_profissio  = ep in ['admin.profissionais','admin.profissional_novo','admin.profissional_detalhe','admin.expedientes','admin.expediente_novo','admin.expediente_detalhe','admin.unidades'] %}
       {% set in_financeiro = 'financeiro' in ep or 'comanda' in ep or 'venda_pacote' in ep or 'conta_pagar' in ep or 'conta_receber' in ep or ep == 'admin.comissoes' or 'forma_pagamento' in ep %}
       {% set in_relatorios = ep == 'admin.metrics' or ep == 'admin.relatorio_comissoes' or ep == 'admin.campanhas' %}
-      {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.unidades','admin.integracoes','admin.integracoes_meta_conectar','admin.integracoes_meta_callback','admin.integracoes_meta_desconectar','admin.integracoes_meta_ads_conectar','admin.integracoes_meta_ads_sincronizar','admin.integracoes_meta_ads_desconectar','admin.contatos_ignorados','admin.contato_ignorado_remover'] %}
-      {# admin.unidades redireciona para configuracoes, mantido no set para compatibilidade #}
+      {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.integracoes','admin.integracoes_meta_conectar','admin.integracoes_meta_callback','admin.integracoes_meta_desconectar','admin.integracoes_meta_ads_conectar','admin.integracoes_meta_ads_sincronizar','admin.integracoes_meta_ads_desconectar','admin.contatos_ignorados','admin.contato_ignorado_remover'] %}
 
       <!-- Dashboard -->
       {% if perm.admin %}
@@ -139,7 +138,7 @@
       {% endif %}
 
       <!-- Serviços -->
-      {% if perm.admin %}
+      {% if perm.catalogo %}
       <div class="snav-group {% if in_servicos %}snav-active snav-group--open{% endif %}" id="grp-servicos">
         <a href="javascript:void(0)" class="snav-group-btn" onclick="toggleGroup('grp-servicos'); return false;" data-tooltip="Serviços">
           <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -157,7 +156,7 @@
       {% endif %}
 
       <!-- Produtos -->
-      {% if perm.admin %}
+      {% if perm.catalogo %}
       <div class="snav-group {% if in_produtos %}snav-active snav-group--open{% endif %}" id="grp-produtos">
         <a href="javascript:void(0)" class="snav-group-btn" onclick="toggleGroup('grp-produtos'); return false;" data-tooltip="Produtos">
           <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -175,7 +174,7 @@
       {% endif %}
 
       <!-- Profissionais -->
-      {% if perm.admin %}
+      {% if perm.catalogo %}
       <div class="snav-group {% if in_profissio %}snav-active snav-group--open{% endif %}" id="grp-profissio">
         <a href="javascript:void(0)" class="snav-group-btn" onclick="toggleGroup('grp-profissio'); return false;" data-tooltip="Profissionais">
           <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -187,6 +186,7 @@
         <div class="snav-group-items">
           <a href="{{ url_for('admin.profissionais') }}" class="snav-sub {% if ep == 'admin.profissionais' %}active{% endif %}">Listagem</a>
           <a href="{{ url_for('admin.expedientes') }}"  class="snav-sub {% if ep == 'admin.expedientes'  %}active{% endif %}">Expedientes</a>
+          <a href="{{ url_for('admin.unidades') }}"     class="snav-sub {% if ep == 'admin.unidades'     %}active{% endif %}">Unidades</a>
         </div>
       </div>
       {% endif %}

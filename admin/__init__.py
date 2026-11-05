@@ -16,6 +16,23 @@ _SKIP_SUBSCRIPTION_CHECK = frozenset({
     'admin.boas_vindas',
 })
 
+# Telas de CATÁLOGO: administrador E atendente têm acesso (ver
+# PERFIL_ACESSO/tem_acesso_catalogo() em permissions.py). Exclusão dentro
+# delas continua restrita a administrador via checagem explícita na própria
+# rota (is_administrador()), já que lá a exclusão é uma ação (action=delete/
+# excluir, ou método DELETE) dentro do mesmo endpoint de listar/criar/editar,
+# não um endpoint separado.
+_CATALOGO_ENDPOINTS = frozenset({
+    'servicos', 'servicos_importar_csv', 'servico_novo', 'servico_detalhe',
+    'categorias',
+    'produtos', 'produto_novo', 'produto_detalhe', 'produto_categorias',
+    'profissionais', 'profissional_novo', 'profissional_detalhe',
+    'unidades',
+    'expedientes', 'expediente_novo', 'expediente_detalhe',
+    'pacotes', 'api_pacote_criar', 'api_pacote_detalhe', 'api_servico_preco',
+    'api_cat_profissionais',
+})
+
 # Endpoints reservados a perfil 'administrador' — telas de configuração/gestão
 # do negócio, sem sentido para quem só atende clientes (Agenda/Comissões/
 # Financeiro têm suas próprias regras de escopo, aplicadas nas rotas).
@@ -27,30 +44,24 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'metrics',
     'configuracoes',
     'themes', 'theme_set',
-    'servicos', 'servicos_importar_csv', 'servico_novo', 'servico_detalhe',
-    'categorias',
-    'produtos', 'produto_novo', 'produto_detalhe', 'produto_categorias',
-    'profissionais', 'profissional_novo', 'profissional_detalhe',
+    'profissional_resetar_senha',
     'profissional_comissao_add', 'profissional_comissao_delete',
     'profissional_escala_data', 'profissional_escalas',
     'profissional_escala_add', 'profissional_escala_delete',
-    'unidades',
-    'expedientes', 'expediente_novo', 'expediente_detalhe', 'expediente_excluir',
+    'expediente_excluir',
     'boas_vindas',
-    'pacotes', 'api_pacote_criar', 'api_pacote_detalhe', 'api_servico_preco',
-    'api_cat_profissionais',
     'financeiro',
     'vendas_pacote', 'venda_pacote_nova', 'venda_pacote_detalhe',
     'venda_pacote_usar_sessao', 'venda_pacote_cancelar',
     'contas_pagar', 'conta_pagar_baixa', 'conta_pagar_excluir',
     'contas_receber', 'conta_receber_baixa', 'conta_receber_excluir',
-    'formas_pagamento',
+    'formas_pagamento', 'financeiro_categorias',
     'integracoes', 'integracoes_meta_conectar', 'integracoes_meta_callback',
     'integracoes_meta_desconectar',
     'integracoes_meta_ads_conectar',
     'integracoes_meta_ads_sincronizar', 'integracoes_meta_ads_desconectar',
     'contatos_ignorados', 'contato_ignorado_remover',
-    'campanhas',
+    'campanhas', 'atendimento_ia',
 })
 
 
@@ -69,6 +80,10 @@ def _check_perfil_acesso():
     if view in _ADMIN_ONLY_ENDPOINTS:
         from .permissions import is_administrador
         if not is_administrador():
+            abort(403)
+    elif view in _CATALOGO_ENDPOINTS:
+        from .permissions import tem_acesso_catalogo
+        if not tem_acesso_catalogo():
             abort(403)
 
 
@@ -141,12 +156,13 @@ def _inject_empresa():
             pass
 
     from flask_login import current_user
-    from .permissions import agenda_scope, comissoes_scope, financeiro_scope, is_administrador
+    from .permissions import agenda_scope, comissoes_scope, financeiro_scope, is_administrador, tem_acesso_catalogo
     if current_user.is_authenticated:
         perm = {'agenda': agenda_scope(), 'comissoes': comissoes_scope(),
-                'financeiro': financeiro_scope(), 'admin': is_administrador()}
+                'financeiro': financeiro_scope(), 'admin': is_administrador(),
+                'catalogo': tem_acesso_catalogo()}
     else:
-        perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False}
+        perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False, 'catalogo': False}
 
     return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css,
             'profissionais_limite_atingido': profissionais_limite_atingido, 'perm': perm}

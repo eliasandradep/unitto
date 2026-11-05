@@ -54,7 +54,9 @@
         </td>
         <td style="text-align:center;white-space:nowrap">
           <button class="btn-icon" title="Editar" onclick="editarPacote({{ p.id }})">✏️</button>
+          {% if perm.admin %}
           <button class="btn-icon" title="Excluir" onclick="excluirPacote({{ p.id }}, '{{ p.nome|e }}')">🗑️</button>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
