@@ -1226,6 +1226,24 @@ def servico_detalhe(servico_id):
     return render_template('admin/servico_form.html', s=s, categorias=cats, profissionais=profs)
 
 
+def _parse_valor_br(texto, default=''):
+    """Normaliza um valor monetário digitado em formato brasileiro
+    ('1.234,56') para o formato aceito por Decimal()/float() ('1234.56').
+
+    Bug corrigido: fazer só `.replace(',', '.')` (sem antes remover o ponto
+    de milhar) transforma '1.234,56' em '1.234.56' — dois pontos, que
+    Decimal()/float() rejeitam como 'Dados inválidos'. Só acontecia em
+    valores >= 1000, por isso passava despercebido em testes manuais com
+    valores pequenos. Sem vírgula, o texto é devolvido como veio (pode já
+    estar em formato decimal puro, ex: um campo calculado em JS)."""
+    s = (texto or '').strip()
+    if not s:
+        return default
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    return s
+
+
 def _build_servico(s):
     nome = request.form.get('nome', '').strip()
     if not nome:
@@ -1233,7 +1251,7 @@ def _build_servico(s):
         return None
 
     def _float(field):
-        try: return float(request.form.get(field, '').replace(',', '.')) or None
+        try: return float(_parse_valor_br(request.form.get(field, ''))) or None
         except (ValueError, AttributeError): return None
 
     def _int(field, default=0):
@@ -1369,12 +1387,12 @@ def _build_produto(p):
         return None
 
     def _float(field):
-        try: return float(request.form.get(field, '').replace(',', '.')) or None
+        try: return float(_parse_valor_br(request.form.get(field, ''))) or None
         except (ValueError, AttributeError): return None
 
     def _dec(field, default='0'):
         from decimal import Decimal, InvalidOperation
-        raw = request.form.get(field, '').strip().replace(',', '.')
+        raw = _parse_valor_br(request.form.get(field, ''))
         try: return Decimal(raw) if raw else Decimal(default)
         except InvalidOperation: return Decimal(default)
 
@@ -1751,7 +1769,7 @@ def profissional_comissao_add(prof_id):
     if not svc:
         return jsonify({'ok': False, 'error': 'Serviço não encontrado.'}), 404
     try:
-        valor_f = float(str(valor).replace(',', '.'))
+        valor_f = float(_parse_valor_br(str(valor)))
     except (ValueError, TypeError):
         return jsonify({'ok': False, 'error': 'Valor inválido.'}), 400
     c = ComissaoProfissional(
@@ -3031,7 +3049,7 @@ def _save_comanda(c):
     c.cliente_id      = int(cid) if cid else None
     c.unidade_id      = int(uid) if uid else None
     c.profissional_id = int(pid) if pid else None
-    desc = request.form.get('desconto', '0').strip().replace(',', '.')
+    desc = _parse_valor_br(request.form.get('desconto', '0'), '0')
     try:
         from decimal import Decimal
         c.desconto = Decimal(desc)
@@ -3069,13 +3087,13 @@ def _save_comanda(c):
             continue
         try:
             from decimal import Decimal as D
-            val    = D(valors[i].strip().replace(',', '.')) if i < len(valors) else D('0')
+            val    = D(_parse_valor_br(valors[i], '0')) if i < len(valors) else D('0')
             qtd    = int(qtds[i]) if i < len(qtds) and qtds[i] else 1
             svc_id = int(svcs[i]) if i < len(svcs) and svcs[i] else None
             prod_id = int(prods[i]) if i < len(prods) and prods[i] else None
             vp_id  = int(vpitems[i]) if i < len(vpitems) and vpitems[i] else None
             prof_id  = int(profs_i[i]) if i < len(profs_i) and profs_i[i] else None
-            com_v_s  = comissoes_v[i].strip().replace(',', '.') if i < len(comissoes_v) else ''
+            com_v_s  = _parse_valor_br(comissoes_v[i]) if i < len(comissoes_v) else ''
             com_v    = D(com_v_s) if com_v_s else None
             com_t    = comissoes_t[i] if i < len(comissoes_t) and comissoes_t[i] else '%'
         except Exception:
@@ -3164,7 +3182,7 @@ def comanda_pagamento_add(comanda_id):
     c = db.get_or_404(Comanda, comanda_id)
     _check_financeiro_scope(c)
     forma = request.form.get('forma_pagamento', '').strip()
-    valor_s = request.form.get('valor', '').strip().replace(',', '.')
+    valor_s = _parse_valor_br(request.form.get('valor', ''))
     parcelas = request.form.get('parcelas', '1')
     if not forma or not valor_s:
         flash('Informe forma e valor do pagamento.', 'error')
@@ -3348,7 +3366,7 @@ def contas_pagar():
         action = request.form.get('action')
         if action == 'nova':
             desc     = request.form.get('descricao', '').strip()
-            valor_s  = request.form.get('valor', '').strip().replace(',', '.')
+            valor_s  = _parse_valor_br(request.form.get('valor', ''))
             venc_s   = request.form.get('vencimento', '').strip()
             cat_id_s = request.form.get('categoria_id', '').strip()
             uni_id_s = request.form.get('unidade_id', '').strip()
@@ -3448,7 +3466,7 @@ def contas_receber():
         action = request.form.get('action')
         if action == 'nova':
             desc      = request.form.get('descricao', '').strip()
-            valor_s   = request.form.get('valor', '').strip().replace(',', '.')
+            valor_s   = _parse_valor_br(request.form.get('valor', ''))
             venc_s    = request.form.get('vencimento', '').strip()
             cli_s     = request.form.get('cliente_id', '').strip()
             cat_id_s  = request.form.get('categoria_id', '').strip()
@@ -3600,7 +3618,7 @@ def formas_pagamento():
 
         def _dec(field, default='0'):
             try:
-                return Decimal(request.form.get(field, default).strip().replace(',', '.') or default)
+                return Decimal(_parse_valor_br(request.form.get(field, default), default))
             except (InvalidOperation, AttributeError):
                 return Decimal(default)
 
@@ -4084,7 +4102,7 @@ def api_comanda_pag_add(comanda_id):
     pl = request.get_json(silent=True) or {}
     forma = pl.get('forma_pagamento', '').strip()
     try:
-        valor = Decimal(str(pl.get('valor', '0')).replace(',', '.'))
+        valor = Decimal(_parse_valor_br(str(pl.get('valor', '0')), '0'))
     except Exception:
         return jsonify({'ok': False, 'error': 'Valor inválido.'})
     if not forma:
@@ -4165,7 +4183,7 @@ def api_pacote_criar():
         try:
             svc_id = int(it['servico_id'])
             qtd    = max(1, int(it.get('quantidade', 1)))
-            val    = Decimal(str(it.get('valor_unitario', 0)).replace(',', '.'))
+            val    = Decimal(_parse_valor_br(str(it.get('valor_unitario', 0)), '0'))
         except (KeyError, ValueError, InvalidOperation):
             return jsonify({'ok': False, 'erro': 'Dados de item inválidos'}), 400
         svc = db.session.get(Servico, svc_id)
@@ -4222,7 +4240,7 @@ def api_pacote_detalhe(pacote_id):
         try:
             svc_id = int(it['servico_id'])
             qtd    = max(1, int(it.get('quantidade', 1)))
-            val    = Decimal(str(it.get('valor_unitario', 0)).replace(',', '.'))
+            val    = Decimal(_parse_valor_br(str(it.get('valor_unitario', 0)), '0'))
         except (KeyError, ValueError, InvalidOperation):
             return jsonify({'ok': False, 'erro': 'Dados de item inválidos'}), 400
         p.itens.append(PacoteItem(servico_id=svc_id, quantidade=qtd, valor_unitario=val))
@@ -4303,7 +4321,7 @@ def venda_pacote_nova():
             data_venda = hoje
 
         # Ler valor customizado do pacote (pode ser ajustado na venda)
-        valor_venda_str = request.form.get('valor_total', '').strip().replace(',', '.')
+        valor_venda_str = _parse_valor_br(request.form.get('valor_total', ''))
         try:
             valor_venda = Decimal(valor_venda_str) if valor_venda_str else pacote.valor_total
         except Exception:
@@ -4367,7 +4385,7 @@ def venda_pacote_nova():
             if not forma:
                 continue
             try:
-                v = Decimal(valor_str.replace(',', '.'))
+                v = Decimal(_parse_valor_br(valor_str, '0'))
             except Exception:
                 continue
             if v <= 0:
@@ -4996,7 +5014,7 @@ def cliente_receber_saldo(cliente_id):
     from datetime import date
     from decimal import Decimal
     c = db.get_or_404(Cliente, cliente_id)
-    valor_str = request.form.get('valor', '').strip().replace(',', '.')
+    valor_str = _parse_valor_br(request.form.get('valor', ''))
     forma     = request.form.get('forma_pagamento', '').strip()
     data_str  = request.form.get('data', date.today().isoformat()).strip()
     obs       = request.form.get('observacao', '').strip() or None
