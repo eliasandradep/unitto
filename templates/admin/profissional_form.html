@@ -226,18 +226,43 @@
             </div>
             <p style="font-size:.78rem;color:var(--text-muted);margin:.4rem 0 1rem;line-height:1.4">
               Login {{ 'ativo' if p.ativo else 'inativo (profissional marcado como inativo)' }}.
-              {% if p.user and p.user.password_hash %}Senha já definida.{% else %}Senha ainda não gerada — o profissional não consegue acessar até que uma senha seja gerada.{% endif %}
+              {% if p.user and p.user.password_hash %}Senha já definida.{% else %}Senha ainda não definida — o profissional não consegue acessar até que um administrador defina uma senha.{% endif %}
             </p>
             {% if perm.admin %}
-            <button type="button" class="btn-secondary" onclick="gerarSenha()">
-              {{ 'Gerar nova senha' if p.user and p.user.password_hash else 'Gerar senha de acesso' }}
+            <div class="form-group">
+              <label>{{ 'Nova senha de acesso' if p.user and p.user.password_hash else 'Definir senha de acesso' }}</label>
+              <input type="password" id="profNovaSenha" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div class="form-group">
+              <label>Confirmar senha</label>
+              <input type="password" id="profNovaSenhaConfirma" minlength="6" autocomplete="new-password" />
+            </div>
+            <button type="button" class="btn-secondary" onclick="definirSenha()">
+              {{ 'Salvar nova senha' if p.user and p.user.password_hash else 'Definir senha de acesso' }}
             </button>
             {% endif %}
             {% else %}
-            <p style="font-size:.82rem;color:var(--text-muted);line-height:1.4">
-              Usuário e senha de acesso serão gerados automaticamente ao salvar o cadastro,
-              conforme o perfil de acesso escolhido.
+            {% if perm.admin %}
+            <div class="form-group">
+              <label>Senha de acesso <span class="required">*</span></label>
+              <input type="password" name="senha" id="profSenhaNova" minlength="6" required
+                     autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div class="form-group">
+              <label>Confirmar senha <span class="required">*</span></label>
+              <input type="password" name="confirmar_senha" id="profSenhaConfirma" minlength="6" required
+                     autocomplete="new-password" />
+            </div>
+            <p style="font-size:.78rem;color:var(--text-muted);margin:.3rem 0 0;line-height:1.4">
+              O nome de usuário é gerado automaticamente a partir do nome do profissional.
+              A senha acima será a senha inicial de acesso ao sistema.
             </p>
+            {% else %}
+            <p style="font-size:.82rem;color:var(--text-muted);line-height:1.4">
+              O usuário de login será gerado automaticamente ao salvar. A senha de acesso
+              precisa ser definida por um administrador (aba "Acesso ao Sistema", após o cadastro).
+            </p>
+            {% endif %}
             {% endif %}
 
           </div>
@@ -478,6 +503,17 @@ document.querySelectorAll('.ptab-btn').forEach(function(btn) {
   });
 });
 
+document.getElementById('profForm')?.addEventListener('submit', function(e) {
+  var senha = document.getElementById('profSenhaNova');
+  var confirma = document.getElementById('profSenhaConfirma');
+  if (senha && confirma && senha.value !== confirma.value) {
+    e.preventDefault();
+    alert('As senhas não coincidem.');
+    document.querySelector('.ptab-btn[data-tab="acesso"]')?.click();
+    confirma.focus();
+  }
+});
+
 // ── Acesso ao Sistema ──────────────────────────────────────────────────────
 document.getElementById('cpfInput')?.addEventListener('input', function() {
   let v = this.value.replace(/\D/g, '').slice(0, 11);
@@ -487,12 +523,27 @@ document.getElementById('cpfInput')?.addEventListener('input', function() {
   this.value = v;
 });
 
-function gerarSenha() {
+function definirSenha() {
   if (!_PROF_ID) return;
-  if (!confirm('Gerar uma nova senha de acesso? A senha atual (se houver) deixará de funcionar.')) return;
+  var senhaInput    = document.getElementById('profNovaSenha');
+  var confirmaInput = document.getElementById('profNovaSenhaConfirma');
+  var senha    = senhaInput.value;
+  var confirma = confirmaInput.value;
+  if (!senha || senha.length < 6) {
+    alert('Digite uma senha com pelo menos 6 caracteres.');
+    return;
+  }
+  if (senha !== confirma) {
+    alert('As senhas não coincidem.');
+    return;
+  }
+  if (!confirm('Definir esta senha de acesso? A senha atual (se houver) deixará de funcionar.')) return;
   var f = document.createElement('form');
   f.method = 'POST';
   f.action = '/admin/profissionais/' + _PROF_ID + '/resetar-senha';
+  var inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'senha'; inp.value = senha;
+  f.appendChild(inp);
   document.body.appendChild(f);
   f.submit();
 }

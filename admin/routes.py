@@ -1533,9 +1533,12 @@ def _msg_limite_profissionais():
             'Desative outro profissional ou faça upgrade do plano para continuar.')
 
 
-def _provision_login(p):
-    """Cria o User de login vinculado a um Profissional, com senha gerada.
-    Retorna (username, senha_texto_puro)."""
+def _provision_login(p, senha=None):
+    """Cria o User de login vinculado a um Profissional. A senha de acesso
+    é sempre definida por um administrador — nunca gerada aleatoriamente.
+    Se `senha` não for informada, o User é criado sem senha utilizável
+    (login bloqueado até um administrador definir uma, via
+    profissional_resetar_senha). Retorna (username, senha_texto_puro ou None)."""
     base = re.sub(r'[^a-z0-9]+', '.', p.nome.strip().lower()).strip('.') or 'profissional'
     username = base
     n = 1
@@ -1545,10 +1548,10 @@ def _provision_login(p):
     email = p.email
     if not email or User.query.filter(db.func.lower(User.email) == email.lower()).first():
         email = f'{base}.{uuid.uuid4().hex[:6]}@login.interno'
-    senha = secrets.token_urlsafe(9)
     u = User(name=p.nome, username=username, email=email, phone=p.telefone,
               role='profissional', profissional_id=p.id, is_active=p.ativo)
-    u.set_password(senha)
+    if senha:
+        u.set_password(senha)
     db.session.add(u)
     return username, senha
 
@@ -1630,19 +1633,32 @@ def profissional_novo():
         flash(_msg_limite_profissionais(), 'error')
         return redirect(url_for('admin.profissionais'))
     if request.method == 'POST':
-        p = Profissional()
-        if _save_profissional(p):
-            try:
-                db.session.add(p)
-                db.session.flush()
-                username, senha = _provision_login(p)
-                db.session.commit()
-                session['_prof_pwd_once'] = {'prof_id': p.id, 'username': username, 'senha': senha}
-                flash('Profissional cadastrado com sucesso.', 'success')
-                return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
-            except Exception as exc:
-                db.session.rollback()
-                flash(f'Erro ao salvar: {exc}', 'error')
+        senha = None
+        if is_administrador():
+            senha           = request.form.get('senha', '').strip()
+            confirmar_senha = request.form.get('confirmar_senha', '').strip()
+            if not senha or len(senha) < 6:
+                flash('Defina uma senha de acesso com pelo menos 6 caracteres.', 'error')
+                senha = False
+            elif senha != confirmar_senha:
+                flash('As senhas não coincidem.', 'error')
+                senha = False
+
+        if senha is not False:
+            p = Profissional()
+            if _save_profissional(p):
+                try:
+                    db.session.add(p)
+                    db.session.flush()
+                    username, senha_criada = _provision_login(p, senha=senha)
+                    db.session.commit()
+                    if senha_criada:
+                        session['_prof_pwd_once'] = {'prof_id': p.id, 'username': username, 'senha': senha_criada}
+                    flash('Profissional cadastrado com sucesso.', 'success')
+                    return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
+                except Exception as exc:
+                    db.session.rollback()
+                    flash(f'Erro ao salvar: {exc}', 'error')
     ctx = _prof_form_ctx()
     svcs_data = [{'id': s.id, 'nome': s.nome} for s in ctx['servicos']]
     return render_template('admin/profissional_form.html',
@@ -1699,19 +1715,22 @@ def profissional_resetar_senha(prof_id):
     if not is_administrador():
         abort(403)
     p = db.get_or_404(Profissional, prof_id)
+    senha = request.form.get('senha', '').strip()
+    if not senha or len(senha) < 6:
+        flash('Defina uma senha de acesso com pelo menos 6 caracteres.', 'error')
+        return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
     try:
         if p.user:
-            senha = secrets.token_urlsafe(9)
             p.user.set_password(senha)
             username = p.user.username
         else:
-            username, senha = _provision_login(p)
+            username, senha = _provision_login(p, senha=senha)
         db.session.commit()
         session['_prof_pwd_once'] = {'prof_id': p.id, 'username': username, 'senha': senha}
-        flash('Nova senha gerada com sucesso.', 'success')
+        flash('Senha definida com sucesso.', 'success')
     except Exception as exc:
         db.session.rollback()
-        flash(f'Erro ao gerar senha: {exc}', 'error')
+        flash(f'Erro ao definir senha: {exc}', 'error')
     return redirect(url_for('admin.profissional_detalhe', prof_id=p.id))
 
 
