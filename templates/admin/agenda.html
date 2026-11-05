@@ -695,8 +695,15 @@
   background: #f2ede8;
 }
 .ag-prof-head {
-  flex: 1;
+  flex: 1 1 160px;
+  width: 160px;       /* idêntico ao .ag-prof-col — trava a largura real da coluna */
   min-width: 160px;
+  max-width: 160px;
+  /* overflow:hidden muda o cálculo automático de largura mínima do flexbox:
+     sem isso, um cargo longo e sem quebra (ex: "Cabeleireira, Maquiadora e
+     Penteado") força a célula a crescer além do min-width, descolando essa
+     coluna (e todas as seguintes) do corpo do calendário abaixo. */
+  overflow: hidden;
   padding: .55rem .5rem;
   text-align: center;
   border-left: 1px solid var(--border);
@@ -721,8 +728,19 @@
   font-weight: 700;
   color: #fff;
 }
+.ag-prof-head-name,
+.ag-prof-head-cargo {
+  width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+}
 .ag-prof-head-name  { font-size: .83rem; font-weight: 600; color: var(--dark); line-height: 1.25; }
-.ag-prof-head-cargo { font-size: .74rem; color: var(--text-muted); margin-top: 0; }
+.ag-prof-head-cargo {
+  font-size: .74rem; color: var(--text-muted); margin-top: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.2;
+}
 
 .ag-body {
   display: flex;
@@ -755,8 +773,10 @@
 
 /* Colunas dos profissionais */
 .ag-prof-col {
-  flex: 1;
+  flex: 1 1 160px;
+  width: 160px;        /* idêntico ao .ag-prof-head — garante alinhamento com o cabeçalho */
   min-width: 160px;
+  max-width: 160px;
   position: relative;
   border-left: 1px solid var(--border);
 }
