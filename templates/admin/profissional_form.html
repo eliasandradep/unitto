@@ -449,6 +449,16 @@
 .restricao-item-text span   { font-size: .78rem; color: var(--text-muted); line-height: 1.4; }
 
 /* Escalas */
+.escala-list { display: flex; flex-direction: column; }
+.escala-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; padding: .55rem .9rem; border-bottom: 1px solid var(--border);
+}
+.escala-row:last-child { border-bottom: none; }
+.escala-row-info { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: .1rem; }
+.escala-row-info strong { font-size: .85rem; overflow-wrap: anywhere; }
+.escala-row-info span { font-size: .76rem; color: var(--text-muted); }
+.escala-row .btn-icon { flex-shrink: 0; }
 .escala-add-row {
   display: flex; gap: .4rem; flex-wrap: wrap; align-items: center;
   background: #f9f7f5; border-top: 2px solid var(--border); padding: .65rem;
@@ -663,22 +673,21 @@ function renderEscalas() {
     return;
   }
   var rows = _escalas.map(function(e) {
-    return '<tr>'
-      + '<td>' + e.unidade_nome + '</td>'
-      + '<td>' + fmtData(e.data_inicio) + '</td>'
-      + '<td>' + fmtData(e.data_fim) + '</td>'
-      + '<td><button type="button" class="btn-icon btn-icon--danger" title="Remover escala"'
+    return '<div class="escala-row">'
+      + '<div class="escala-row-info">'
+      + '<strong>' + e.unidade_nome + '</strong>'
+      + '<span>' + fmtData(e.data_inicio) + ' — ' + fmtData(e.data_fim) + '</span>'
+      + '</div>'
+      + '<button type="button" class="btn-icon btn-icon--danger" title="Remover escala"'
       + ' onclick="delEscala(' + e.id + ')">'
       + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">'
       + '<polyline points="3 6 5 6 21 6"/>'
       + '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
       + '<path d="M10 11v6M14 11v6"/>'
-      + '</svg></button></td>'
-      + '</tr>';
+      + '</svg></button>'
+      + '</div>';
   }).join('');
-  mount.innerHTML = '<table class="com-table"><thead><tr>'
-    + '<th>Unidade</th><th>De</th><th>Até</th><th style="width:42px"></th>'
-    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+  mount.innerHTML = '<div class="escala-list">' + rows + '</div>';
 }
 
 async function carregarEscalas() {
