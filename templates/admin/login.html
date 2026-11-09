@@ -6,6 +6,16 @@
   <title>Login — Unitto</title>
   <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+  <meta name="theme-color" content="#1B2D6E" />
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon-32.png') }}" sizes="32x32" />
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon-64.png') }}" sizes="64x64" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Unitto" />
 </head>
 <body class="admin-body admin-body--auth">
 
@@ -36,6 +46,14 @@
       <a href="{{ url_for('admin.forgot_password') }}">Esqueci minha senha</a>
     </p>
   </div>
+
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js', { scope: '/admin/' }).catch(function () {});
+    });
+  }
+  </script>
 
 </body>
 </html>

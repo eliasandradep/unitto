@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, Response, abort
+from flask import Flask, render_template, Response, abort, send_from_directory
 from flask_login import LoginManager
 from dotenv import load_dotenv
 
@@ -597,6 +597,18 @@ def exclusao_dados():
 @app.route('/ping')
 def ping():
     return 'ok', 200
+
+
+@app.route('/sw.js')
+def service_worker():
+    """Service worker do PWA do painel admin. Precisa ser servido na raiz do
+    site (não em /static/js/) para que seu escopo máximo permitido cubra
+    /admin/, que é onde ele é de fato registrado (ver admin/base.html)."""
+    resp = send_from_directory(os.path.join(app.static_folder, 'js'), 'sw.js',
+                                mimetype='application/javascript')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['Service-Worker-Allowed'] = '/admin/'
+    return resp
 
 
 @app.route('/logo/<int:empresa_id>')
