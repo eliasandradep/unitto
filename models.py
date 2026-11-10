@@ -355,6 +355,10 @@ class User(db.Model, UserMixin):
     profissional_id = db.Column(db.Integer, db.ForeignKey('profissionais.id'), nullable=True)
     profissional     = db.relationship('Profissional', backref=db.backref('user', uselist=False))
 
+    # Ordem pessoal das colunas de profissionais na agenda (JSON: lista de
+    # ids), só pra este usuário — cada um organiza do seu jeito.
+    agenda_ordem_profissionais = db.Column(db.Text)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 

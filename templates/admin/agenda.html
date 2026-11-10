@@ -41,9 +41,9 @@
     <div class="ag-header" id="agHeader">
       <div class="ag-corner"></div>
       {% for p in profissionais %}
-      <div class="ag-prof-head">
+      <div class="ag-prof-head" data-prof="{{ p.id }}" draggable="true" title="Arraste para reordenar">
         {% if p.foto_data %}
-        <img class="ag-prof-head-avatar" src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="" />
+        <img class="ag-prof-head-avatar" draggable="false" src="{{ url_for('profissional_foto_serve', prof_id=p.id) }}" alt="" />
         {% else %}
         <div class="ag-prof-head-avatar ag-prof-head-avatar--fallback" style="background:{{ p.avatar_cor() }}">{{ p.avatar_iniciais() }}</div>
         {% endif %}
@@ -745,7 +745,11 @@
   align-items: center;
   justify-content: center;
   gap: .3rem;
+  cursor: grab;
+  transition: background .12s, opacity .12s;
 }
+.ag-prof-head.ag-dragging { opacity: .35; cursor: grabbing; }
+.ag-prof-head.ag-drop-target { background: rgba(30,62,158,.1); }
 .ag-prof-head-avatar {
   width: 34px;
   height: 34px;
@@ -1783,6 +1787,78 @@ document.addEventListener('keydown', function(e) {
       headerWrap.scrollLeft = bodyWrap.scrollLeft;
     });
   }
+})();
+
+// Reordenação das colunas de profissionais por drag-and-drop — a ordem
+// escolhida é salva por usuário (cada atendente/profissional organiza do
+// seu jeito) e volta a ser aplicada nas próximas visitas dela.
+(function() {
+  var header = document.getElementById('agHeader');
+  var body   = document.getElementById('agBody');
+  if (!header || !body) return;
+
+  var dragged = null;
+
+  function heads() {
+    return Array.prototype.slice.call(header.querySelectorAll('.ag-prof-head'));
+  }
+
+  function salvarOrdem() {
+    var ordem = heads().map(function(h) { return parseInt(h.dataset.prof, 10); });
+    fetch('/admin/agenda/ordem-colunas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordem: ordem })
+    }).catch(function() {});
+  }
+
+  heads().forEach(function(head) {
+    head.addEventListener('dragstart', function(e) {
+      dragged = head;
+      head.classList.add('ag-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', head.dataset.prof); } catch (err) {}
+    });
+    head.addEventListener('dragend', function() {
+      head.classList.remove('ag-dragging');
+      heads().forEach(function(h) { h.classList.remove('ag-drop-target'); });
+      dragged = null;
+    });
+    head.addEventListener('dragover', function(e) {
+      if (!dragged || dragged === head) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      head.classList.add('ag-drop-target');
+    });
+    head.addEventListener('dragleave', function() {
+      head.classList.remove('ag-drop-target');
+    });
+    head.addEventListener('drop', function(e) {
+      e.preventDefault();
+      head.classList.remove('ag-drop-target');
+      if (!dragged || dragged === head) return;
+
+      var before = heads();
+      var fromIdx = before.indexOf(dragged);
+      var toIdx   = before.indexOf(head);
+      if (fromIdx < toIdx) {
+        header.insertBefore(dragged, head.nextSibling);
+      } else {
+        header.insertBefore(dragged, head);
+      }
+
+      var draggedCol = body.querySelector('.ag-prof-col[data-prof="' + dragged.dataset.prof + '"]');
+      var targetCol  = body.querySelector('.ag-prof-col[data-prof="' + head.dataset.prof + '"]');
+      if (draggedCol && targetCol) {
+        if (fromIdx < toIdx) {
+          body.insertBefore(draggedCol, targetCol.nextSibling);
+        } else {
+          body.insertBefore(draggedCol, targetCol);
+        }
+      }
+      salvarOrdem();
+    });
+  });
 })();
 
 // Scroll automático para 08:00 ao carregar — agora quem rola verticalmente

@@ -2321,6 +2321,25 @@ def agenda_listagem():
 
 # ── Agenda ───────────────────────────────────────────────────────────────────
 
+def _aplicar_ordem_colunas_agenda(profissionais, ordem_json):
+    """Reordena as colunas de profissionais da agenda conforme a preferência
+    salva pelo usuário (lista de ids em JSON). Profissionais que não estão
+    mais na lista salva (novo cadastro, por exemplo) entram no final, na
+    ordem alfabética padrão."""
+    if not ordem_json:
+        return profissionais
+    try:
+        ordem = json.loads(ordem_json)
+    except (ValueError, TypeError):
+        return profissionais
+    if not isinstance(ordem, list):
+        return profissionais
+    por_id = {p.id: p for p in profissionais}
+    ordenados = [por_id[i] for i in ordem if i in por_id]
+    restantes = [p for p in profissionais if p.id not in set(ordem)]
+    return ordenados + restantes
+
+
 @admin_bp.route('/agenda')
 @login_required
 def agenda():
@@ -2331,6 +2350,8 @@ def agenda():
     except ValueError:
         data_sel = date.today()
     profissionais_ativos = tq(Profissional).filter_by(ativo=True).order_by(Profissional.nome).all()
+    profissionais_ativos = _aplicar_ordem_colunas_agenda(
+        profissionais_ativos, current_user.agenda_ordem_profissionais)
     servicos_ativos      = tq(Servico).filter_by(ativo=True).order_by(Servico.nome).all()
     unidades_ativas      = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
     return render_template('admin/agenda.html',
@@ -2340,6 +2361,22 @@ def agenda():
         unidades=unidades_ativas,
         formas=FORMA_PAGAMENTO,
     )
+
+
+@admin_bp.route('/agenda/ordem-colunas', methods=['POST'])
+@login_required
+def agenda_ordem_colunas():
+    """Salva a ordem de colunas de profissionais escolhida pelo usuário
+    logado (drag-and-drop na agenda). É por usuário, não por empresa."""
+    body = request.get_json(silent=True) or {}
+    ordem = body.get('ordem')
+    if not isinstance(ordem, list) or not all(isinstance(i, int) for i in ordem):
+        return jsonify({'ok': False, 'error': 'Formato inválido.'}), 400
+    ids_validos = {p.id for p in tq(Profissional).filter(Profissional.id.in_(ordem)).all()}
+    ordem_filtrada = [i for i in ordem if i in ids_validos]
+    current_user.agenda_ordem_profissionais = json.dumps(ordem_filtrada)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
 def _build_expedientes_para_data(data_sel):
