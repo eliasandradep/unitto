@@ -2499,6 +2499,10 @@ def _build_agendamento(a):
         if s:
             servicos_sel.append(s)
 
+    if not servicos_sel:
+        flash('Selecione ao menos um serviço — escolha na lista e clique em "+ Adicionar Serviço".', 'error')
+        return None, data_str
+
     if dur_form:
         try: duracao = max(15, int(dur_form))
         except ValueError: pass
@@ -2756,6 +2760,38 @@ def _add_servicos_agendamento_comanda(comanda, agendamento):
                 vpi.venda.status = 'concluido'
 
 
+def _sync_servicos_agendamento_comanda(comanda, agendamento):
+    """A comanda é montada a partir dos serviços do agendamento só uma vez,
+    na hora em que é criada (_add_servicos_agendamento_comanda). Se depois
+    disso o agendamento for editado — por exemplo, o serviço foi esquecido
+    na hora de agendar e só adicionado depois —, a comanda já existente
+    nunca ficava sabendo: reabrir "Faturar" devolvia a mesma comanda, sem o
+    serviço novo. Esta função roda sempre que uma comanda já existente é
+    reaberta e completa os itens que estiverem faltando, sem duplicar os
+    que já estão lá nem mexer em itens extras (produtos, serviços avulsos
+    etc) que o usuário tenha adicionado manualmente na própria comanda."""
+    from decimal import Decimal
+    if comanda.status != 'aberta':
+        return  # já fechada/paga — editar o agendamento não deve alterar o faturado
+    servicos = list(agendamento.servicos_lista or [])
+    if not servicos and agendamento.servico:
+        servicos = [agendamento.servico]
+    if not servicos:
+        return
+    ja_tem = {i.servico_id for i in comanda.itens if i.servico_id}
+    faltando = [s for s in servicos if s.id not in ja_tem]
+    if not faltando:
+        return
+    for s in faltando:
+        db.session.add(ComandaItem(
+            comanda_id=comanda.id, servico_id=s.id, descricao=s.nome,
+            valor=s.preco or Decimal('0'), quantidade=1,
+            profissional_id=agendamento.profissional_id,
+            comissao_valor=s.comissao_valor, comissao_tipo=s.comissao_tipo or '%',
+        ))
+    db.session.commit()
+
+
 @admin_bp.route('/agenda/<int:ag_id>/faturar', methods=['POST'])
 @login_required
 def agenda_faturar(ag_id):
@@ -2775,6 +2811,7 @@ def agenda_faturar(ag_id):
     if fin_scope == 'limited' and a.data != date.today():
         abort(403)
     if a.comanda:
+        _sync_servicos_agendamento_comanda(a.comanda, a)
         return redirect(url_for('admin.comanda_detalhe', comanda_id=a.comanda.id))
     codigo = _next_codigo()
     c = Comanda(
@@ -4100,6 +4137,7 @@ def api_ag_comanda(ag_id):
         abort(403)
     if a.comanda:
         _check_financeiro_scope(a.comanda)
+        _sync_servicos_agendamento_comanda(a.comanda, a)
         return jsonify(_comanda_to_json(a.comanda))
     if scope == 'limited' and a.data != date.today():
         abort(403)

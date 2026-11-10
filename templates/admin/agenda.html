@@ -264,9 +264,10 @@
             {# Tags de serviços selecionados #}
             <div id="svcTags" style="display:flex;flex-wrap:wrap;gap:.3rem;min-height:1.6rem;margin-bottom:.35rem"></div>
 
-            {# Dropdown + botão adicionar #}
-            <div style="display:flex;gap:.4rem;align-items:center">
-              <select id="agFormServico" style="flex:1;padding:.42rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;background:var(--card-bg)">
+            {# Dropdown + botão adicionar — selecionar já adiciona sozinho (onchange);
+               o botão fica só como reforço visual/alternativa pra quem navega por teclado. #}
+            <div id="svcPickerBox" style="display:flex;gap:.4rem;align-items:center;border-radius:6px;transition:box-shadow .2s">
+              <select id="agFormServico" onchange="svcAdicionar()" style="flex:1;padding:.42rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;background:var(--card-bg)">
                 <option value="">Selecione um serviço…</option>
                 {% for s in servicos %}
                 <option value="{{ s.id }}"
@@ -282,6 +283,9 @@
                 + Adicionar Serviço
               </button>
             </div>
+            <p style="font-size:.74rem;color:var(--text-muted);margin:.3rem 0 0">
+              Ao escolher um serviço na lista ele já é adicionado automaticamente.
+            </p>
 
             {# Inputs ocultos gerados dinamicamente (servico_ids[]) #}
             <div id="svcHiddenInputs"></div>
@@ -1158,6 +1162,9 @@
   margin-top: .5rem;
 }
 
+/* Alerta visual quando o usuário tenta salvar sem adicionar nenhum serviço */
+.svc-picker-alert { box-shadow: 0 0 0 3px rgba(220,53,69,.5); }
+
 /* Adicionar serviço */
 .cmd-add-svc {
   margin-top: .9rem;
@@ -1706,7 +1713,26 @@ function _svcRender() {
   if (totalDur > 0) {
     document.getElementById('agFormDur').value = totalDur;
   }
+  document.getElementById('svcPickerBox').classList.remove('svc-picker-alert');
 }
+
+// Trava o envio se nenhum serviço foi adicionado — selecionar na lista sem
+// clicar (ou sem disparar o auto-add do onchange) não deve criar um
+// agendamento sem serviço.
+(function() {
+  var form = document.getElementById('agForm');
+  if (!form) return;
+  form.addEventListener('submit', function(e) {
+    if (_svcSel.length === 0) {
+      e.preventDefault();
+      _showAgToast('Selecione um serviço na lista antes de salvar.');
+      var box = document.getElementById('svcPickerBox');
+      box.classList.add('svc-picker-alert');
+      document.getElementById('agFormServico').focus();
+      setTimeout(function() { box.classList.remove('svc-picker-alert'); }, 2000);
+    }
+  });
+})();
 
 function _svcPopular(lista, vpItemId) {
   _agVpItemId = vpItemId || null;
@@ -2278,6 +2304,20 @@ async function _salvarCmdItens() {
 
 async function salvarComandaModal() {
   if (!_cmdId) return;
+  // Trava o salvamento se um serviço foi escolhido na lista mas o usuário
+  // esqueceu de clicar em "Inserir" — sem isso a comanda salva sem aquele
+  // serviço, silenciosamente.
+  var svcSel = document.getElementById('cmdSvcPicker');
+  if (svcSel && svcSel.value) {
+    _showAgToast('Clique em "Inserir" para adicionar o serviço selecionado antes de salvar.');
+    var addBox = document.querySelector('.cmd-add-svc');
+    if (addBox) {
+      addBox.classList.add('svc-picker-alert');
+      setTimeout(function() { addBox.classList.remove('svc-picker-alert'); }, 2000);
+    }
+    svcSel.focus();
+    return;
+  }
   var btnSave = document.querySelectorAll('.cmd-btn-save');
   btnSave.forEach(function(b) { b.disabled = true; b.textContent = 'Salvando…'; });
   try {
