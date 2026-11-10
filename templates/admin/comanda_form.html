@@ -289,9 +289,9 @@
         {% endif %}
       </div>
       {% endif %}
-      <form method="POST" action="{{ url_for('admin.comanda_fechar', comanda_id=c.id) }}"
+      <form method="POST" action="{{ url_for('admin.comanda_fechar', comanda_id=c.id) }}" id="fecharForm"
             style="margin-top:.8rem"
-            onsubmit="return confirm('Fechar esta comanda?{% if c.saldo > 0 and c.cliente %} R$ {{ '%.2f'|format(c.saldo)|replace('.', ',') }} serão lançados como dívida do cliente.{% elif c.saldo < 0 and c.cliente %} R$ {{ '%.2f'|format(-c.saldo)|replace('.', ',') }} serão creditados ao cliente.{% endif %}')">
+            onsubmit="return confirm('Fechar esta comanda?{% if c.saldo > 0 and c.cliente %} R$ {{ '%.2f'|format(c.saldo)|replace('.', ',') }} serão lançados como dívida do cliente.{% elif c.saldo < 0 and c.cliente %} R$ {{ '%.2f'|format(-c.saldo)|replace('.', ',') }} serão creditados ao cliente.{% elif c.saldo == 0 and not c.pagamentos %} Nenhum pagamento foi registrado e o valor total é R$ 0,00 — confira se os serviços foram inseridos antes de continuar.{% endif %}')">
         <button type="submit" class="btn-primary" style="width:100%">Fechar comanda</button>
       </form>
       {% endif %}
@@ -703,6 +703,36 @@ recalc();
       .finally(function() {
         if (btn) { btn.disabled = false; btn.textContent = 'Registrar'; }
         pagForm.submit();   // submete o pagamento (sem interceptar — _saving=true)
+      });
+  });
+})();
+
+// ── Auto-save da comanda antes de fechar ──────────────────────────────────────
+// O botão "Fechar comanda" é um <form> à parte do #comandaForm: sem isto, itens
+// adicionados na tela (serviço/produto) mas nunca salvos via "Salvar comanda"
+// eram perdidos ao fechar — a comanda fechava com total R$ 0,00.
+(function() {
+  var fecharForm = document.getElementById('fecharForm');
+  if (!fecharForm) return;
+  var _saving = false;
+
+  fecharForm.addEventListener('submit', function(e) {
+    if (e.defaultPrevented) return;   // confirm() cancelado pelo usuário
+    if (_saving) return;              // segunda chamada após o fetch: deixa passar
+    var cmdForm = document.getElementById('comandaForm');
+    if (!cmdForm) return;
+
+    e.preventDefault();
+    _saving = true;
+    var btn = fecharForm.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+
+    var autosaveUrl = window.location.pathname.replace(/\/$/, '') + '/autosave';
+    fetch(autosaveUrl, { method: 'POST', body: new FormData(cmdForm) })
+      .catch(function() { /* ignora erros — não bloqueia o fechamento */ })
+      .finally(function() {
+        if (btn) { btn.disabled = false; btn.textContent = 'Fechar comanda'; }
+        fecharForm.submit();   // submete o fechamento (sem interceptar — _saving=true)
       });
   });
 })();
