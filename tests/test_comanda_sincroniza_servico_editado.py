@@ -22,21 +22,7 @@ def _login_admin(client, empresa):
     return user
 
 
-def _isolar_codigo_comanda(monkeypatch):
-    """`Comanda.codigo` é globalmente único na tabela (não só por empresa) —
-    detalhe ortogonal ao bug sendo testado aqui, mas que faz dois testes
-    criando comanda em empresas diferentes colidirem no mesmo arquivo de
-    banco compartilhado da suíte. Isola só pra não depender de quantas
-    comandas outros testes já criaram."""
-    import itertools
-    import random
-    import admin.routes as routes_mod
-    contador = itertools.count(random.randint(10_000_000, 999_000_000))
-    monkeypatch.setattr(routes_mod, '_next_codigo', lambda: next(contador))
-
-
-def test_comanda_sincroniza_servico_adicionado_apos_editar_agendamento(client, monkeypatch):
-    _isolar_codigo_comanda(monkeypatch)
+def test_comanda_sincroniza_servico_adicionado_apos_editar_agendamento(client):
     empresa = make_empresa()
     _login_admin(client, empresa)
     servico, prof = make_booking_setup(empresa)
@@ -73,8 +59,7 @@ def test_comanda_sincroniza_servico_adicionado_apos_editar_agendamento(client, m
     assert r2.get_json()['itens'][0]['servico_id'] == servico.id
 
 
-def test_sincronizacao_nao_duplica_servico_ja_presente(client, monkeypatch):
-    _isolar_codigo_comanda(monkeypatch)
+def test_sincronizacao_nao_duplica_servico_ja_presente(client):
     empresa = make_empresa()
     _login_admin(client, empresa)
     servico, prof = make_booking_setup(empresa)
@@ -99,8 +84,7 @@ def test_sincronizacao_nao_duplica_servico_ja_presente(client, monkeypatch):
     assert ComandaItem.query.filter_by(comanda_id=c.id).count() == 1
 
 
-def test_sincronizacao_nao_mexe_em_comanda_ja_fechada(client, monkeypatch):
-    _isolar_codigo_comanda(monkeypatch)
+def test_sincronizacao_nao_mexe_em_comanda_ja_fechada(client):
     empresa = make_empresa()
     _login_admin(client, empresa)
     servico, prof = make_booking_setup(empresa)

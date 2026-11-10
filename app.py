@@ -161,6 +161,36 @@ def _migrate_leads_phone_nullable():
         pass
 
 
+def _migrate_comanda_codigo_por_empresa():
+    """Comanda.codigo era UNIQUE globalmente na tabela toda, mas _next_codigo()
+    calcula o próximo número POR EMPRESA (cada uma começa do 1). Duas
+    empresas diferentes acabam gerando o mesmo código mais cedo ou mais
+    tarde (ex: a 1ª comanda de cada uma é sempre #1) — a segunda a tentar
+    criar batia num IntegrityError e caía num 500 ao fechar/faturar. Troca
+    a constraint para (empresa_id, codigo), que é o que a numeração de fato
+    garante."""
+    from sqlalchemy import inspect as _insp, text
+    if 'postgresql' not in db.engine.url.drivername:
+        return  # SQLite (dev/testes) sempre parte de um db.create_all() já com a constraint nova
+    try:
+        insp = _insp(db.engine)
+        uniques = insp.get_unique_constraints('comandas')
+        tem_composto = any(set(u['column_names']) == {'empresa_id', 'codigo'} for u in uniques)
+        antigo = next((u for u in uniques if u['column_names'] == ['codigo'] and u['name']), None)
+        if tem_composto and not antigo:
+            return
+        with db.engine.begin() as conn:
+            if antigo:
+                conn.execute(text(f'ALTER TABLE comandas DROP CONSTRAINT "{antigo["name"]}"'))
+            if not tem_composto:
+                conn.execute(text(
+                    'ALTER TABLE comandas ADD CONSTRAINT uq_comanda_empresa_codigo '
+                    'UNIQUE (empresa_id, codigo)'
+                ))
+    except Exception:
+        pass
+
+
 def _migrate_expedientes():
     from sqlalchemy import inspect as _insp, text
     _pg = 'postgresql' in db.engine.url.drivername
@@ -448,6 +478,7 @@ with app.app_context():
     db.create_all()
     _migrate_checkout_url_len()
     _migrate_leads_phone_nullable()
+    _migrate_comanda_codigo_por_empresa()
     _pg = 'postgresql' in db.engine.url.drivername
     _safe_add_col('empresas',      'logo_data', 'BYTEA' if _pg else 'BLOB')
     _safe_add_col('empresas',      'logo_mime', 'VARCHAR(50)')

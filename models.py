@@ -791,8 +791,11 @@ class FormaPagamento(db.Model):
 
 class Comanda(db.Model):
     __tablename__ = 'comandas'
+    __table_args__ = (
+        db.UniqueConstraint('empresa_id', 'codigo', name='uq_comanda_empresa_codigo'),
+    )
     id              = db.Column(db.Integer, primary_key=True)
-    codigo          = db.Column(db.Integer, unique=True, nullable=False)
+    codigo          = db.Column(db.Integer, nullable=False)
     data            = db.Column(db.Date, nullable=False)
     cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'),      nullable=True)
     nome_cliente    = db.Column(db.String(100))
