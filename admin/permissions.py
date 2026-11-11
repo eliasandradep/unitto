@@ -9,11 +9,13 @@ from flask_login import current_user
 PERFIL_CAPS = {
     'leitura':       {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none'},
     'pessoal':       {'agenda': 'own',    'comissoes': 'own',  'financeiro': 'none'},
-    'profissional':  {'agenda': 'own',    'comissoes': 'own',  'financeiro': 'limited'},
+    'profissional':  {'agenda': 'own',    'comissoes': 'own',  'financeiro': 'own'},
     'atendente':     {'agenda': 'all',    'comissoes': 'own',  'financeiro': 'none'},
     'recepcao':      {'agenda': 'all',    'comissoes': 'own',  'financeiro': 'limited'},
     'administrador': {'agenda': 'all',    'comissoes': 'all',  'financeiro': 'full'},
 }
+# financeiro: 'none' sem acesso · 'own' só comandas do próprio profissional (qualquer
+# data) · 'limited' qualquer comanda, só do dia de hoje · 'full' sem restrição
 
 _ROLE_TO_PERFIL = {
     'saas_admin':    'administrador',
@@ -61,6 +63,27 @@ def financeiro_scope():
 
 def is_administrador():
     return current_perfil() == 'administrador'
+
+
+def financeiro_pode_acessar(c=None):
+    """True se o usuário logado pode ver/editar/fechar/lançar pagamento em `c`
+    (uma Comanda ou um Agendamento — ambos têm .data e .profissional_id),
+    considerando seu escopo financeiro. Sem `c`, só diz se há acesso geral
+    à área financeira (ignora dono/data)."""
+    scope = financeiro_scope()
+    if scope == 'none':
+        return False
+    if scope == 'full':
+        return True
+    if scope == 'limited':
+        from datetime import date
+        return c is None or c.data == date.today()
+    if scope == 'own':
+        if c is None:
+            return True
+        prof = current_profissional()
+        return prof is not None and c.profissional_id == prof.id
+    return False
 
 
 def tem_acesso_catalogo():

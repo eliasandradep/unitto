@@ -14,7 +14,7 @@ from . import admin_bp
 from .tenant import tq, get_setting, save_setting, BASE_DOMAIN
 from .auth import require_role
 from .permissions import (agenda_scope, comissoes_scope, financeiro_scope,
-                           current_profissional, is_administrador)
+                           financeiro_pode_acessar, current_profissional, is_administrador)
 from models import (db, User, Lead, Setting, PageView, ROLES,
                     Cliente, AnamneseCapilar, AnamneseCorporal,
                     Categoria, Unidade, Profissional, Servico,
@@ -2808,11 +2808,12 @@ def agenda_faturar(ag_id):
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
             abort(403)
-    if fin_scope == 'limited' and a.data != date.today():
-        abort(403)
     if a.comanda:
+        _check_financeiro_scope(a.comanda)
         _sync_servicos_agendamento_comanda(a.comanda, a)
         return redirect(url_for('admin.comanda_detalhe', comanda_id=a.comanda.id))
+    if not financeiro_pode_acessar(a):
+        abort(403)
     codigo = _next_codigo()
     c = Comanda(
         codigo=codigo, data=a.data,
@@ -2840,14 +2841,10 @@ def _next_codigo():
 
 
 def _check_financeiro_scope(c=None):
-    """Bloqueia conforme o escopo financeiro do usuário logado.
-    Com 'c' informado, também bloqueia quando o escopo é 'limited' e a
-    comanda carregada não é do dia."""
-    from datetime import date
-    scope = financeiro_scope()
-    if scope == 'none':
-        abort(403)
-    if scope == 'limited' and c is not None and c.data != date.today():
+    """Bloqueia conforme o escopo financeiro do usuário logado. Com 'c'
+    informado (Comanda ou Agendamento), também bloqueia quando o escopo é
+    'limited' e não é do dia, ou 'own' e não é do profissional logado."""
+    if not financeiro_pode_acessar(c):
         abort(403)
 
 
@@ -2981,6 +2978,9 @@ def financeiro_comandas():
         q = q.filter(Comanda.status == status_f)
     if scope == 'limited':
         q = q.filter(Comanda.data == date.today())
+    elif scope == 'own':
+        prof = current_profissional()
+        q = q.filter(Comanda.profissional_id == (prof.id if prof else -1))
 
     hoje  = date.today()
     if scope == 'limited':
@@ -3121,6 +3121,12 @@ def _save_comanda(c):
     c.cliente_id      = int(cid) if cid else None
     c.unidade_id      = int(uid) if uid else None
     c.profissional_id = int(pid) if pid else None
+    if financeiro_scope() == 'own':
+        # Perfil Profissional só mexe nas próprias comandas — força o responsável
+        # a ser sempre ele mesmo, ignorando o que foi submetido no formulário.
+        prof = current_profissional()
+        if prof:
+            c.profissional_id = prof.id
     desc = _parse_valor_br(request.form.get('desconto', '0'), '0')
     try:
         from decimal import Decimal
@@ -4149,8 +4155,7 @@ def api_ag_comanda(ag_id):
         _check_financeiro_scope(a.comanda)
         _sync_servicos_agendamento_comanda(a.comanda, a)
         return jsonify(_comanda_to_json(a.comanda))
-    if scope == 'limited' and a.data != date.today():
-        abort(403)
+    _check_financeiro_scope(a)
     # Tenta auto-vincular cliente pelo telefone quando agendamento não tem cliente_id
     cliente_id = a.cliente_id
     if not cliente_id and a.telefone:

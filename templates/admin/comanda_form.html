@@ -75,12 +75,19 @@
       <div class="form-row">
         <div class="form-group">
           <label>Responsável</label>
-          <select name="profissional_id" {% if readonly %}disabled{% endif %}>
+          {% set trava_responsavel = perm.financeiro == 'own' %}
+          <select name="profissional_id" {% if readonly or trava_responsavel %}disabled{% endif %}>
             <option value="">Selecione</option>
             {% for p in profs %}
-            <option value="{{ p.id }}" {% if c and c.profissional_id == p.id %}selected{% endif %}>{{ p.nome }}</option>
+            <option value="{{ p.id }}"
+                    {% if (c and c.profissional_id == p.id) or (not c and trava_responsavel and current_user.profissional and current_user.profissional.id == p.id) %}selected{% endif %}>
+              {{ p.nome }}
+            </option>
             {% endfor %}
           </select>
+          {% if trava_responsavel %}
+          <span style="font-size:.72rem;color:var(--text-muted)">Seu perfil só pode mexer nas próprias comandas.</span>
+          {% endif %}
         </div>
         <div class="form-group">
           <label>Unidade</label>
