@@ -10,7 +10,7 @@ endpoints que a correção depende: autosave precisa persistir os itens e
 fechar não pode apagá-los nem precisar de pagamento para fechar."""
 from datetime import date
 
-from models import db, User, Comanda, ComandaItem, ContaReceber
+from models import db, User, Cliente, Comanda, ComandaItem, ContaReceber
 from tests.conftest import make_empresa, make_booking_setup
 
 
@@ -24,13 +24,13 @@ def _login_admin(client, empresa):
     return user
 
 
-def _form_base(hoje):
+def _form_base(hoje, cliente_id=''):
     return {
         'data': hoje.isoformat(),
         'status': 'aberta',
+        'cliente_id': cliente_id,
         'nome_cliente': 'Cliente Teste',
         'observacoes': '',
-        'cliente_id': '',
         'unidade_id': '',
         'profissional_id': '',
         'desconto': '0',
@@ -69,11 +69,15 @@ def test_autosave_antes_de_fechar_preserva_itens_e_gera_conta_a_receber(client):
     _login_admin(client, empresa)
     servico, prof = make_booking_setup(empresa)
     hoje = date.today()
+    cliente = Cliente(nome='Maria', telefone='11999990000', empresa_id=empresa.id, saldo=0)
+    db.session.add(cliente)
+    db.session.commit()
 
-    resp = client.post('/admin/financeiro/comandas/nova', data=_form_base(hoje), follow_redirects=True)
+    resp = client.post('/admin/financeiro/comandas/nova', data=_form_base(hoje, cliente_id=str(cliente.id)),
+                        follow_redirects=True)
     c = Comanda.query.filter_by(empresa_id=empresa.id).first()
 
-    form = _form_base(hoje)
+    form = _form_base(hoje, cliente_id=str(cliente.id))
     form.update({
         'item_descricao': [servico.nome],
         'item_valor': ['100,00'],

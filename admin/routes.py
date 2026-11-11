@@ -3205,6 +3205,12 @@ def _save_comanda(c):
                 vpi.venda.status = 'ativo'
 
     from decimal import Decimal
+    if c.status == 'fechada' and c.saldo > 0 and not c.cliente_id:
+        c.status = 'aberta'
+        flash('Esta comanda ficaria com saldo devedor, mas não está vinculada a nenhum cliente '
+              'cadastrado. Vincule um cliente antes de fechar, para a dívida poder ser cobrada depois.', 'error')
+        return False
+
     if c.status == 'fechada' and c.cliente_id:
         # Transferir saldo (positivo = dívida, negativo = crédito) para o cliente ao fechar
         novo_saldo_aj = c.saldo  # recalculado com novos itens e desconto
@@ -3328,6 +3334,10 @@ def comanda_pagamento_excluir(comanda_id, pag_id):
 def comanda_fechar(comanda_id):
     c = db.get_or_404(Comanda, comanda_id)
     _check_financeiro_scope(c)
+    if c.saldo > 0 and not c.cliente_id:
+        flash('Esta comanda ficaria com saldo devedor, mas não está vinculada a nenhum cliente '
+              'cadastrado. Vincule um cliente antes de fechar, para a dívida poder ser cobrada depois.', 'error')
+        return redirect(url_for('admin.comanda_detalhe', comanda_id=comanda_id))
     _fechar_comanda(c)
     db.session.commit()
     flash('Comanda fechada.', 'success')
