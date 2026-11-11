@@ -290,8 +290,7 @@
       </div>
       {% endif %}
       <form method="POST" action="{{ url_for('admin.comanda_fechar', comanda_id=c.id) }}" id="fecharForm"
-            style="margin-top:.8rem"
-            onsubmit="return confirm('Fechar esta comanda?{% if c.saldo > 0 and c.cliente %} R$ {{ '%.2f'|format(c.saldo)|replace('.', ',') }} serão lançados como dívida do cliente.{% elif c.saldo < 0 and c.cliente %} R$ {{ '%.2f'|format(-c.saldo)|replace('.', ',') }} serão creditados ao cliente.{% elif c.saldo == 0 and not c.pagamentos %} Nenhum pagamento foi registrado e o valor total é R$ 0,00 — confira se os serviços foram inseridos antes de continuar.{% endif %}')">
+            style="margin-top:.8rem">
         <button type="submit" class="btn-primary" style="width:100%">Fechar comanda</button>
       </form>
       {% endif %}
@@ -422,6 +421,24 @@
       style="display:none"></form>
 {% endif %}
 
+{% if c %}
+<!-- Confirmação de fechamento com saldo devedor -->
+<div id="modalFecharDevedor" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);
+     z-index:1000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg);border-radius:10px;max-width:420px;width:100%;padding:1.4rem 1.5rem;
+       box-shadow:0 10px 40px rgba(0,0,0,.25)">
+    <div style="font-size:.95rem;font-weight:600;margin-bottom:.6rem;color:var(--text)">
+      Fechar com saldo devedor?
+    </div>
+    <div id="modalFecharDevedorTexto" style="font-size:.85rem;color:var(--text-muted);line-height:1.5;margin-bottom:1.2rem"></div>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <button type="button" class="btn-primary" onclick="_fecharComandaConfirmarDivida()">Lançar dívida e fechar</button>
+      <button type="button" class="btn-secondary" onclick="_fecharComandaVoltarPagamento()">Voltar e lançar pagamento</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 // ── Recálculo dinâmico do Resumo ─────────────────────────────────────────────
 var _VALOR_PAGO = {{ (c.valor_pago | float) if c else 0 }};
@@ -438,6 +455,7 @@ function recalc() {
   var dInp = document.querySelector('[name="desconto"]');
   var desconto = parseFloat((dInp ? dInp.value : '0').replace(',', '.')) || 0;
   var saldo = subtotal - desconto - _VALOR_PAGO;
+  window._SALDO_ATUAL = saldo;
 
   var fmt = function(n) { return 'R$ ' + n.toFixed(2).replace('.', ','); };
   var elS = document.getElementById('resumo_subtotal');
@@ -707,23 +725,38 @@ recalc();
   });
 })();
 
-// ── Auto-save da comanda antes de fechar ──────────────────────────────────────
-// O botão "Fechar comanda" é um <form> à parte do #comandaForm: sem isto, itens
-// adicionados na tela (serviço/produto) mas nunca salvos via "Salvar comanda"
-// eram perdidos ao fechar — a comanda fechava com total R$ 0,00.
+// ── Fechamento da comanda: autosave + confirmação ─────────────────────────────
+// O botão "Fechar comanda" é um <form> à parte do #comandaForm: sem autosave,
+// itens adicionados na tela (serviço/produto) mas nunca salvos via "Salvar
+// comanda" eram perdidos ao fechar — a comanda fechava com total R$ 0,00.
+// Se vai sobrar saldo devedor e há cliente vinculado, mostra um modal próprio
+// pedindo confirmação explícita (lançar a dívida ou voltar e lançar o pagamento)
+// em vez de fechar direto.
 (function() {
   var fecharForm = document.getElementById('fecharForm');
   if (!fecharForm) return;
   var _saving = false;
+  var _TEM_PAGAMENTOS = {{ 'true' if c and c.pagamentos else 'false' }};
+  var _NOME_CLIENTE_VINCULADO = {{ (c.cliente.nome if c and c.cliente else '') | tojson }};
 
-  fecharForm.addEventListener('submit', function(e) {
-    if (e.defaultPrevented) return;   // confirm() cancelado pelo usuário
-    if (_saving) return;              // segunda chamada após o fetch: deixa passar
-    var cmdForm = document.getElementById('comandaForm');
-    if (!cmdForm) return;
+  function clienteIdAtual() {
+    var sel = document.getElementById('clienteSelect');
+    return sel ? (sel.value || '') : '';
+  }
 
-    e.preventDefault();
+  function nomeClienteAtual() {
+    var sel = document.getElementById('clienteSelect');
+    if (!sel) return '';
+    if (sel.tagName === 'SELECT') {
+      var opt = sel.options[sel.selectedIndex];
+      return (opt && opt.value) ? opt.textContent.split(' — ')[0].trim() : '';
+    }
+    return _NOME_CLIENTE_VINCULADO;
+  }
+
+  function autosaveEFechar() {
     _saving = true;
+    var cmdForm = document.getElementById('comandaForm');
     var btn = fecharForm.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
 
@@ -734,6 +767,54 @@ recalc();
         if (btn) { btn.disabled = false; btn.textContent = 'Fechar comanda'; }
         fecharForm.submit();   // submete o fechamento (sem interceptar — _saving=true)
       });
+  }
+
+  function abrirModalDevedor(saldo) {
+    var nome = nomeClienteAtual() || 'o cliente';
+    document.getElementById('modalFecharDevedorTexto').innerHTML =
+      'Esta comanda será fechada com saldo devedor de <strong>R$ ' + saldo.toFixed(2).replace('.', ',')
+      + '</strong>. Esse valor será lançado como dívida no cadastro de <strong>' + nome + '</strong>.';
+    document.getElementById('modalFecharDevedor').style.display = 'flex';
+  }
+
+  window._fecharComandaConfirmarDivida = function() {
+    document.getElementById('modalFecharDevedor').style.display = 'none';
+    autosaveEFechar();
+  };
+
+  window._fecharComandaVoltarPagamento = function() {
+    document.getElementById('modalFecharDevedor').style.display = 'none';
+    var valorInput = document.getElementById('valorPagInput');
+    if (valorInput) {
+      valorInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      valorInput.focus();
+    }
+  };
+
+  fecharForm.addEventListener('submit', function(e) {
+    if (_saving) return;   // segunda chamada após confirmar: deixa passar
+    e.preventDefault();
+
+    var saldo = window._SALDO_ATUAL || 0;
+    var temCliente = !!clienteIdAtual();
+
+    if (saldo > 0.004 && !temCliente) {
+      alert('Esta comanda ficaria com saldo devedor, mas não há cliente vinculado. '
+            + 'Vincule um cliente antes de fechar.');
+      return;
+    }
+    if (saldo > 0.004 && temCliente) {
+      abrirModalDevedor(saldo);
+      return;
+    }
+    if (saldo < -0.004 && temCliente) {
+      if (!confirm('Fechar esta comanda? R$ ' + (-saldo).toFixed(2).replace('.', ',') + ' serão creditados ao cliente.')) return;
+    } else if (Math.abs(saldo) < 0.005 && !_TEM_PAGAMENTOS) {
+      if (!confirm('Nenhum pagamento foi registrado e o valor total é R$ 0,00 — confira se os serviços foram inseridos antes de continuar.')) return;
+    } else {
+      if (!confirm('Fechar esta comanda?')) return;
+    }
+    autosaveEFechar();
   });
 })();
 </script>
