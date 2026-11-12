@@ -482,7 +482,7 @@
           <div class="cmd-total-item">
             <span class="cmd-total-label">Desconto (R$)</span>
             <div style="display:flex;align-items:center;gap:.4rem">
-              <input type="text" id="cmdDesconto" value="0,00" class="cmd-input cmd-input--sm"
+              <input type="text" id="cmdDesconto" value="0,00" class="cmd-input cmd-input--sm moeda-br"
                      style="width:80px;text-align:right" oninput="cmdRecalc()" />
             </div>
           </div>
@@ -518,7 +518,7 @@
             </div>
             <div class="cmd-field" style="margin:0">
               <label class="cmd-label">Valor (R$)</label>
-              <input type="text" id="cmdValorPag" class="cmd-input" placeholder="0,00"
+              <input type="text" id="cmdValorPag" class="cmd-input moeda-br" placeholder="0,00"
                      onkeydown="if(event.key==='Enter'){event.preventDefault();registrarPagamentoModal();}" />
             </div>
           </div>
@@ -586,7 +586,7 @@
           </div>
           <div class="cmd-field" style="margin:0;flex:0 0 100px">
             <label class="cmd-label">Valor (R$)</label>
-            <input type="text" id="cmdSvcPreco" class="cmd-input" placeholder="0,00"
+            <input type="text" id="cmdSvcPreco" class="cmd-input moeda-br" placeholder="0,00"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();cmdAddItem();}" />
           </div>
           <div class="cmd-field" style="margin:0;flex:0 0 56px">

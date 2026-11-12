@@ -105,7 +105,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Desconto (R$)</label>
-          <input type="text" name="desconto" placeholder="0,00"
+          <input type="text" name="desconto" class="moeda-br" placeholder="0,00"
                  value="{{ '%.2f'|format(c.desconto)|replace('.', ',') if c and c.desconto else '' }}"
                  {% if readonly %}disabled{% endif %} />
         </div>
@@ -142,7 +142,7 @@
             </div>
             <div>
               <label style="font-size:.75rem;color:var(--text-muted)">Valor (R$)</label>
-              <input type="text" name="item_valor" value="{{ '%.2f'|format(item.valor)|replace('.', ',') }}"
+              <input type="text" name="item_valor" class="moeda-br" value="{{ '%.2f'|format(item.valor)|replace('.', ',') }}"
                      placeholder="0,00" {% if readonly %}disabled{% endif %} />
             </div>
             <div style="min-width:0">
@@ -187,7 +187,7 @@
           </div>
           <div>
             <label style="font-size:.72rem;color:var(--text-muted)">Valor (R$)</label>
-            <input type="text" id="svcValorInput" placeholder="0,00" style="width:100%"
+            <input type="text" id="svcValorInput" class="moeda-br" placeholder="0,00" style="width:100%"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();addFromCatalog();}" />
           </div>
           <div>
@@ -218,7 +218,7 @@
           </div>
           <div>
             <label style="font-size:.72rem;color:var(--text-muted)">Valor (R$)</label>
-            <input type="text" id="prodValorInput" placeholder="0,00" style="width:100%"
+            <input type="text" id="prodValorInput" class="moeda-br" placeholder="0,00" style="width:100%"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();addProdFromCatalog();}" />
           </div>
           <div>
@@ -384,7 +384,7 @@
                 <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--gold-dark);cursor:pointer;padding:0"
                         onclick="preencherSaldo()">↙ usar saldo</button>
               </label>
-              <input type="text" name="valor" id="valorPagInput" placeholder="0,00" required />
+              <input type="text" name="valor" id="valorPagInput" class="moeda-br" placeholder="0,00" required />
             </div>
             <div class="form-group" style="margin:0" id="parcelasGroup">
               <label style="font-size:.75rem">Parcelas</label>
@@ -608,7 +608,7 @@ function addItem(nome, valor, svcId, vpItemId, isPacote, qtd, prodId) {
     </div>
     <div>
       <label style="font-size:.75rem;color:var(--text-muted)">Valor (R$)</label>
-      <input type="text" name="item_valor" value="${escHtml(valor)}" placeholder="0,00" />
+      <input type="text" name="item_valor" class="moeda-br" value="${escHtml(valor)}" placeholder="0,00" />
     </div>
     <div style="min-width:0">
       <label style="font-size:.75rem;color:var(--text-muted)">Qtd</label>

@@ -97,7 +97,7 @@
       <div style="font-size:.85rem;font-weight:600;margin-bottom:.8rem;color:var(--text)">Valor da Venda</div>
       <div class="form-group" style="margin-bottom:.8rem">
         <label>Valor total (R$)</label>
-        <input type="text" name="valor_total" id="inpValorTotal"
+        <input type="text" name="valor_total" id="inpValorTotal" class="moeda-br"
                placeholder="Preenchido automaticamente"
                style="font-size:1.1rem;font-weight:600"
                oninput="pgAtualizarSaldo()" />
@@ -134,7 +134,7 @@
                 <button type="button" style="font-size:.7rem;background:none;border:none;color:var(--accent-dark);cursor:pointer;padding:0"
                         onclick="pgUsarSaldo()">↙ saldo restante</button>
               </label>
-              <input type="text" id="pgValor" placeholder="0,00" />
+              <input type="text" id="pgValor" class="moeda-br" placeholder="0,00" />
             </div>
             <div class="form-group" style="margin:0;display:none" id="pgParcelasGrp">
               <label style="font-size:.75rem">Parcelas</label>

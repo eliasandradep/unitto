@@ -476,5 +476,28 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+<script>
+// Completa automaticamente as casas decimais de campos de valor monetário
+// (classe "moeda-br") ao sair do campo — ex: digitou "250", vira "250,00".
+// Só ajusta o separador decimal (vírgula), nunca insere separador de milhar:
+// várias telas calculam total fazendo valor.replace(',', '.') direto no JS,
+// sem tratar ponto de milhar, então "1.250,00" quebraria essas contas.
+(function() {
+  function formatarMoedaBR(el) {
+    var v = (el.value || '').trim();
+    if (!v) return;
+    var normalizado = v.indexOf(',') !== -1 ? v.replace(',', '.') : v;
+    var n = parseFloat(normalizado);
+    if (isNaN(n)) return;
+    el.value = n.toFixed(2).replace('.', ',');
+  }
+  document.addEventListener('blur', function(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('moeda-br')) {
+      formatarMoedaBR(e.target);
+    }
+  }, true);
+})();
+</script>
+
 </body>
 </html>
