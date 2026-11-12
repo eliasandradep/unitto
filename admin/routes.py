@@ -14,7 +14,8 @@ from . import admin_bp
 from .tenant import tq, get_setting, save_setting, BASE_DOMAIN
 from .auth import require_role
 from .permissions import (agenda_scope, comissoes_scope, financeiro_scope,
-                           financeiro_pode_acessar, current_profissional, is_administrador)
+                           financeiro_pode_acessar, current_profissional, is_administrador,
+                           bloqueios_pode_gerenciar)
 from models import (db, User, Lead, Setting, PageView, ROLES,
                     Cliente, AnamneseCapilar, AnamneseCorporal,
                     Categoria, Unidade, Profissional, Servico,
@@ -2134,25 +2135,36 @@ def _build_bloqueio(b):
 @login_required
 def agenda_bloqueios():
     from datetime import date, timedelta
-    if agenda_scope() != 'all':
+    if not bloqueios_pode_gerenciar():
         abort(403)
+    own_mode = agenda_scope() != 'all'
+    prof_logado = current_profissional() if own_mode else None
 
     if request.method == 'POST':
         action = request.form.get('action', '')
 
         if action == 'bulk_delete':
-            ids = request.form.getlist('ids')
+            ids = [int(i) for i in request.form.getlist('ids') if i.isdigit()]
+            n = 0
             if ids:
-                tq(BloqueioAgenda).filter(BloqueioAgenda.id.in_(
-                    [int(i) for i in ids if i.isdigit()]
-                )).delete(synchronize_session=False)
+                q_del = tq(BloqueioAgenda).filter(BloqueioAgenda.id.in_(ids))
+                if own_mode:
+                    q_del = q_del.filter(BloqueioAgenda.profissional_id == (prof_logado.id if prof_logado else -1))
+                n = q_del.delete(synchronize_session=False)
                 db.session.commit()
-                flash(f'{len(ids)} bloqueio(s) removido(s).', 'success')
+            if n:
+                flash(f'{n} bloqueio(s) removido(s).', 'success')
             return redirect(url_for('admin.agenda_bloqueios'))
 
         base = BloqueioAgenda()
         if not _validar_bloqueio_base(base):
             return redirect(url_for('admin.agenda_bloqueios'))
+        if own_mode:
+            # Perfil Profissional só cria bloqueio para si mesmo — nunca
+            # geral (sem profissional) nem para outro profissional.
+            if not prof_logado:
+                abort(403)
+            base.profissional_id = prof_logado.id
 
         if base.dia_inteiro:
             db.session.add(base)
@@ -2205,7 +2217,9 @@ def agenda_bloqueios():
     dt_fim  = request.args.get('dt_fim', '')
 
     q = tq(BloqueioAgenda)
-    if resp_q:
+    if own_mode:
+        q = q.filter(BloqueioAgenda.profissional_id == (prof_logado.id if prof_logado else -1))
+    elif resp_q:
         q = q.join(BloqueioAgenda.profissional).filter(
             Profissional.nome.ilike(f'%{resp_q}%')
         )
@@ -2229,16 +2243,22 @@ def agenda_bloqueios():
 
     return render_template('admin/agenda_bloqueios.html',
         bloqueios=bloqueios, profissionais=profissionais,
-        resp_q=resp_q, dt_ini=d_ini, dt_fim=d_fim)
+        resp_q=resp_q, dt_ini=d_ini, dt_fim=d_fim,
+        own_mode=own_mode, prof_logado=prof_logado)
 
 
 @admin_bp.route('/agenda/bloqueios/<int:bl_id>/editar', methods=['POST'])
 @login_required
 def agenda_bloqueio_editar(bl_id):
-    if agenda_scope() != 'all':
-        abort(403)
     b = db.get_or_404(BloqueioAgenda, bl_id)
+    if not bloqueios_pode_gerenciar(b):
+        abort(403)
     if _build_bloqueio(b):
+        if agenda_scope() != 'all':
+            # Perfil Profissional não pode reatribuir o bloqueio a outro
+            # profissional — força de volta para si mesmo.
+            prof = current_profissional()
+            b.profissional_id = prof.id if prof else None
         db.session.commit()
         flash('Bloqueio atualizado.', 'success')
     return redirect(url_for('admin.agenda_bloqueios'))
@@ -2247,9 +2267,9 @@ def agenda_bloqueio_editar(bl_id):
 @admin_bp.route('/agenda/bloqueios/<int:bl_id>/excluir', methods=['POST'])
 @login_required
 def agenda_bloqueio_excluir(bl_id):
-    if agenda_scope() != 'all':
-        abort(403)
     b = db.get_or_404(BloqueioAgenda, bl_id)
+    if not bloqueios_pode_gerenciar(b):
+        abort(403)
     db.session.delete(b)
     db.session.commit()
     flash('Bloqueio removido.', 'success')

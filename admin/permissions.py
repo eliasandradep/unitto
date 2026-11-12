@@ -86,6 +86,25 @@ def financeiro_pode_acessar(c=None):
     return False
 
 
+def bloqueios_pode_gerenciar(b=None):
+    """True se o usuário logado pode ver/criar/editar/excluir o bloqueio `b`
+    (BloqueioAgenda). Perfis com agenda 'all' (atendente/recepção/
+    administrador) mexem em qualquer bloqueio, inclusive os sem profissional
+    (bloqueio geral da empresa). O perfil 'profissional' só mexe nos
+    próprios bloqueios (b.profissional_id igual ao seu id) — não pode criar
+    bloqueio geral nem de outro profissional. Demais perfis ('pessoal',
+    'leitura') não têm acesso à tela. Sem `b`, só diz se há acesso geral à
+    tela (ignora dono)."""
+    if agenda_scope() == 'all':
+        return True
+    if current_perfil() == 'profissional':
+        if b is None:
+            return True
+        prof = current_profissional()
+        return prof is not None and b.profissional_id == prof.id
+    return False
+
+
 def tem_acesso_catalogo():
     """Telas de catálogo (Serviços, Categorias, Produtos, Profissionais,
     Unidades, Expedientes, Pacotes) — administrador, atendente e recepção

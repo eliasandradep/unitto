@@ -7,10 +7,12 @@
 <!-- Filtros -->
 <div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
   <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
+    {% if not own_mode %}
     <div class="form-group" style="margin:0;flex:1;min-width:180px">
       <label style="font-size:.8rem">Procurar por Responsável</label>
       <input type="text" name="responsavel" value="{{ resp_q }}" placeholder="Nome do profissional..." />
     </div>
+    {% endif %}
     <div class="form-group" style="margin:0">
       <label style="font-size:.8rem">Data Início</label>
       <input type="date" name="dt_ini" value="{{ dt_ini }}" />
@@ -129,12 +131,19 @@
 
         <div class="form-group">
           <label>Selecione o profissional</label>
+          {% if own_mode %}
+          <select name="profissional_id" id="blProf" disabled>
+            <option value="{{ prof_logado.id if prof_logado else '' }}" selected>{{ prof_logado.nome if prof_logado else '' }}</option>
+          </select>
+          <span style="font-size:.72rem;color:var(--text-muted)">Seu perfil só pode bloquear a própria agenda.</span>
+          {% else %}
           <select name="profissional_id" id="blProf">
             <option value="">Todos os profissionais</option>
             {% for p in profissionais %}
             <option value="{{ p.id }}">{{ p.nome }}</option>
             {% endfor %}
           </select>
+          {% endif %}
         </div>
 
         <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">

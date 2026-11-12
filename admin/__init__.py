@@ -156,13 +156,15 @@ def _inject_empresa():
             pass
 
     from flask_login import current_user
-    from .permissions import agenda_scope, comissoes_scope, financeiro_scope, is_administrador, tem_acesso_catalogo
+    from .permissions import (agenda_scope, comissoes_scope, financeiro_scope, is_administrador,
+                               tem_acesso_catalogo, bloqueios_pode_gerenciar)
     if current_user.is_authenticated:
         perm = {'agenda': agenda_scope(), 'comissoes': comissoes_scope(),
                 'financeiro': financeiro_scope(), 'admin': is_administrador(),
-                'catalogo': tem_acesso_catalogo()}
+                'catalogo': tem_acesso_catalogo(), 'bloqueios': bloqueios_pode_gerenciar()}
     else:
-        perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False, 'catalogo': False}
+        perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False,
+                'catalogo': False, 'bloqueios': False}
 
     return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css,
             'profissionais_limite_atingido': profissionais_limite_atingido, 'perm': perm}

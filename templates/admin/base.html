@@ -67,7 +67,7 @@
         <div class="snav-group-items">
           <a href="{{ url_for('admin.agenda') }}"           class="snav-sub {% if ep == 'admin.agenda' %}active{% endif %}">Calendário</a>
           <a href="{{ url_for('admin.agenda_listagem') }}"  class="snav-sub {% if ep == 'admin.agenda_listagem' %}active{% endif %}">Listagem</a>
-          {% if perm.agenda == 'all' %}
+          {% if perm.bloqueios %}
           <a href="{{ url_for('admin.agenda_bloqueios') }}" class="snav-sub {% if ep == 'admin.agenda_bloqueios' %}active{% endif %}">Bloqueios</a>
           {% endif %}
         </div>
@@ -284,7 +284,7 @@
             Novo Agendamento
           </a>
           {% endif %}
-          {% if perm.agenda == 'all' %}
+          {% if perm.bloqueios %}
           <a href="{{ url_for('admin.agenda_bloqueios') }}" class="criar-item">
             <svg class="criar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
