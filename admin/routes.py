@@ -198,6 +198,7 @@ def setup():
 @admin_bp.route('/dashboard')
 @login_required
 def dashboard():
+    from datetime import date
     total  = tq(Lead).count()
     by_status = {s: tq(Lead).filter_by(status=s).count() for s, _ in LEAD_STATUSES}
     recent = tq(Lead).order_by(Lead.created_at.desc()).limit(8).all()
@@ -212,7 +213,83 @@ def dashboard():
         statuses=LEAD_STATUSES,
         theme_name=theme_name,
         theme_key=theme_key,
+        hoje_iso=date.today().isoformat(),
     )
+
+
+def _faturamento_por_dia(data_ini, data_fim):
+    """Soma PagamentoComanda (de comandas fechadas) + RecebimentoCliente por
+    dia, no intervalo [data_ini, data_fim]. Mesma fonte/critério usado no
+    dashboard Financeiro (admin.financeiro): atribui o faturamento à data da
+    comanda (Comanda.data), não à data em que o pagamento foi digitado."""
+    from sqlalchemy import func
+    _fechada = Comanda.status == 'fechada'
+    _eid = g.get('empresa_id')
+    _ec = (Comanda.empresa_id == _eid,) if _eid else ()
+    _er = (RecebimentoCliente.empresa_id == _eid,) if _eid else ()
+
+    fat_dias = {}
+    rows = db.session.query(
+        Comanda.data, func.sum(PagamentoComanda.valor)
+    ).join(PagamentoComanda).filter(
+        _fechada, Comanda.data >= data_ini, Comanda.data <= data_fim, *_ec
+    ).group_by(Comanda.data).all()
+    for d, v in rows:
+        fat_dias[d] = float(v or 0)
+    rows_rec = db.session.query(
+        RecebimentoCliente.data, func.sum(RecebimentoCliente.valor)
+    ).filter(
+        RecebimentoCliente.data >= data_ini, RecebimentoCliente.data <= data_fim, *_er
+    ).group_by(RecebimentoCliente.data).all()
+    for d, v in rows_rec:
+        fat_dias[d] = fat_dias.get(d, 0) + float(v or 0)
+    return fat_dias
+
+
+@admin_bp.route('/dashboard/faturamento')
+@login_required
+def dashboard_faturamento():
+    """Dados do gráfico de faturamento do Dashboard — mesma visão (empresa
+    toda) do dashboard Financeiro. Restrito a administrador via
+    _ADMIN_ONLY_ENDPOINTS (admin/__init__.py), igual à rota 'financeiro'."""
+    from datetime import date, timedelta
+
+    hoje = date.today()
+    periodo = request.args.get('periodo', 'dia')
+
+    if periodo == 'semana':
+        data_ini = hoje - timedelta(days=hoje.weekday())
+        data_fim = hoje
+    elif periodo == 'mes':
+        data_ini = hoje.replace(day=1)
+        data_fim = hoje
+    elif periodo == 'personalizado':
+        try:
+            data_ini = date.fromisoformat(request.args.get('data_ini', ''))
+            data_fim = date.fromisoformat(request.args.get('data_fim', ''))
+        except ValueError:
+            return jsonify({'error': 'Datas inválidas.'}), 400
+        if data_fim < data_ini:
+            data_ini, data_fim = data_fim, data_ini
+        if (data_fim - data_ini).days > 366:
+            return jsonify({'error': 'Selecione um período de até 366 dias.'}), 400
+    else:
+        periodo = 'dia'
+        data_ini = data_fim = hoje
+
+    fat_dias = _faturamento_por_dia(data_ini, data_fim)
+    dias   = [data_ini + timedelta(days=i) for i in range((data_fim - data_ini).days + 1)]
+    labels = [d.strftime('%d/%m') for d in dias]
+    values = [fat_dias.get(d, 0) for d in dias]
+
+    return jsonify({
+        'periodo': periodo,
+        'labels': labels,
+        'values': values,
+        'total': sum(values),
+        'data_ini': data_ini.isoformat(),
+        'data_fim': data_fim.isoformat(),
+    })
 
 
 # ── Leads ─────────────────────────────────────────────────────────────────────
@@ -2907,19 +2984,7 @@ def financeiro():
 
     # Últimos 14 dias para o gráfico
     dias = [(hoje - timedelta(days=i)) for i in range(13, -1, -1)]
-    fat_dias = {}
-    rows = db.session.query(
-        Comanda.data, func.sum(PagamentoComanda.valor)
-    ).join(PagamentoComanda).filter(
-        _fechada, Comanda.data >= dias[0], *_ec
-    ).group_by(Comanda.data).all()
-    for d, v in rows:
-        fat_dias[d] = float(v or 0)
-    rows_rec = db.session.query(
-        RecebimentoCliente.data, func.sum(RecebimentoCliente.valor)
-    ).filter(RecebimentoCliente.data >= dias[0], *_er).group_by(RecebimentoCliente.data).all()
-    for d, v in rows_rec:
-        fat_dias[d] = fat_dias.get(d, 0) + float(v or 0)
+    fat_dias = _faturamento_por_dia(dias[0], hoje)
     chart_labels = [d.strftime('%d/%m') for d in dias]
     chart_values = [fat_dias.get(d, 0) for d in dias]
 

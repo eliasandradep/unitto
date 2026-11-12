@@ -37,7 +37,7 @@ _CATALOGO_ENDPOINTS = frozenset({
 # do negócio, sem sentido para quem só atende clientes (Agenda/Comissões/
 # Financeiro têm suas próprias regras de escopo, aplicadas nas rotas).
 _ADMIN_ONLY_ENDPOINTS = frozenset({
-    'dashboard',
+    'dashboard', 'dashboard_faturamento',
     'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete', 'lead_marcar_pessoal',
     'lead_marcar_spam',
     'users', 'user_new', 'user_edit', 'user_delete',

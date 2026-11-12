@@ -4,6 +4,26 @@
 
 {% block content %}
 
+{% if perm.financeiro == 'full' %}
+<div class="card" style="padding:1.2rem 1.4rem;margin-bottom:1.5rem">
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.8rem;margin-bottom:1rem">
+    <div style="font-size:.85rem;font-weight:600;color:var(--text)">Faturamento</div>
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center">
+      <button type="button" class="btn-primary fat-periodo-btn" data-periodo="dia" style="font-size:.8rem;padding:.35rem .8rem">Hoje</button>
+      <button type="button" class="btn-secondary fat-periodo-btn" data-periodo="semana" style="font-size:.8rem;padding:.35rem .8rem">Semana</button>
+      <button type="button" class="btn-secondary fat-periodo-btn" data-periodo="mes" style="font-size:.8rem;padding:.35rem .8rem">Mês</button>
+      <button type="button" class="btn-secondary fat-periodo-btn" data-periodo="personalizado" style="font-size:.8rem;padding:.35rem .8rem">Período específico</button>
+      <input type="date" id="fatDataIni" style="display:none;font-size:.82rem" />
+      <span id="fatDataSep" style="display:none;font-size:.8rem;color:var(--text-muted)">até</span>
+      <input type="date" id="fatDataFim" style="display:none;font-size:.82rem" />
+      <button type="button" class="btn-primary" id="fatAplicarPersonalizado" style="display:none;font-size:.8rem;padding:.35rem .8rem">Aplicar</button>
+    </div>
+  </div>
+  <div style="font-size:1.6rem;font-weight:600;color:var(--gold);margin-bottom:.8rem" id="fatTotalLabel">R$ 0,00</div>
+  <canvas id="chartFaturamentoDash" height="220"></canvas>
+</div>
+{% endif %}
+
 <div class="stats-grid">
   <div class="stat-card stat-card--total">
     <div class="stat-card__value">{{ total }}</div>
@@ -65,5 +85,94 @@
     </div>
   </div>
 </div>
+
+{% if perm.financeiro == 'full' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var canvas = document.getElementById('chartFaturamentoDash');
+  if (!canvas) return;
+  var URL_BASE  = "{{ url_for('admin.dashboard_faturamento') }}";
+  var HOJE_ISO  = "{{ hoje_iso }}";
+  var btns      = document.querySelectorAll('.fat-periodo-btn');
+  var inpIni    = document.getElementById('fatDataIni');
+  var inpFim    = document.getElementById('fatDataFim');
+  var sep       = document.getElementById('fatDataSep');
+  var btnAplicar = document.getElementById('fatAplicarPersonalizado');
+  var totalLabel = document.getElementById('fatTotalLabel');
+  var chart = null;
+
+  inpIni.value = HOJE_ISO;
+  inpFim.value = HOJE_ISO;
+
+  function setActive(periodo) {
+    btns.forEach(function(b) {
+      var ativo = b.dataset.periodo === periodo;
+      b.classList.toggle('btn-primary', ativo);
+      b.classList.toggle('btn-secondary', !ativo);
+    });
+    var personalizado = periodo === 'personalizado';
+    [inpIni, sep, inpFim, btnAplicar].forEach(function(el) {
+      el.style.display = personalizado ? '' : 'none';
+    });
+  }
+
+  function carregar(periodo, dataIni, dataFim) {
+    var url = URL_BASE + '?periodo=' + encodeURIComponent(periodo);
+    if (periodo === 'personalizado') {
+      if (!dataIni || !dataFim) return;
+      url += '&data_ini=' + encodeURIComponent(dataIni) + '&data_fim=' + encodeURIComponent(dataFim);
+    }
+    fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.error) { alert(d.error); return; }
+      totalLabel.textContent = 'R$ ' + d.total.toFixed(2).replace('.', ',');
+      if (chart) chart.destroy();
+      chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: d.labels,
+          datasets: [{
+            label: 'R$',
+            data: d.values,
+            backgroundColor: 'rgba(180,143,89,0.7)',
+            borderColor: 'rgba(180,143,89,1)',
+            borderWidth: 1,
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { callback: function(v) { return 'R$ ' + v.toFixed(0); }, font: { size: 11 } },
+              grid: { color: 'rgba(0,0,0,.06)' },
+            },
+            x: {
+              ticks: { font: { size: 11 } },
+              grid: { display: false },
+            }
+          }
+        }
+      });
+    }).catch(function() {});
+  }
+
+  btns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      var periodo = b.dataset.periodo;
+      setActive(periodo);
+      if (periodo !== 'personalizado') carregar(periodo);
+    });
+  });
+  btnAplicar.addEventListener('click', function() {
+    carregar('personalizado', inpIni.value, inpFim.value);
+  });
+
+  setActive('dia');
+  carregar('dia');
+})();
+</script>
+{% endif %}
 
 {% endblock %}
