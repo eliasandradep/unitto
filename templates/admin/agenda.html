@@ -1405,31 +1405,65 @@
 }
 .agm-prof-nome { font-size: .92rem; font-weight: 600; color: var(--dark); }
 
-.agm-dia { margin-bottom: 1.1rem; }
-.agm-dia-header {
-  font-size: .78rem;
+/* Dias em linha (uma por dia da semana, ou só uma na visão Diária), com os
+   agendamentos daquele dia em cards lado a lado — não empilhados — pra
+   ocupar o mínimo de altura e caber todos os dias na tela. Quando não cabem
+   lado a lado, rola horizontalmente (arrastar no touch) só aquela linha,
+   igual ao print de referência. */
+.agm-dia {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  padding: .55rem 0;
+}
+.agm-dia:first-child { border-top: 1px solid var(--border); }
+.agm-dia-label {
+  flex: 0 0 50px;
+  width: 50px;
+  text-align: center;
+  padding-top: .15rem;
+}
+.agm-dia-label-dow {
+  font-size: .72rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: .04em;
-  margin-bottom: .45rem;
-  padding-left: .1rem;
+  letter-spacing: .02em;
 }
-.agm-dia-header--hoje { color: var(--gold-dark); }
+.agm-dia-label-num { font-size: .78rem; font-weight: 600; color: var(--dark); margin-top: .1rem; }
+.agm-dia--hoje .agm-dia-label-dow,
+.agm-dia--hoje .agm-dia-label-num { color: var(--gold-dark); }
+
+.agm-dia-cards {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  padding: 0 .2rem .3rem .6rem;
+}
 .agm-dia-vazio {
-  font-size: .8rem;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  font-size: .78rem;
   color: var(--text-muted);
   font-style: italic;
-  padding: .2rem .1rem .3rem;
+  padding-left: .6rem;
 }
 
 .agm-card {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 180px;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-left: 4px solid #3b82f6;
   border-radius: 8px;
-  padding: .6rem .8rem;
-  margin-bottom: .5rem;
+  padding: .55rem .7rem;
   cursor: pointer;
 }
 .agm-card--confirmado { border-left-color: #1B2D6E; }
@@ -2812,15 +2846,19 @@ function _escH(s) {
     var hojeIso = new Date().toISOString().slice(0, 10);
 
     dias.forEach(function(diaIso) {
-      var bloco = document.createElement('div');
-      bloco.className = 'agm-dia';
-
-      var header = document.createElement('div');
       var d = new Date(diaIso + 'T00:00:00');
       var ehHoje = diaIso === hojeIso;
-      header.className = 'agm-dia-header' + (ehHoje ? ' agm-dia-header--hoje' : '');
-      header.textContent = DIA_SEMANA[d.getDay()] + ' ' + agmFmtDM(diaIso) + (ehHoje ? ' (hoje)' : '');
-      bloco.appendChild(header);
+
+      var bloco = document.createElement('div');
+      bloco.className = 'agm-dia' + (ehHoje ? ' agm-dia--hoje' : '');
+
+      // Rótulo do dia, à esquerda — fixo, não entra na rolagem horizontal.
+      var label = document.createElement('div');
+      label.className = 'agm-dia-label';
+      label.innerHTML =
+        '<div class="agm-dia-label-dow">' + DIA_SEMANA[d.getDay()] + '</div>' +
+        '<div class="agm-dia-label-num">' + agmFmtDM(diaIso) + '</div>';
+      bloco.appendChild(label);
 
       var evsDoDia = agmEstado.cache.events.filter(function(ev) {
         return ev.data === diaIso && ev.profissional_id === agmEstado.profAtualId;
@@ -2832,6 +2870,10 @@ function _escH(s) {
         vazio.textContent = 'Nenhum agendamento.';
         bloco.appendChild(vazio);
       } else {
+        // Cards lado a lado (não empilhados) — essa é a área que rola
+        // horizontalmente quando os agendamentos do dia não cabem na tela.
+        var cardsRow = document.createElement('div');
+        cardsRow.className = 'agm-dia-cards';
         evsDoDia.forEach(function(ev) {
           var card = document.createElement('div');
           var statusClasse = (ev.comanda_status === 'fechada') ? 'pago' : ev.status;
@@ -2843,8 +2885,9 @@ function _escH(s) {
             svcHtml +
             '<div class="agm-card-status">' + (_statusLabel[ev.status] || ev.status) + '</div>';
           card.addEventListener('click', function() { openActsModal(ev); });
-          bloco.appendChild(card);
+          cardsRow.appendChild(card);
         });
+        bloco.appendChild(cardsRow);
       }
       cont.appendChild(bloco);
     });
