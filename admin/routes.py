@@ -2437,6 +2437,29 @@ def _aplicar_ordem_colunas_agenda(profissionais, ordem_json):
     return ordenados + restantes
 
 
+def _ler_filtro_mobile():
+    """Lê o filtro da agenda mobile salvo pelo usuário logado (ver
+    User.agenda_filtro_mobile). Sem preferência salva ainda, cai no padrão:
+    visão diária, todos os profissionais."""
+    default = {'tipo': 'dia', 'profissional_ids': []}
+    bruto = current_user.agenda_filtro_mobile
+    if not bruto:
+        return default
+    try:
+        dado = json.loads(bruto)
+    except (ValueError, TypeError):
+        return default
+    if not isinstance(dado, dict):
+        return default
+    tipo = dado.get('tipo')
+    if tipo not in ('dia', 'semana', 'listagem'):
+        tipo = 'dia'
+    ids = dado.get('profissional_ids')
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        ids = []
+    return {'tipo': tipo, 'profissional_ids': ids}
+
+
 @admin_bp.route('/agenda')
 @login_required
 def agenda():
@@ -2451,12 +2474,19 @@ def agenda():
         profissionais_ativos, current_user.agenda_ordem_profissionais)
     servicos_ativos      = tq(Servico).filter_by(ativo=True).order_by(Servico.nome).all()
     unidades_ativas      = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
+    profs_json = [{
+        'id': p.id, 'nome': p.nome,
+        'cor': p.avatar_cor(), 'iniciais': p.avatar_iniciais(),
+        'foto_url': url_for('profissional_foto_serve', prof_id=p.id) if p.foto_data else None,
+    } for p in profissionais_ativos]
     return render_template('admin/agenda.html',
         data_sel=data_sel,
         profissionais=profissionais_ativos,
+        profissionais_json=profs_json,
         servicos=servicos_ativos,
         unidades=unidades_ativas,
         formas=FORMA_PAGAMENTO,
+        filtro_mobile=_ler_filtro_mobile(),
     )
 
 
@@ -2472,6 +2502,31 @@ def agenda_ordem_colunas():
     ids_validos = {p.id for p in tq(Profissional).filter(Profissional.id.in_(ordem)).all()}
     ordem_filtrada = [i for i in ordem if i in ids_validos]
     current_user.agenda_ordem_profissionais = json.dumps(ordem_filtrada)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@admin_bp.route('/agenda/filtro-mobile', methods=['POST'])
+@login_required
+def agenda_filtro_mobile_salvar():
+    """Salva o filtro da agenda no mobile (tipo de visão + profissionais
+    escolhidos) pro usuário logado, pra vir aplicado automaticamente da
+    próxima vez que ele abrir a Agenda — mesmo padrão de
+    agenda_ordem_colunas, mas aqui é específico da visão mobile."""
+    body = request.get_json(silent=True) or {}
+    tipo = body.get('tipo')
+    if tipo not in ('dia', 'semana', 'listagem'):
+        tipo = 'dia'
+    ids_brutos = body.get('profissional_ids')
+    if not isinstance(ids_brutos, list):
+        ids_brutos = []
+    try:
+        ids = [int(i) for i in ids_brutos]
+    except (TypeError, ValueError):
+        ids = []
+    ids_validos = {p.id for p in tq(Profissional).filter(Profissional.id.in_(ids)).all()} if ids else set()
+    ids_filtrados = [i for i in ids if i in ids_validos]
+    current_user.agenda_filtro_mobile = json.dumps({'tipo': tipo, 'profissional_ids': ids_filtrados})
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -2514,18 +2569,30 @@ def agenda_dados():
         data_sel = date.fromisoformat(data_str)
     except ValueError:
         data_sel = date.today()
-    ags_q = tq(Agendamento).filter_by(data=data_sel)
+    # data_fim é opcional — usado pela visão semanal do mobile pra trazer a
+    # semana inteira numa só chamada. Sem ela, comportamento 100% igual ao
+    # de antes (só o dia de data_sel), é o que a grade do desktop usa.
+    data_fim_str = request.args.get('data_fim', '')
+    try:
+        data_fim = date.fromisoformat(data_fim_str) if data_fim_str else data_sel
+    except ValueError:
+        data_fim = data_sel
+    if data_fim < data_sel:
+        data_fim = data_sel
+
+    ags_q = tq(Agendamento).filter(Agendamento.data >= data_sel, Agendamento.data <= data_fim)
     if agenda_scope() in ('own_ro', 'own'):
         prof = current_profissional()
         ags_q = ags_q.filter(Agendamento.profissional_id == (prof.id if prof else -1))
-    ags = ags_q.order_by(Agendamento.hora_inicio).all()
+    ags = ags_q.order_by(Agendamento.data, Agendamento.hora_inicio).all()
     bls = tq(BloqueioAgenda).filter(
-        BloqueioAgenda.data_inicio <= data_sel,
+        BloqueioAgenda.data_inicio <= data_fim,
         BloqueioAgenda.data_fim    >= data_sel,
     ).all()
     return jsonify({
         'events': [{
             'id':              a.id,
+            'data':            a.data.isoformat(),
             'nome_cliente':    a.nome_cliente,
             'cliente_id':      a.cliente_id,
             'telefone':        a.telefone or '',
@@ -2555,6 +2622,8 @@ def agenda_dados():
         'bloqueios': [{
             'id':              b.id,
             'profissional_id': b.profissional_id,
+            'data_inicio':     b.data_inicio.isoformat(),
+            'data_fim':        b.data_fim.isoformat(),
             'hora_inicio':     b.hora_inicio.strftime('%H:%M') if b.hora_inicio else None,
             'hora_fim':        b.hora_fim.strftime('%H:%M')    if b.hora_fim    else None,
             'dia_inteiro':     b.dia_inteiro,

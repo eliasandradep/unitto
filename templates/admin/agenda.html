@@ -4,6 +4,9 @@
 
 {% block content %}
 
+{% if profissionais %}
+<div class="ag-desktop-only" id="agDesktopView">
+
 <!-- Toolbar de data -->
 <div class="ag-toolbar">
   <button type="button" class="btn-icon ag-nav-btn" id="btnPrevDay" title="Dia anterior">
@@ -22,14 +25,10 @@
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
   </button>
   <button type="button" class="btn-secondary ag-today-btn" id="btnToday">Hoje</button>
-  {% if profissionais %}
   <div style="margin-left:auto">
     <button type="button" class="btn-primary" onclick="openNewAg(null, null)">+ Novo Agendamento</button>
   </div>
-  {% endif %}
 </div>
-
-{% if profissionais %}
 
 <!-- Grade do calendário -->
 <div class="ag-scroll" id="agScroll">
@@ -82,6 +81,102 @@
         {% endfor %}
       </div>
       {% endfor %}
+    </div>
+  </div>
+</div>
+
+</div> <!-- /agDesktopView -->
+
+<!-- ═══════════ Visão mobile: 1 profissional por vez, dia ou semana ═══════════ -->
+<div class="ag-mobile-only" id="agMobile">
+
+  <!-- Toolbar: filtro + navegação de data -->
+  <div class="agm-toolbar">
+    <button type="button" class="btn-icon ag-nav-btn" id="agmFiltroBtn" title="Filtro da agenda">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+        <circle cx="9" cy="6" r="1.8" fill="currentColor"/><circle cx="16" cy="12" r="1.8" fill="currentColor"/><circle cx="9" cy="18" r="1.8" fill="currentColor"/>
+      </svg>
+    </button>
+    <button type="button" class="btn-icon ag-nav-btn" id="agmPrevBtn" title="Anterior">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="agm-date-btn" id="agmDateBtn" title="Toque para escolher a data">
+      <span id="agmDateLabel">—</span>
+      <input type="date" id="agmDateInput" tabindex="-1"
+             style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none" />
+    </div>
+    <button type="button" class="btn-icon ag-nav-btn" id="agmNextBtn" title="Próximo">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
+
+  <!-- Profissional em exibição — toque abre lista pra trocar -->
+  <div class="agm-prof-bar" id="agmProfBar">
+    <div class="agm-prof-avatar" id="agmProfAvatar"></div>
+    <div class="agm-prof-nome" id="agmProfNome">—</div>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:.3rem;flex-shrink:0;opacity:.6">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </div>
+
+  <!-- Dias + cards de agendamento -->
+  <div id="agmDias"></div>
+
+  <!-- Botão flutuante: novo agendamento -->
+  <button type="button" class="agm-fab" id="agmFab" title="Novo agendamento">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
+<!-- Modal: filtro (tipo de agenda + profissionais) -->
+<div class="modal-backdrop" id="agmFiltroBg" onclick="if(event.target===this)agmFecharFiltro()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal__header">
+      <h3>Filtro da Agenda</h3>
+      <button type="button" class="modal__close" onclick="agmFecharFiltro()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="agm-filtro-label">Tipo de agenda</div>
+      <div class="agm-tipo-grid" id="agmTipoGrid">
+        <button type="button" class="agm-tipo-opt" data-tipo="dia">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+          Diária
+        </button>
+        <button type="button" class="agm-tipo-opt" data-tipo="semana">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M3 14h18"/></svg>
+          Semanal
+        </button>
+        <button type="button" class="agm-tipo-opt" data-tipo="listagem">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Listagem
+        </button>
+      </div>
+
+      <div class="agm-filtro-label" style="margin-top:1.2rem">Profissionais</div>
+      <p style="font-size:.76rem;color:var(--text-muted);margin:0 0 .6rem">Nenhum selecionado mostra todos.</p>
+      <div class="agm-prof-grid" id="agmFiltroProfGrid"></div>
+    </div>
+    <div class="modal__body" style="padding-top:0;display:flex;gap:.6rem">
+      <button type="button" class="btn-secondary" style="flex:1;justify-content:center" onclick="agmFecharFiltro()">Cancelar</button>
+      <button type="button" class="btn-primary" style="flex:1;justify-content:center" id="agmFiltroSalvarBtn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: trocar o profissional em exibição -->
+<div class="modal-backdrop" id="agmProfPickerBg" onclick="if(event.target===this)agmFecharProfPicker()">
+  <div class="modal" style="max-width:380px">
+    <div class="modal__header">
+      <h3>Ver agenda de</h3>
+      <button type="button" class="modal__close" onclick="agmFecharProfPicker()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div id="agmProfPickerLista"></div>
     </div>
   </div>
 </div>
@@ -1252,6 +1347,212 @@
   .cmd-add-svc-grid .cmd-field:nth-child(4) { grid-column: 1; grid-row: 2; }
   .cmd-btn-add-svc { grid-column: 2; grid-row: 2; align-self: flex-end; }
 }
+
+/* ── Agenda mobile — 1 profissional por vez, dia ou semana ──────────────────
+   Abaixo de 760px a grade de colunas (feita pra desktop) vira ilegível —
+   troca pela visão em cards: toolbar enxuta, 1 profissional por vez (trocado
+   por uma lista rápida) e os agendamentos daquele profissional em cards,
+   num único dia (Diária) ou nos 7 dias da semana (Semanal). */
+.ag-mobile-only { display: none; }
+@media (max-width: 760px) {
+  .ag-desktop-only { display: none; }
+  .ag-mobile-only  { display: block; }
+}
+
+.agm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .7rem;
+}
+.agm-date-btn {
+  position: relative;
+  flex: 1;
+  cursor: pointer;
+  padding: .5rem .6rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .86rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+}
+
+.agm-prof-bar {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .55rem .7rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  cursor: pointer;
+}
+.agm-prof-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #fff;
+}
+.agm-prof-nome { font-size: .92rem; font-weight: 600; color: var(--dark); }
+
+.agm-dia { margin-bottom: 1.1rem; }
+.agm-dia-header {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .45rem;
+  padding-left: .1rem;
+}
+.agm-dia-header--hoje { color: var(--gold-dark); }
+.agm-dia-vazio {
+  font-size: .8rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: .2rem .1rem .3rem;
+}
+
+.agm-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  margin-bottom: .5rem;
+  cursor: pointer;
+}
+.agm-card--confirmado { border-left-color: #1B2D6E; }
+.agm-card--concluido,
+.agm-card--cancelado  { border-left-color: #9ca3af; opacity: .75; }
+.agm-card--faltou     { border-left-color: #f59e0b; }
+.agm-card--pago       { border-left-color: #16a34a; opacity: 1; }
+.agm-card-hora    { font-size: .82rem; font-weight: 600; color: var(--text); }
+.agm-card-nome    { font-size: .94rem; font-weight: 700; color: var(--dark); margin: .15rem 0; }
+.agm-card-servico { font-size: .8rem; color: var(--text-muted); }
+.agm-card-status {
+  display: inline-block;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  margin-top: .35rem;
+  color: #2563eb;
+}
+.agm-card--confirmado .agm-card-status { color: #1B2D6E; }
+.agm-card--concluido  .agm-card-status,
+.agm-card--cancelado  .agm-card-status { color: #6b7280; }
+.agm-card--faltou     .agm-card-status { color: #d97706; }
+.agm-card--pago       .agm-card-status { color: #16a34a; }
+
+.agm-fab {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.3rem;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
+  cursor: pointer;
+  z-index: 20;
+}
+
+.agm-filtro-label {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.agm-tipo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.agm-tipo-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .3rem;
+  padding: .7rem .3rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: .78rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.agm-tipo-opt.active {
+  border-color: var(--gold);
+  color: var(--gold-dark);
+  background: color-mix(in srgb, var(--gold) 14%, var(--card-bg));
+  font-weight: 600;
+}
+
+.agm-prof-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; max-height: 46vh; overflow-y: auto; }
+.agm-prof-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .3rem;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: .3rem;
+  border-radius: 8px;
+}
+.agm-prof-opt-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85rem;
+  font-weight: 700;
+  color: #fff;
+  outline: 3px solid transparent;
+  transition: outline-color .15s;
+}
+.agm-prof-opt.selected .agm-prof-opt-avatar { outline-color: var(--gold); }
+.agm-prof-opt-nome { font-size: .74rem; text-align: center; color: var(--text); line-height: 1.2; }
+
+.agm-prof-pick-row {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .55rem .4rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.agm-prof-pick-row:hover  { background: var(--content-bg); }
+.agm-prof-pick-row.active { background: color-mix(in srgb, var(--gold) 14%, var(--card-bg)); }
+.agm-prof-pick-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
 </style>
 
 <script>
@@ -1282,19 +1583,26 @@ function gotoDate(dateStr) {
   window.location.href = "{{ url_for('admin.agenda') }}?data=" + dateStr;
 }
 
-document.getElementById('btnPrevDay').addEventListener('click', function() {
+// Os botões abaixo só existem quando há profissionais ativos (a visão
+// desktop só é renderizada nesse caso) — sem isso, a página "Nenhum
+// profissional cadastrado" quebrava aqui mesmo, antes de chegar no
+// resto do script.
+var _btnPrevDay = document.getElementById('btnPrevDay');
+if (_btnPrevDay) _btnPrevDay.addEventListener('click', function() {
   const d = new Date(currentDate + 'T00:00:00');
   d.setDate(d.getDate() - 1);
   gotoDate(d.toISOString().slice(0, 10));
 });
 
-document.getElementById('btnNextDay').addEventListener('click', function() {
+var _btnNextDay = document.getElementById('btnNextDay');
+if (_btnNextDay) _btnNextDay.addEventListener('click', function() {
   const d = new Date(currentDate + 'T00:00:00');
   d.setDate(d.getDate() + 1);
   gotoDate(d.toISOString().slice(0, 10));
 });
 
-document.getElementById('btnToday').addEventListener('click', function() {
+var _btnToday = document.getElementById('btnToday');
+if (_btnToday) _btnToday.addEventListener('click', function() {
   const today = new Date();
   const y = today.getFullYear();
   const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -1302,11 +1610,13 @@ document.getElementById('btnToday').addEventListener('click', function() {
   gotoDate(y + '-' + m + '-' + d);
 });
 
-document.getElementById('agDateInput').addEventListener('change', function() {
+var _agDateInput = document.getElementById('agDateInput');
+if (_agDateInput) _agDateInput.addEventListener('change', function() {
   if (this.value) gotoDate(this.value);
 });
 
-document.getElementById('agDateBtn').addEventListener('click', function(e) {
+var _agDateBtn = document.getElementById('agDateBtn');
+if (_agDateBtn) _agDateBtn.addEventListener('click', function(e) {
   var inp = document.getElementById('agDateInput');
   // showPicker() abre o calendário nativo de forma confiável nos navegadores modernos
   if (typeof inp.showPicker === 'function') {
@@ -1327,6 +1637,10 @@ function durToH(min) {
 }
 
 const PROF_IDS = {{ profissionais | map(attribute='id') | list | tojson }};
+const PROFS = {{ profissionais_json | tojson }};
+const FILTRO_MOBILE_URL = "{{ url_for('admin.agenda_filtro_mobile_salvar') }}";
+const AGENDA_LISTAGEM_URL = "{{ url_for('admin.agenda_listagem') }}";
+const FILTRO_INICIAL = {{ filtro_mobile | tojson }};
 
 function timeDiffMin(hi, hf) {
   var pi = hi.split(':'), pf = hf.split(':');
@@ -1504,7 +1818,8 @@ function _actSetStatus(novoStatus) {
     badge.textContent = _statusLabel[novoStatus] || novoStatus;
     badge.className   = 'act-badge act-badge--' + novoStatus;
 
-    // Recarregar eventos na grade
+    // Recarregar eventos na grade (desktop) e, se a visão mobile estiver
+    // montada, nela também — cada uma com sua própria busca/estado.
     fetch('/admin/agenda/dados?data=' + currentDate)
       .then(function(r2) { return r2.json(); })
       .then(function(d2) {
@@ -1512,6 +1827,7 @@ function _actSetStatus(novoStatus) {
         renderBloqueios(d2.bloqueios || []);
         renderEvents(d2.events || []);
       });
+    if (window._agmRefresh) window._agmRefresh();
     closeActsModal();
   })
   .catch(function() { _showAgToast('Erro ao atualizar status.'); });
@@ -1620,7 +1936,7 @@ function openEditAg(ev) {
   faturarBtn.style.display = '';
   faturarBtn.onclick = function() { closeAgModal(); abrirComandaModal(ev.id, false); };
 
-  document.getElementById('agFormData').value    = currentDate;
+  document.getElementById('agFormData').value    = ev.data || currentDate;
   document.getElementById('agFormHora').value    = ev.hora_inicio;
   document.getElementById('agFormNome').value        = ev.nome_cliente;
   document.getElementById('agFormClienteId').value  = ev.cliente_id ? String(ev.cliente_id) : '';
@@ -1637,7 +1953,7 @@ function openEditAg(ev) {
   document.getElementById('agFormUnidade').value = ev.unidade_id ? String(ev.unidade_id) : '';
   document.getElementById('agFormLembrete').checked = !!ev.lembrete_wa;
 
-  _aplicarEscalaUnidade(ev.profissional_id, currentDate);
+  _aplicarEscalaUnidade(ev.profissional_id, ev.data || currentDate);
   document.getElementById('agModalBg').classList.add('open');
 }
 
@@ -2034,6 +2350,7 @@ function fecharComandaModal() {
       renderBloqueios(d.bloqueios || []);
       renderEvents(d.events || []);
     });
+  if (window._agmRefresh) window._agmRefresh();
 }
 
 function _carregarCmdUI(data) {
@@ -2397,6 +2714,311 @@ async function excluirComandaModal() {
 function _escH(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ── Agenda mobile — 1 profissional por vez, dia ou semana ──────────────────
+(function() {
+  var elMobile = document.getElementById('agMobile');
+  if (!elMobile) return; // sem profissionais cadastrados — nada a montar aqui
+
+  var agmEstado = {
+    tipo: FILTRO_INICIAL.tipo,
+    profissionalIds: (FILTRO_INICIAL.profissional_ids || []).slice(),
+    profAtualId: null,
+    dataSel: currentDate,
+    cache: { ini: null, fim: null, events: [] },
+  };
+
+  function agmProfissionaisDisponiveis() {
+    if (!agmEstado.profissionalIds.length) return PROFS;
+    var set = {};
+    agmEstado.profissionalIds.forEach(function(id) { set[id] = true; });
+    var filtrados = PROFS.filter(function(p) { return set[p.id]; });
+    return filtrados.length ? filtrados : PROFS;
+  }
+
+  function agmEscolherProfInicial() {
+    var disponiveis = agmProfissionaisDisponiveis();
+    if (!disponiveis.length) return null;
+    var atual = disponiveis.filter(function(p) { return p.id === agmEstado.profAtualId; });
+    return atual.length ? agmEstado.profAtualId : disponiveis[0].id;
+  }
+
+  function agmAvatarEl(el, p) {
+    if (!p) { el.style.background = '#ccc'; el.innerHTML = ''; return; }
+    if (p.foto_url) {
+      el.style.background = 'none';
+      el.innerHTML = '<img src="' + p.foto_url + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover" />';
+    } else {
+      el.style.background = p.cor;
+      el.innerHTML = _escH(p.iniciais);
+    }
+  }
+
+  function agmFmtDM(iso) {
+    var p = iso.split('-');
+    return p[2] + '.' + p[1];
+  }
+  function agmAddDias(iso, n) {
+    var d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function agmSegundaDaSemana(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    var dow = d.getDay();
+    var diff = (dow === 0) ? -6 : (1 - dow);
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().slice(0, 10);
+  }
+  function agmRangeAtual() {
+    if (agmEstado.tipo === 'semana') {
+      var ini = agmSegundaDaSemana(agmEstado.dataSel);
+      return { ini: ini, fim: agmAddDias(ini, 6) };
+    }
+    return { ini: agmEstado.dataSel, fim: agmEstado.dataSel };
+  }
+
+  function agmAtualizarDateLabel() {
+    var r = agmRangeAtual();
+    var label;
+    if (agmEstado.tipo === 'semana') {
+      label = agmFmtDM(r.ini) + ' a ' + agmFmtDM(r.fim);
+    } else {
+      var p = agmEstado.dataSel.split('-');
+      label = p[2] + '/' + p[1] + '/' + p[0];
+    }
+    document.getElementById('agmDateLabel').textContent = label;
+    document.getElementById('agmDateInput').value = agmEstado.dataSel;
+  }
+
+  function agmAtualizarProfBar() {
+    var p = PROFS.filter(function(x) { return x.id === agmEstado.profAtualId; })[0];
+    agmAvatarEl(document.getElementById('agmProfAvatar'), p);
+    document.getElementById('agmProfNome').textContent = p ? p.nome : 'Nenhum profissional';
+  }
+
+  var DIA_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  function agmRenderDias() {
+    var r = agmRangeAtual();
+    var cont = document.getElementById('agmDias');
+    cont.innerHTML = '';
+    var dias = [];
+    if (agmEstado.tipo === 'semana') {
+      for (var i = 0; i < 7; i++) dias.push(agmAddDias(r.ini, i));
+    } else {
+      dias.push(r.ini);
+    }
+    var hojeIso = new Date().toISOString().slice(0, 10);
+
+    dias.forEach(function(diaIso) {
+      var bloco = document.createElement('div');
+      bloco.className = 'agm-dia';
+
+      var header = document.createElement('div');
+      var d = new Date(diaIso + 'T00:00:00');
+      var ehHoje = diaIso === hojeIso;
+      header.className = 'agm-dia-header' + (ehHoje ? ' agm-dia-header--hoje' : '');
+      header.textContent = DIA_SEMANA[d.getDay()] + ' ' + agmFmtDM(diaIso) + (ehHoje ? ' (hoje)' : '');
+      bloco.appendChild(header);
+
+      var evsDoDia = agmEstado.cache.events.filter(function(ev) {
+        return ev.data === diaIso && ev.profissional_id === agmEstado.profAtualId;
+      }).sort(function(a, b) { return a.hora_inicio < b.hora_inicio ? -1 : (a.hora_inicio > b.hora_inicio ? 1 : 0); });
+
+      if (!evsDoDia.length) {
+        var vazio = document.createElement('div');
+        vazio.className = 'agm-dia-vazio';
+        vazio.textContent = 'Nenhum agendamento.';
+        bloco.appendChild(vazio);
+      } else {
+        evsDoDia.forEach(function(ev) {
+          var card = document.createElement('div');
+          var statusClasse = (ev.comanda_status === 'fechada') ? 'pago' : ev.status;
+          card.className = 'agm-card agm-card--' + statusClasse;
+          var svcHtml = ev.servico_nome ? '<div class="agm-card-servico">' + _escH(ev.servico_nome) + '</div>' : '';
+          card.innerHTML =
+            '<div class="agm-card-hora">' + ev.hora_inicio + ' – ' + ev.hora_fim + '</div>' +
+            '<div class="agm-card-nome">' + _escH(ev.nome_cliente) + '</div>' +
+            svcHtml +
+            '<div class="agm-card-status">' + (_statusLabel[ev.status] || ev.status) + '</div>';
+          card.addEventListener('click', function() { openActsModal(ev); });
+          bloco.appendChild(card);
+        });
+      }
+      cont.appendChild(bloco);
+    });
+
+    agmAtualizarDateLabel();
+    agmAtualizarProfBar();
+  }
+
+  function agmCarregar() {
+    var r = agmRangeAtual();
+    if (agmEstado.cache.ini === r.ini && agmEstado.cache.fim === r.fim) {
+      agmRenderDias();
+      return;
+    }
+    fetch('/admin/agenda/dados?data=' + r.ini + '&data_fim=' + r.fim)
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        agmEstado.cache = { ini: r.ini, fim: r.fim, events: data.events || [] };
+        agmRenderDias();
+      })
+      .catch(function() {});
+  }
+
+  // Exposto pra outras ações da página (confirmar/cancelar/faltou, fechar a
+  // comanda) pedirem uma recarga depois de mudar algo — essas ações já
+  // atualizam a grade do desktop sozinhas, mas não sabem que esta visão
+  // mobile existe nem com que intervalo de datas ela está trabalhando.
+  window._agmRefresh = function() {
+    agmEstado.cache = { ini: null, fim: null, events: [] };
+    agmCarregar();
+  };
+
+  // ── Navegação de data (dia ou semana, conforme o tipo) ────────────────────
+  document.getElementById('agmPrevBtn').addEventListener('click', function() {
+    agmEstado.dataSel = agmAddDias(agmEstado.dataSel, agmEstado.tipo === 'semana' ? -7 : -1);
+    agmCarregar();
+  });
+  document.getElementById('agmNextBtn').addEventListener('click', function() {
+    agmEstado.dataSel = agmAddDias(agmEstado.dataSel, agmEstado.tipo === 'semana' ? 7 : 1);
+    agmCarregar();
+  });
+  document.getElementById('agmDateBtn').addEventListener('click', function() {
+    var inp = document.getElementById('agmDateInput');
+    if (typeof inp.showPicker === 'function') { try { inp.showPicker(); } catch (_) {} } else { inp.focus(); }
+  });
+  document.getElementById('agmDateInput').addEventListener('change', function() {
+    if (!this.value) return;
+    agmEstado.dataSel = this.value;
+    agmCarregar();
+  });
+
+  // ── Trocar o profissional em exibição ─────────────────────────────────────
+  function agmFecharProfPicker() { document.getElementById('agmProfPickerBg').classList.remove('open'); }
+  window.agmFecharProfPicker = agmFecharProfPicker;
+
+  function agmAbrirProfPicker() {
+    var lista = document.getElementById('agmProfPickerLista');
+    lista.innerHTML = '';
+    agmProfissionaisDisponiveis().forEach(function(p) {
+      var row = document.createElement('div');
+      row.className = 'agm-prof-pick-row' + (p.id === agmEstado.profAtualId ? ' active' : '');
+      var avatarDiv = document.createElement('div');
+      avatarDiv.className = 'agm-prof-pick-avatar';
+      agmAvatarEl(avatarDiv, p);
+      var nomeDiv = document.createElement('div');
+      nomeDiv.textContent = p.nome;
+      nomeDiv.style.fontSize = '.88rem';
+      nomeDiv.style.fontWeight = '600';
+      row.appendChild(avatarDiv);
+      row.appendChild(nomeDiv);
+      row.addEventListener('click', function() {
+        agmEstado.profAtualId = p.id;
+        agmFecharProfPicker();
+        agmRenderDias();
+      });
+      lista.appendChild(row);
+    });
+    document.getElementById('agmProfPickerBg').classList.add('open');
+  }
+  document.getElementById('agmProfBar').addEventListener('click', agmAbrirProfPicker);
+
+  // ── Modal de filtro (tipo de agenda + profissionais) ──────────────────────
+  var _filtroTipoSelecionado = agmEstado.tipo;
+  var _filtroProfSelecionados = agmEstado.profissionalIds.slice();
+
+  function agmFecharFiltro() { document.getElementById('agmFiltroBg').classList.remove('open'); }
+  window.agmFecharFiltro = agmFecharFiltro;
+
+  function agmMarcarTipoAtivo() {
+    document.querySelectorAll('.agm-tipo-opt').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.tipo === _filtroTipoSelecionado);
+    });
+  }
+
+  document.querySelectorAll('.agm-tipo-opt').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _filtroTipoSelecionado = btn.dataset.tipo;
+      agmMarcarTipoAtivo();
+    });
+  });
+
+  function agmMontarGradeFiltroProf() {
+    var grid = document.getElementById('agmFiltroProfGrid');
+    grid.innerHTML = '';
+    PROFS.forEach(function(p) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'agm-prof-opt' + (_filtroProfSelecionados.indexOf(p.id) !== -1 ? ' selected' : '');
+      var avatarDiv = document.createElement('div');
+      avatarDiv.className = 'agm-prof-opt-avatar';
+      agmAvatarEl(avatarDiv, p);
+      var nomeDiv = document.createElement('div');
+      nomeDiv.className = 'agm-prof-opt-nome';
+      nomeDiv.textContent = p.nome;
+      btn.appendChild(avatarDiv);
+      btn.appendChild(nomeDiv);
+      btn.addEventListener('click', function() {
+        var idx = _filtroProfSelecionados.indexOf(p.id);
+        if (idx === -1) _filtroProfSelecionados.push(p.id); else _filtroProfSelecionados.splice(idx, 1);
+        btn.classList.toggle('selected', idx === -1);
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  document.getElementById('agmFiltroBtn').addEventListener('click', function() {
+    _filtroTipoSelecionado = agmEstado.tipo;
+    _filtroProfSelecionados = agmEstado.profissionalIds.slice();
+    agmMarcarTipoAtivo();
+    agmMontarGradeFiltroProf();
+    document.getElementById('agmFiltroBg').classList.add('open');
+  });
+
+  document.getElementById('agmFiltroSalvarBtn').addEventListener('click', function() {
+    var tipo = _filtroTipoSelecionado;
+    var ids = _filtroProfSelecionados.slice();
+    fetch(FILTRO_MOBILE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: tipo, profissional_ids: ids }),
+    }).catch(function() {});
+
+    agmFecharFiltro();
+    if (tipo === 'listagem') {
+      window.location.href = AGENDA_LISTAGEM_URL;
+      return;
+    }
+    agmEstado.tipo = tipo;
+    agmEstado.profissionalIds = ids;
+    agmEstado.profAtualId = agmEscolherProfInicial();
+    agmCarregar();
+  });
+
+  // ── Novo agendamento (botão flutuante) ────────────────────────────────────
+  document.getElementById('agmFab').addEventListener('click', function() {
+    var hoje = new Date().toISOString().slice(0, 10);
+    var r = agmRangeAtual();
+    currentDate = (hoje >= r.ini && hoje <= r.fim) ? hoje : r.ini;
+    openNewAg(null, agmEstado.profAtualId);
+  });
+
+  // Se a preferência salva for "listagem", a visão mobile já nasce lá —
+  // não tem card-list próprio pra essa opção (reaproveita a tela existente).
+  if (agmEstado.tipo === 'listagem') {
+    if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+      window.location.href = AGENDA_LISTAGEM_URL;
+      return;
+    }
+    agmEstado.tipo = 'dia';
+  }
+
+  agmEstado.profAtualId = agmEscolherProfInicial();
+  agmCarregar();
+})();
 
 </script>
 

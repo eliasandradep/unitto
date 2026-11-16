@@ -359,6 +359,11 @@ class User(db.Model, UserMixin):
     # ids), só pra este usuário — cada um organiza do seu jeito.
     agenda_ordem_profissionais = db.Column(db.Text)
 
+    # Filtro da agenda no mobile (JSON: {"tipo": "dia"|"semana"|"listagem",
+    # "profissional_ids": [ids]}), lembrado entre acessos — lista vazia
+    # de profissional_ids significa "todos".
+    agenda_filtro_mobile = db.Column(db.Text)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 

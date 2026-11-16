@@ -535,6 +535,7 @@ with app.app_context():
                   'INTEGER REFERENCES profissionais(id)' if _pg else 'INTEGER')
     _safe_add_col('users',         'cpf', 'VARCHAR(14)')
     _safe_add_col('users',         'agenda_ordem_profissionais', 'TEXT')
+    _safe_add_col('users',         'agenda_filtro_mobile', 'TEXT')
     _fk_emp = 'INTEGER REFERENCES empresas(id)' if _pg else 'INTEGER'
     _safe_add_col('leads',                'empresa_id', _fk_emp)
     _safe_add_col('leads',                'external_thread_id', 'VARCHAR(100)')
