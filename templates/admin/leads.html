@@ -19,8 +19,16 @@
       <option value="{{ key }}" {% if source_filter == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
+    {% if mostrar_funil_rr %}
+    <select name="temperatura" class="toolbar__select">
+      <option value="">Todas as temperaturas</option>
+      <option value="quente" {% if temperatura_filter == 'quente' %}selected{% endif %}>🔥 Quente</option>
+      <option value="morno"  {% if temperatura_filter == 'morno'  %}selected{% endif %}>Morno</option>
+      <option value="frio"   {% if temperatura_filter == 'frio'   %}selected{% endif %}>Frio</option>
+    </select>
+    {% endif %}
     <button type="submit" class="btn-primary">Filtrar</button>
-    {% if q or status_filter or source_filter %}
+    {% if q or status_filter or source_filter or temperatura_filter %}
     <a href="{{ url_for('admin.leads') }}" class="btn-secondary">Limpar</a>
     {% endif %}
   </form>
@@ -37,6 +45,7 @@
         <th>Serviço</th>
         <th>Origem</th>
         <th>Status</th>
+        {% if mostrar_funil_rr %}<th>Temperatura</th>{% endif %}
         <th>Data</th>
         <th></th>
       </tr>
@@ -61,6 +70,16 @@
           <span class="badge badge--aguardando" title="Contato ainda não respondeu nome/telefone/serviço — confira a conversa direto na rede social.">Aguardando resposta</span>
           {% endif %}
         </td>
+        {% if mostrar_funil_rr %}
+        <td>
+          {% if lead.funil_rr and lead.funil_rr.classificacao %}
+          <span class="badge badge--{{ lead.funil_rr.classificacao }}">
+            {% if lead.funil_rr.classificacao == 'quente' %}🔥 Quente{% elif lead.funil_rr.classificacao == 'morno' %}Morno{% else %}Frio{% endif %}
+            ({{ lead.funil_rr.score_total }})
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        {% endif %}
         <td>{{ lead.created_at.strftime('%d/%m/%Y') }}</td>
         <td>
           <a href="{{ url_for('admin.lead_detail', lead_id=lead.id) }}" class="btn-icon btn-icon--view" title="Ver detalhes">

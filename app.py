@@ -487,6 +487,8 @@ with app.app_context():
     _safe_add_col('empresas',        'website',            'VARCHAR(250)')
     _safe_add_col('empresas',        'atendimento_ia_ativo',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('empresas',        'funil_qualificacao_rr_ativo',
+                  'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('contas_pagar',   'categoria_id', 'INTEGER')
     _safe_add_col('contas_receber', 'categoria_id', 'INTEGER')
     _safe_add_col('contas_pagar',   'unidade_id',   'INTEGER')

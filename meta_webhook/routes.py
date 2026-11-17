@@ -15,6 +15,8 @@ from crypto_utils import decrypt_token
 from ai_attendance.gating import ia_disponivel
 from ai_attendance.orquestrador import processar_mensagem
 from ai_attendance.logging_ia import log_evento_ia
+from renata_rosa_bot.gating import funil_ativo
+from renata_rosa_bot.orquestrador import processar_mensagem as rr_processar_mensagem
 
 _PARSERS = {
     'whatsapp_business_account': parse_whatsapp,
@@ -123,6 +125,24 @@ def _processar_turno_whatsapp(integracao, evento, lead, fallback):
     de elegibilidade é sempre a primeira coisa, antes de qualquer chamada à
     Anthropic — tenants não elegíveis nunca tocam código novo."""
     empresa = integracao.empresa
+
+    if funil_ativo(empresa):
+        # Funil bespoke da Renata Rosa — checado ANTES do motor genérico de
+        # propósito: pra esse tenant, o motor genérico nunca deve rodar
+        # enquanto esse flag estiver ligado (ver renata_rosa_bot/gating.py).
+        try:
+            token = decrypt_token(integracao.access_token_enc)
+            textos = rr_processar_mensagem(empresa, lead, evento['external_thread_id'], evento['mensagem'])
+            for texto in textos:
+                meta_client.enviar_mensagem_whatsapp(
+                    integracao.identificador_externo, evento['external_thread_id'], texto, token)
+        except Exception:
+            current_app.logger.exception('Falha no funil de qualificação RR — caindo pro fluxo padrão')
+            log_evento_ia(empresa, 'AI_ERROR', lead_id=lead.id,
+                          detalhes='exception no funil Renata Rosa')
+            fallback(integracao, evento, lead)
+        return
+
     if ia_disponivel(empresa):
         # meta_webhook_bp não passa por set_tenant_context() (só admin_bp/
         # billing_bp) — precisa popular g.empresa/g.empresa_id manualmente pra

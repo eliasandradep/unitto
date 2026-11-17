@@ -27,11 +27,12 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     CategoriaProduto, CategoriaFinanceira, Produto, IntegracaoMeta, ContatoIgnorado,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
-                    META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento)
+                    META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento, RenataRosaFunilLead)
 from themes import THEMES
 from ai_attendance.gating import ia_disponivel
 from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
 from ai_attendance.informacoes import get_or_create_info, atualizar_info
+from renata_rosa_bot.gating import funil_ativo as rr_funil_ativo
 import meta_client
 from crypto_utils import encrypt_token
 
@@ -297,9 +298,11 @@ def dashboard_faturamento():
 @admin_bp.route('/leads')
 @login_required
 def leads():
-    status_filter = request.args.get('status', '')
-    source_filter = request.args.get('source', '')
-    q             = request.args.get('q', '').strip()
+    status_filter      = request.args.get('status', '')
+    source_filter      = request.args.get('source', '')
+    q                  = request.args.get('q', '').strip()
+    mostrar_funil_rr   = rr_funil_ativo(g.empresa)
+    temperatura_filter = request.args.get('temperatura', '') if mostrar_funil_rr else ''
 
     query = tq(Lead)
     if status_filter:
@@ -311,6 +314,8 @@ def leads():
         query = query.filter(
             db.or_(Lead.name.ilike(like), Lead.phone.ilike(like), Lead.email.ilike(like))
         )
+    if temperatura_filter:
+        query = query.join(RenataRosaFunilLead).filter(RenataRosaFunilLead.classificacao == temperatura_filter)
 
     all_leads = query.order_by(Lead.created_at.desc()).all()
 
@@ -321,6 +326,8 @@ def leads():
         status_filter=status_filter,
         source_filter=source_filter,
         q=q,
+        mostrar_funil_rr=mostrar_funil_rr,
+        temperatura_filter=temperatura_filter,
     )
 
 
@@ -393,7 +400,8 @@ def lead_detail(lead_id):
         ).first()
 
     return render_template('admin/lead_detail.html',
-        lead=lead, statuses=LEAD_STATUSES, cliente_vinculado=cliente_vinculado)
+        lead=lead, statuses=LEAD_STATUSES, cliente_vinculado=cliente_vinculado,
+        mostrar_funil_rr=rr_funil_ativo(g.empresa))
 
 
 @admin_bp.route('/leads/<int:lead_id>/converter', methods=['POST'])
@@ -466,6 +474,9 @@ def _soltar_referencias_ia(lead):
             .update({'conversa_id': None}, synchronize_session=False)
     AtendimentoIAEvento.query.filter_by(lead_id=lead.id).update({'lead_id': None}, synchronize_session=False)
     AtendimentoIAConversa.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
+    # Mesmo motivo acima, pro funil bespoke da Renata Rosa (renata_rosa_bot/) —
+    # é estado ativo do funil, não faz sentido preservar pra um Lead apagado.
+    RenataRosaFunilLead.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
 
 
 def _ignorar_lead(lead, motivo):
@@ -842,6 +853,15 @@ def atendimento_ia():
         elif section == 'informacoes':
             atualizar_info(empresa, request.form)
             flash('Informações do estabelecimento atualizadas.', 'success')
+        elif section == 'funil_rr_toggle':
+            # Guarda server-side restrita ao slug — defesa em profundidade além
+            # do guard no template (empresa.slug pode ser checado no form, mas
+            # nunca confiar só no frontend pra esconder um recurso bespoke).
+            if empresa.slug == 'renatarosa':
+                empresa.funil_qualificacao_rr_ativo = 'funil_qualificacao_rr_ativo' in request.form
+                db.session.commit()
+                flash('Funil de qualificação ' +
+                      ('ativado.' if empresa.funil_qualificacao_rr_ativo else 'desativado.'), 'success')
         return redirect(url_for('admin.atendimento_ia'))
 
     menu_config = get_or_create_menu_config(empresa)

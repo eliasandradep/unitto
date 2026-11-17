@@ -37,6 +37,30 @@
   </form>
 </div>
 
+{% if empresa.slug == 'renatarosa' %}
+{# ── Funil de qualificação bespoke (fase 1) ──────────────────────────────── #}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Funil de qualificação de leads</h3>
+  </div>
+  <form method="POST" action="{{ url_for('admin.atendimento_ia') }}">
+    <input type="hidden" name="section" value="funil_rr_toggle" />
+    <div class="form-group" style="display:flex;align-items:center;gap:.5rem">
+      <input type="checkbox" id="funil_qualificacao_rr_ativo" name="funil_qualificacao_rr_ativo"
+             {{ 'checked' if empresa.funil_qualificacao_rr_ativo else '' }} />
+      <label for="funil_qualificacao_rr_ativo" style="margin:0">Funil de qualificação de leads ativo no WhatsApp</label>
+    </div>
+    <p style="font-size:.8rem;color:var(--text-muted);margin:.3rem 0 1rem">
+      Quando ativo, substitui o atendimento por IA acima: o bot qualifica a cliente
+      por pontuação (prazo, investimento, intenção de agendamento) e sempre transfere
+      pra equipe agendar — nunca agenda sozinho. Leads quentes aparecem destacados na
+      tela de Leads.
+    </p>
+    <button type="submit" class="btn-primary">Salvar</button>
+  </form>
+</div>
+{% endif %}
+
 {# ── Menu ─────────────────────────────────────────────────────────────────── #}
 <div class="card" style="max-width:680px;margin-bottom:1.5rem">
   <div class="card__header">

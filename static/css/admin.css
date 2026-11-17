@@ -346,6 +346,9 @@ body.sidebar--collapsed .sidebar__nav {
 .badge--convertido     { background: #E9F7EF; color: #1E8449; }
 .badge--perdido        { background: #F2F3F4; color: #717D7E; }
 .badge--active         { background: #E9F7EF; color: #1E8449; }
+.badge--quente { background: #FDEDEC; color: #C0392B; }
+.badge--morno  { background: #FEF9E7; color: #B7950B; }
+.badge--frio   { background: #EBF5FB; color: #2980B9; }
 .badge--source-formulario   { background: #EBF5FB; color: #2471A3; }
 .badge--source-whatsapp     { background: #E9F7EF; color: #1A7A42; }
 .badge--source-manual       { background: #F5EEF8; color: #7D3C98; }
@@ -547,6 +550,7 @@ body.sidebar--collapsed .sidebar__nav {
 .alert--success { background: #E9F7EF; color: #1E8449; border: 1px solid #A9DFBF; }
 .alert--error   { background: #FDEDEC; color: #922B21; border: 1px solid #F1948A; }
 .alert--warning { background: #FEF9E7; color: #9A7D0A; border: 1px solid #F7DC6F; }
+.alert--hot { background: #FDEDEC; color: #922B21; border: 1px solid #F1948A; font-weight: 600; }
 
 /* ── Lead detail ─────────────────────────────────────────── */
 .detail-grid {

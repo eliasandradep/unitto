@@ -16,6 +16,12 @@
 </div>
 {% endif %}
 
+{% if mostrar_funil_rr and lead.funil_rr and lead.funil_rr.classificacao == 'quente' %}
+<div class="alert alert--hot">
+  🔥 Lead QUENTE — score {{ lead.funil_rr.score_total }}/100. Veja o resumo completo nas Anotações abaixo.
+</div>
+{% endif %}
+
 <div class="detail-grid">
 
   <!-- Informações principais -->

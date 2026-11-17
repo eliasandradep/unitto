@@ -71,6 +71,9 @@ class Empresa(db.Model):
     whatsapp_automacao = db.Column(db.String(20))  # fallback manual — só usado quando não há IntegracaoMeta whatsapp conectada
     whatsapp_humano    = db.Column(db.String(20))  # nunca exibido publicamente; só enviado no handoff do bot
     atendimento_ia_ativo = db.Column(db.Boolean, default=False)  # menu de atendimento por IA no WhatsApp — plano PRO
+    funil_qualificacao_rr_ativo = db.Column(db.Boolean, default=False)
+    # Funil de qualificação de leads bespoke (renata_rosa_bot/) — exclusivo do
+    # tenant slug='renatarosa', nunca checado isoladamente (ver renata_rosa_bot/gating.py).
     logo_url      = db.Column(db.String(250))
     logo_data     = db.Column(db.LargeBinary)
     logo_mime     = db.Column(db.String(50))
@@ -1129,6 +1132,7 @@ EVENTOS_IA_TIPOS = [
     'AI_APPOINTMENT_VIEWED', 'AI_APPOINTMENT_RESCHEDULED', 'AI_APPOINTMENT_CANCELLED',
     'AI_SERVICES_VIEWED', 'AI_INFORMATION_VIEWED',
     'AI_HUMAN_HANDOFF', 'AI_ERROR', 'AI_FALLBACK_REGRA',
+    'RR_HANDOFF',
 ]
 
 
@@ -1228,3 +1232,45 @@ class AtendimentoIAEvento(db.Model):
         db.Index('ix_ia_evento_empresa_criado', 'empresa_id', 'criado_em'),
         db.Index('ix_ia_evento_empresa_tipo', 'empresa_id', 'tipo'),
     )
+
+
+class RenataRosaFunilLead(db.Model):
+    """Estado do funil de qualificação de leads bespoke da Renata Rosa Beauty
+    Concept (ver pacote renata_rosa_bot/) — 1:1 com Lead. Isolado do motor
+    genérico ai_attendance: não reaproveita AtendimentoIAConversa porque esse
+    funil precisa persistir indefinidamente (sem staleness que reinicie o
+    fluxo) e guardar respostas tipadas pra recalcular a pontuação a qualquer
+    momento. Nunca usado por nenhum outro tenant (gate em renata_rosa_bot/gating.py)."""
+    __tablename__ = 'renata_rosa_funil_leads'
+    id                     = db.Column(db.Integer, primary_key=True)
+    lead_id                = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=False)
+    empresa_id             = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+
+    estado                 = db.Column(db.String(30), default='menu_principal')
+    estado_anterior        = db.Column(db.String(30), nullable=True)
+    fluxo                  = db.Column(db.String(20), nullable=True)
+    # 'mechas_coloracao' | 'corte_tratamento' | 'cliente_existente'
+
+    servico_opcao_idx      = db.Column(db.Integer, nullable=True)   # RN02: 1-5
+    servico_opcao_label    = db.Column(db.String(100), nullable=True)
+    servico_identificado   = db.Column(db.Boolean, nullable=True)   # clareza do serviço (RN09)
+    prazo_opcao            = db.Column(db.Integer, nullable=True)   # RN03: 1-4
+    historico_cabelo_opcao = db.Column(db.Integer, nullable=True)   # RN04: 1-5 (sem pontuação)
+    investimento_opcao     = db.Column(db.Integer, nullable=True)   # RN05: 1-3
+    avaliacao_opcao        = db.Column(db.Integer, nullable=True)   # RN06: 1-3
+    agendamento_opcao      = db.Column(db.Integer, nullable=True)   # RN08: 1-3
+
+    contador_nao_entendido = db.Column(db.Integer, default=0)       # RN14: 2x seguidas -> handoff
+
+    score_total            = db.Column(db.Integer, nullable=True)   # RN09, sempre recalculado do zero
+    classificacao          = db.Column(db.String(10), nullable=True)  # 'quente'|'morno'|'frio'
+
+    transcricao            = db.Column(db.Text, nullable=True)      # histórico bot/cliente pro resumo (RN14)
+    resumo_enviado         = db.Column(db.Boolean, default=False)   # evita nota duplicada em retry
+
+    criado_em              = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em          = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('lead_id', name='uq_rr_funil_lead'),)
+
+    lead = db.relationship('Lead', backref=db.backref('funil_rr', uselist=False))

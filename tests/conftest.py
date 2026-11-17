@@ -68,9 +68,24 @@ def _slug_unico(prefixo):
     return f'{prefixo}-{_contador[0]}-{uuid.uuid4().hex[:6]}'
 
 
-def make_empresa(plano='pro', atendimento_ia_ativo=True, status='ativa', nome='Empresa Teste'):
-    emp = Empresa(nome=nome, slug=_slug_unico('empresa'), plano=plano, status=status,
-                  atendimento_ia_ativo=atendimento_ia_ativo)
+def make_empresa(plano='pro', atendimento_ia_ativo=True, status='ativa', nome='Empresa Teste',
+                  slug=None, funil_qualificacao_rr_ativo=False):
+    """Com `slug` explícito (ex: 'renatarosa', pra testar o gate por slug
+    exato do renata_rosa_bot), reaproveita a empresa já existente em vez de
+    tentar criar de novo — o banco de teste é compartilhado pela sessão
+    inteira (um arquivo SQLite só, sem drop_all entre testes), então slug
+    é UNIQUE e uma segunda criação do mesmo slug quebraria com IntegrityError."""
+    if slug:
+        emp = Empresa.query.filter_by(slug=slug).first()
+        if emp:
+            emp.plano, emp.status = plano, status
+            emp.atendimento_ia_ativo = atendimento_ia_ativo
+            emp.funil_qualificacao_rr_ativo = funil_qualificacao_rr_ativo
+            db.session.commit()
+            return emp
+    emp = Empresa(nome=nome, slug=slug or _slug_unico('empresa'), plano=plano, status=status,
+                  atendimento_ia_ativo=atendimento_ia_ativo,
+                  funil_qualificacao_rr_ativo=funil_qualificacao_rr_ativo)
     db.session.add(emp)
     db.session.commit()
     return emp
