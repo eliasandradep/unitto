@@ -32,6 +32,17 @@ def test_atendimento_ia_200_para_plano_pro_mesmo_com_toggle_desligado(client):
     assert resp.status_code == 200
 
 
+def test_atendimento_ia_200_para_plano_black(client):
+    """Bug real em produção: a rota só liberava plano_familia == 'pro',
+    enquanto o resto do sistema (badge 'Ativo' em Integrações, ia_disponivel)
+    já tratava 'pro' e 'black' como equivalentes — um tenant no plano black
+    via 'Ativo' na tela de Integrações mas tomava 404 ao clicar em Configurar."""
+    empresa = make_empresa(plano='black', atendimento_ia_ativo=False)
+    _login(client, empresa)
+    resp = client.get('/admin/atendimento-ia')
+    assert resp.status_code == 200
+
+
 def test_toggle_post_ativa_atendimento_ia(client):
     empresa = make_empresa(plano='pro', atendimento_ia_ativo=False)
     _login(client, empresa)

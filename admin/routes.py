@@ -904,7 +904,7 @@ def integracoes():
 @login_required
 def atendimento_ia():
     empresa = g.get('empresa')
-    if not empresa or empresa.plano_familia != 'pro':
+    if not empresa or empresa.plano_familia not in ('pro', 'black'):
         abort(404)
 
     if request.method == 'POST':
