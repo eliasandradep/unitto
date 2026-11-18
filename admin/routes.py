@@ -26,7 +26,7 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     ContaPagar, ContaReceber, FormaPagamento,
                     CategoriaProduto, CategoriaFinanceira, Produto, IntegracaoMeta, ContatoIgnorado,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
-                    LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
+                    LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA, AGENDAMENTO_STATUS,
                     META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento, RenataRosaFunilLead,
                     RenataRosaFunilFoto, RenataRosaFunilStatusHistorico, STATUS_COMERCIAL_RR)
 from themes import THEMES
@@ -35,6 +35,7 @@ from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
 from ai_attendance.informacoes import get_or_create_info, atualizar_info
 from renata_rosa_bot.gating import funil_ativo as rr_funil_ativo
 from renata_rosa_bot.status_comercial import definir_status as rr_definir_status_comercial
+from renata_rosa_bot.indicadores import calcular_indicadores as rr_calcular_indicadores
 import meta_client
 from crypto_utils import encrypt_token
 
@@ -209,6 +210,9 @@ def dashboard():
     theme_key  = get_setting('active_theme', 'default')
     theme_name = THEMES.get(theme_key, THEMES['default'])['name']
 
+    mostrar_funil_rr = rr_funil_ativo(g.empresa)
+    indicadores_rr = rr_calcular_indicadores(g.empresa) if mostrar_funil_rr else None
+
     return render_template('admin/dashboard.html',
         total=total,
         by_status=by_status,
@@ -217,6 +221,8 @@ def dashboard():
         theme_name=theme_name,
         theme_key=theme_key,
         hoje_iso=date.today().isoformat(),
+        mostrar_funil_rr=mostrar_funil_rr,
+        indicadores_rr=indicadores_rr,
     )
 
 
@@ -394,9 +400,31 @@ def lead_detail(lead_id):
 
         elif action == 'update_status_comercial' and rr_funil_ativo(g.empresa) and lead.funil_rr:
             novo_status = request.form.get('status_comercial', '')
+            motivo = request.form.get('motivo', '').strip()
             if novo_status in dict(STATUS_COMERCIAL_RR):
                 rr_definir_status_comercial(lead.funil_rr, novo_status, forcar=True)
                 flash('Status comercial atualizado.', 'success')
+            if motivo:
+                lead.funil_rr.motivo_nao_convertido = motivo
+                db.session.commit()
+
+        elif action == 'vincular_agendamento' and rr_funil_ativo(g.empresa) and lead.funil_rr:
+            agendamento_id = request.form.get('agendamento_id', '')
+            digits = ''.join(ch for ch in (lead.phone or '') if ch.isdigit())
+            cliente_vinculado = tq(Cliente).filter(Cliente.telefone.like(f'%{digits[-8:]}')).first() \
+                if len(digits) >= 8 else None
+            ag = tq(Agendamento).filter_by(id=agendamento_id).first() if agendamento_id.isdigit() else None
+            if ag and cliente_vinculado and ag.cliente_id == cliente_vinculado.id:
+                lead.funil_rr.agendamento_vinculado_id = ag.id
+                db.session.commit()
+                flash('Agendamento vinculado.', 'success')
+            else:
+                flash('Agendamento inválido — precisa pertencer ao cliente vinculado a este lead.', 'error')
+
+        elif action == 'desvincular_agendamento' and rr_funil_ativo(g.empresa) and lead.funil_rr:
+            lead.funil_rr.agendamento_vinculado_id = None
+            db.session.commit()
+            flash('Vínculo removido.', 'success')
 
         return redirect(url_for('admin.lead_detail', lead_id=lead.id))
 
@@ -407,9 +435,16 @@ def lead_detail(lead_id):
             Cliente.telefone.like(f'%{digits[-8:]}')
         ).first()
 
+    agendamentos_cliente_vinculado = (
+        sorted(cliente_vinculado.agendamentos, key=lambda a: a.data, reverse=True)
+        if cliente_vinculado else []
+    )
+
     return render_template('admin/lead_detail.html',
         lead=lead, statuses=LEAD_STATUSES, cliente_vinculado=cliente_vinculado,
-        mostrar_funil_rr=rr_funil_ativo(g.empresa), status_comercial_opcoes=STATUS_COMERCIAL_RR)
+        mostrar_funil_rr=rr_funil_ativo(g.empresa), status_comercial_opcoes=STATUS_COMERCIAL_RR,
+        agendamentos_cliente_vinculado=agendamentos_cliente_vinculado,
+        agendamento_status_labels=AGENDAMENTO_STATUS)
 
 
 @admin_bp.route('/leads/<int:lead_id>/fotos/<int:foto_id>')

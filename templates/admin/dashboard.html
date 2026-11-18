@@ -4,6 +4,103 @@
 
 {% block content %}
 
+{% if mostrar_funil_rr %}
+<div class="card" style="padding:1.2rem 1.4rem;margin-bottom:1.5rem">
+  <div class="card__header"><h3>Indicadores comerciais — funil de qualificação</h3></div>
+
+  <div class="stats-grid" style="margin-bottom:1.2rem">
+    <div class="stat-card stat-card--total">
+      <div class="stat-card__value">{{ indicadores_rr.total_leads }}</div>
+      <div class="stat-card__label">Total de leads</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ indicadores_rr.taxa_conclusao_questionario }}%</div>
+      <div class="stat-card__label">Concluíram o questionário</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ indicadores_rr.taxa_transferencia_humana }}%</div>
+      <div class="stat-card__label">Transferidos pra atendente</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ indicadores_rr.taxa_conversao_agendamento }}%</div>
+      <div class="stat-card__label">Converteram em agendamento</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ indicadores_rr.taxa_comparecimento }}%</div>
+      <div class="stat-card__label">Taxa de comparecimento</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">{{ indicadores_rr.taxa_contratacao_efetiva }}%</div>
+      <div class="stat-card__label">Contratação efetiva</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">
+        {% if indicadores_rr.tempo_medio_resposta_minutos is not none %}
+        {{ (indicadores_rr.tempo_medio_resposta_minutos / 60) | round(1) }}h
+        {% else %}—{% endif %}
+      </div>
+      <div class="stat-card__label">Tempo médio até a atendente agir (proxy)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">R$ {{ '%.2f' | format(indicadores_rr.receita_total) | replace('.', ',') }}</div>
+      <div class="stat-card__label">Receita (leads vinculados)</div>
+    </div>
+  </div>
+
+  <div class="dashboard-row">
+    <div class="card">
+      <div class="card__header"><h3>Leads por classificação</h3></div>
+      <canvas id="chartRrClassificacao" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div class="card__header"><h3>Leads por origem</h3></div>
+      <canvas id="chartRrOrigem" height="180"></canvas>
+    </div>
+  </div>
+
+  <div class="dashboard-row" style="margin-top:1rem">
+    <div class="card">
+      <div class="card__header"><h3>Leads e receita por serviço</h3></div>
+      {% if indicadores_rr.leads_por_servico %}
+      <table class="data-table">
+        <thead><tr><th>Serviço</th><th>Leads</th><th>Receita</th></tr></thead>
+        <tbody>
+          {% for servico, qtd in indicadores_rr.leads_por_servico.items() %}
+          <tr>
+            <td>{{ servico }}</td>
+            <td>{{ qtd }}</td>
+            <td>R$ {{ '%.2f' | format(indicadores_rr.receita_por_servico.get(servico, 0)) | replace('.', ',') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">Nenhum lead chegou a escolher um serviço ainda.</p>
+      {% endif %}
+    </div>
+    <div class="card">
+      <div class="card__header"><h3>Motivos de não conversão</h3></div>
+      {% if indicadores_rr.motivos_nao_conversao %}
+      <table class="data-table">
+        <thead><tr><th>Lead</th><th>Motivo</th><th>Data</th></tr></thead>
+        <tbody>
+          {% for m in indicadores_rr.motivos_nao_conversao %}
+          <tr>
+            <td>{{ m.nome }}</td>
+            <td>{{ m.motivo }}</td>
+            <td>{{ m.data.strftime('%d/%m/%Y') if m.data else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">Nenhum motivo registrado ainda.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if perm.financeiro == 'full' %}
 <div class="card" style="padding:1.2rem 1.4rem;margin-bottom:1.5rem">
   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.8rem;margin-bottom:1rem">
@@ -86,8 +183,69 @@
   </div>
 </div>
 
-{% if perm.financeiro == 'full' %}
+{% if perm.financeiro == 'full' or mostrar_funil_rr %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endif %}
+
+{% if mostrar_funil_rr %}
+<script>
+(function() {
+  var canvasClass = document.getElementById('chartRrClassificacao');
+  var canvasOrigem = document.getElementById('chartRrOrigem');
+  if (!canvasClass || !canvasOrigem) return;
+
+  var classificacao = {{ indicadores_rr.leads_por_classificacao | tojson }};
+  var ORDEM_CLASS = ['quente', 'morno', 'frio'];
+  var CORES_CLASS = {quente: '#C0392B', morno: '#B7950B', frio: '#2980B9'};
+  var LABELS_CLASS = {quente: 'Quente', morno: 'Morno', frio: 'Frio'};
+  var labelsClass = ORDEM_CLASS.filter(function(k) { return classificacao[k]; });
+
+  new Chart(canvasClass, {
+    type: 'bar',
+    data: {
+      labels: labelsClass.map(function(k) { return LABELS_CLASS[k]; }),
+      datasets: [{
+        data: labelsClass.map(function(k) { return classificacao[k]; }),
+        backgroundColor: labelsClass.map(function(k) { return CORES_CLASS[k]; }),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,.06)' } },
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+      }
+    }
+  });
+
+  var origem = {{ indicadores_rr.leads_por_origem | tojson }};
+  var labelsOrigem = Object.keys(origem);
+  new Chart(canvasOrigem, {
+    type: 'bar',
+    data: {
+      labels: labelsOrigem,
+      datasets: [{
+        data: labelsOrigem.map(function(k) { return origem[k]; }),
+        backgroundColor: 'rgba(180,143,89,0.7)',
+        borderColor: 'rgba(180,143,89,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,.06)' } },
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{% if perm.financeiro == 'full' %}
 <script>
 (function() {
   var canvas = document.getElementById('chartFaturamentoDash');

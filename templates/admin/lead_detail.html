@@ -134,6 +134,10 @@
           </label>
           {% endfor %}
         </div>
+        <div class="form-group" style="margin-top:.6rem">
+          <label>Motivo (opcional — usado ao marcar "Não convertido")</label>
+          <input type="text" name="motivo" value="{{ lead.funil_rr.motivo_nao_convertido or '' }}" />
+        </div>
         <button type="submit" class="btn-primary btn-full" style="margin-top:1rem">Atualizar status comercial</button>
       </form>
       {% if lead.funil_rr.status_historico %}
@@ -141,6 +145,41 @@
         <pre>{% for h in lead.funil_rr.status_historico|sort(attribute='criado_em', reverse=True) %}[{{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}] {{ dict(status_comercial_opcoes).get(h.status_anterior, h.status_anterior or '—') }} → {{ dict(status_comercial_opcoes).get(h.status_novo, h.status_novo) }}
 {% endfor %}</pre>
       </div>
+      {% endif %}
+    </div>
+
+    <!-- Agendamento vinculado (RN18 #8/9/10 — funil Renata Rosa) -->
+    <div class="card">
+      <div class="card__header"><h3>Agendamento vinculado</h3></div>
+      {% if lead.funil_rr.agendamento_vinculado %}
+      {% set ag = lead.funil_rr.agendamento_vinculado %}
+      <p style="font-size:.85rem">
+        {{ ag.data.strftime('%d/%m/%Y') }} — {{ ag.servico.nome if ag.servico else '—' }}
+        ({{ dict(agendamento_status_labels).get(ag.status, ag.status) }})
+      </p>
+      <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+        <input type="hidden" name="action" value="desvincular_agendamento" />
+        <button type="submit" class="btn-secondary btn-full">Remover vínculo</button>
+      </form>
+      {% elif agendamentos_cliente_vinculado %}
+      <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+        <input type="hidden" name="action" value="vincular_agendamento" />
+        <div class="form-group">
+          <select name="agendamento_id">
+            {% for ag in agendamentos_cliente_vinculado %}
+            <option value="{{ ag.id }}">
+              {{ ag.data.strftime('%d/%m/%Y') }} — {{ ag.servico.nome if ag.servico else '—' }}
+              ({{ dict(agendamento_status_labels).get(ag.status, ag.status) }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn-primary btn-full">Vincular agendamento</button>
+      </form>
+      {% elif cliente_vinculado %}
+      <p class="empty-state">O cliente vinculado ainda não tem nenhum agendamento.</p>
+      {% else %}
+      <p class="empty-state">Converta o lead em cliente primeiro pra poder vincular um agendamento.</p>
       {% endif %}
     </div>
     {% endif %}

@@ -1285,6 +1285,12 @@ class RenataRosaFunilLead(db.Model):
     # renata_rosa_bot/status_comercial.py::definir_status(), que também
     # grava o histórico em RenataRosaFunilStatusHistorico.
     status_comercial       = db.Column(db.String(30), default='novo_lead')
+    motivo_nao_convertido  = db.Column(db.Text, nullable=True)  # RN18 #12 — opcional, anotado pela atendente
+
+    # RN18 #8/9/10 — vínculo manual (a atendente escolhe) com o Agendamento
+    # real que nasceu desse lead; a Comanda (quando existir) vem de graça
+    # via Comanda.agendamento_id, não precisa de um 2º campo de vínculo.
+    agendamento_vinculado_id = db.Column(db.Integer, db.ForeignKey('agendamentos.id'), nullable=True)
 
     transcricao            = db.Column(db.Text, nullable=True)      # histórico bot/cliente pro resumo (RN14)
     resumo_enviado         = db.Column(db.Boolean, default=False)   # evita nota duplicada em retry
@@ -1295,6 +1301,7 @@ class RenataRosaFunilLead(db.Model):
     __table_args__ = (db.UniqueConstraint('lead_id', name='uq_rr_funil_lead'),)
 
     lead = db.relationship('Lead', backref=db.backref('funil_rr', uselist=False))
+    agendamento_vinculado = db.relationship('Agendamento')
 
 
 class RenataRosaFunilFoto(db.Model):
