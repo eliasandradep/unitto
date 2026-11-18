@@ -10,6 +10,13 @@ _CAMPOS_RESPOSTA = (
     'fluxo', 'servico_opcao_idx', 'servico_opcao_label', 'servico_identificado',
     'prazo_opcao', 'historico_cabelo_opcao', 'investimento_opcao',
     'avaliacao_opcao', 'agendamento_opcao', 'score_total', 'classificacao',
+    'topico_ativo',
+)
+
+_CAMPOS_PONTUACAO = (
+    'pt_servico_especifico', 'pt_resultado_desejado', 'pt_referencia_foto',
+    'pt_prazo_informado', 'pt_prazo_15dias', 'pt_perguntou_valores',
+    'pt_perguntou_disponibilidade', 'pt_pediu_humano_contratar', 'pt_intencao_agendar',
 )
 
 
@@ -30,11 +37,15 @@ def resetar_estado(estado):
     estado.estado_anterior = None
     estado.contador_nao_entendido = 0
     estado.resumo_enviado = False
+    estado.forcar_quente = False
     # transcricao NÃO é limpa — preserva o histórico completo da conversa
     # entre ciclos do funil (ex: reativação pós-handoff), só reseta as
-    # respostas pra um novo ciclo de qualificação poder gerar seu próprio resumo.
+    # respostas e as flags de pontuação pra um novo ciclo de qualificação
+    # poder gerar seu próprio score e resumo.
     for campo in _CAMPOS_RESPOSTA:
         setattr(estado, campo, None)
+    for campo in _CAMPOS_PONTUACAO:
+        setattr(estado, campo, False)
     db.session.commit()
 
 

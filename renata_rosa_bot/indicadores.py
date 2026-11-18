@@ -47,7 +47,7 @@ def calcular_indicadores(empresa):
                     if h.criado_em and seguinte.criado_em:
                         tempos_resposta_min.append((seguinte.criado_em - h.criado_em).total_seconds() / 60)
                     break
-        if any(s in ('agendamento_realizado', 'atendimento_realizado') for s in novos):
+        if any(s in ('agendamento_confirmado', 'servico_realizado') for s in novos):
             converteu_agendamento += 1
 
     compareceu = faltou = fechou_comanda = 0
@@ -76,7 +76,7 @@ def calcular_indicadores(empresa):
         {'nome': estado.lead.name or estado.lead.phone, 'motivo': estado.motivo_nao_convertido,
          'data': estado.atualizado_em}
         for estado in leads
-        if estado.status_comercial == 'nao_convertido' and estado.motivo_nao_convertido and estado.lead
+        if estado.status_comercial == 'perdido' and estado.motivo_nao_convertido and estado.lead
     ]
 
     return {

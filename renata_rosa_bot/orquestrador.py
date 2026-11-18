@@ -1,262 +1,145 @@
-"""Ponto de entrada do funil de qualificação da Renata Rosa — chamado pelo
-webhook do WhatsApp quando renata_rosa_bot.gating.funil_ativo(empresa) é True
-(ver meta_webhook/routes.py::_processar_turno_whatsapp). State machine 100%
-determinística por dígito — sem chamada a LLM/NLU (RN01-RN08 são todo menu
-numerado fixo; RN19 pede explicitamente "não inventar")."""
-import re
+"""Ponto de entrada do funil da Renata Rosa — Fase 5 (motor com NLU real,
+ver plano em C:\\Users\\elias\\.claude\\plans\\lovely-kindling-wind.md).
+Chamado pelo webhook do WhatsApp quando renata_rosa_bot.gating.funil_ativo
+(empresa) é True (ver meta_webhook/routes.py::_processar_turno_whatsapp).
 
-from models import db, RenataRosaFunilFoto
+Fase 5a cobre os tópicos SALAO e HUMANO de ponta a ponta. Os 4 tópicos de
+serviço (ILUMINAR/COR/TRATAMENTO/CORTE) ainda não têm qualificação própria
+por pergunta — a IA reconhece o interesse com empatia e oferece encaminhar
+pra equipe, pra nunca deixar a cliente travada esperando uma pergunta que
+ainda não existe (Fase 5b implementa a qualificação completa desses 4,
+reaproveitando renata_rosa_bot/fotos.py nesse momento)."""
+from models import db, Servico
 
-from . import mensagens, precos, pontuacao, handoff, fotos as fotos_mod, status_comercial
+from . import mensagens, menu as menu_mod, pontuacao, handoff, status_comercial, nlu
 from .estado import get_or_create_estado, resetar_estado, registrar_transcricao
+from ai_attendance.informacoes import texto_informacoes
 
-_RE_ATENDENTE = re.compile(r'(?i)atendente|humano|\bpessoa\b')
-_RE_MENU      = re.compile(r'(?i)^\s*(menu|voltar\s+ao\s+in[ií]cio|in[ií]cio)\s*$')
-_RE_CORRIGIR  = re.compile(r'(?i)corrigi|resposta\s+anterior')
-
-
-def _parse_opcao(mensagem, n_opcoes):
-    texto = (mensagem or '').strip()
-    if not texto.isdigit():
-        return None
-    idx = int(texto)
-    return idx if 1 <= idx <= n_opcoes else None
+_TOPICOS_SERVICO_SEM_FLUXO_PROPRIO = ('ILUMINAR', 'COR', 'TRATAMENTO', 'CORTE')
 
 
-def _texto_pergunta(empresa, estado):
-    if estado.estado == 'tipo_transformacao':
-        return mensagens.TIPO_TRANSFORMACAO
-    if estado.estado == 'prazo':
-        return mensagens.PRAZO
-    if estado.estado == 'historico_cabelo':
-        return mensagens.HISTORICO_CABELO
-    if estado.estado == 'investimento':
-        return mensagens.texto_investimento(precos.texto_investimento(empresa, estado.servico_opcao_idx))
-    if estado.estado == 'avaliacao':
-        return mensagens.AVALIACAO
-    if estado.estado == 'fotos':
-        return mensagens.FOTOS
-    if estado.estado == 'agendamento':
-        return mensagens.AGENDAMENTO
-    return mensagens.MENU_PRINCIPAL
+def _catalogo(empresa):
+    return Servico.query.filter_by(empresa_id=empresa.id, ativo=True).order_by(Servico.nome).all()
 
 
-def _nao_entendido(empresa, lead, estado):
-    """RN14: 2 respostas não reconhecidas seguidas transferem pra humano.
-    Na 1ª falha só repete a pergunta — sem penalizar a 1ª mensagem de um
-    contato novo (ex: 'Oi'), que nunca teve uma pergunta feita ainda."""
-    estado.contador_nao_entendido = (estado.contador_nao_entendido or 0) + 1
-    if estado.contador_nao_entendido >= 2:
-        db.session.commit()
-        return handoff.transferir(empresa, lead, estado, 'nao_entendido_2x', mensagens.HANDOFF_NAO_ENTENDIDO)
-    db.session.commit()
-    return [mensagens.NAO_ENTENDIDO, _texto_pergunta(empresa, estado)]
+def _aplicar_sinais(estado, resultado):
+    """Marca as flags de pontuação (seção 5.1) uma única vez por ciclo —
+    nunca desmarca sozinha, só o reset explícito do funil zera de novo."""
+    if resultado.get('servico_mencionado'):
+        estado.pt_servico_especifico = True
+        estado.servico_opcao_label = resultado['servico_mencionado'][:100]
+    if resultado.get('resultado_desejado'):
+        estado.pt_resultado_desejado = True
+        estado.resultado_desejado_texto = resultado['resultado_desejado'][:500]
+    if resultado.get('prazo_mencionado'):
+        estado.pt_prazo_informado = True
+        estado.prazo_texto = resultado['prazo_mencionado'][:200]
+        if resultado.get('prazo_ate_15_dias'):
+            estado.pt_prazo_15dias = True
+    if resultado.get('perguntou_valores'):
+        estado.pt_perguntou_valores = True
+    if resultado.get('perguntou_disponibilidade'):
+        estado.pt_perguntou_disponibilidade = True
+    if resultado.get('quer_humano') and estado.topico_ativo in _TOPICOS_SERVICO_SEM_FLUXO_PROPRIO:
+        # pediu atendente já estando numa qualificação de serviço = sinal de
+        # quem quer contratar, não só tirar dúvida (seção 5.1).
+        estado.pt_pediu_humano_contratar = True
+    if resultado.get('quer_agendar'):
+        estado.pt_intencao_agendar = True
+        estado.forcar_quente = True
 
 
-def _h_menu_principal(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 4)
-    if opcao is None:
-        # Nunca escala pra handoff a partir do menu principal — cobre tanto
-        # a 1ª mensagem de um contato novo (qualquer coisa que não é 1-4)
-        # quanto um "oi"/"bom dia" no meio do caminho; só reapresenta o menu.
-        return [mensagens.MENU_PRINCIPAL]
-    estado.contador_nao_entendido = 0
-
-    if opcao == 4:  # já sou cliente / outros assuntos — handoff direto, sem pontuação
-        if lead.status == 'novo':
-            lead.status = 'cliente_existente'
-        db.session.commit()
-        return handoff.transferir(empresa, lead, estado, 'ja_cliente', mensagens.HANDOFF_CLIENTE_EXISTENTE)
-
-    if opcao == 3:  # corte/tratamento/escova — fluxo simplificado (RN02)
-        estado.fluxo = 'corte_tratamento'
-        estado.servico_opcao_label = mensagens.CORTE_TRATAMENTO_LABEL
-        estado.servico_identificado = True
-        estado.estado_anterior = 'menu_principal'
-        estado.estado = 'prazo'
-        db.session.commit()
-        status_comercial.definir_status(estado, 'em_qualificacao')
-        return [mensagens.PRAZO]
-
-    estado.fluxo = 'mechas_coloracao'
-    estado.estado_anterior = 'menu_principal'
-    estado.estado = 'tipo_transformacao'
-    db.session.commit()
-    status_comercial.definir_status(estado, 'em_qualificacao')
-    return [mensagens.TIPO_TRANSFORMACAO]
-
-
-def _h_tipo_transformacao(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 5)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.servico_opcao_idx = opcao
-    estado.servico_opcao_label = mensagens._TIPO_TRANSFORMACAO_LABELS[opcao]
-    estado.servico_identificado = (opcao != 5)
-    estado.estado_anterior = 'tipo_transformacao'
-    estado.estado = 'prazo'
-    db.session.commit()
-    return [mensagens.PRAZO]
-
-
-def _h_prazo(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 4)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.prazo_opcao = opcao
-    estado.estado_anterior = 'prazo'
-    if estado.fluxo == 'corte_tratamento':
-        # RN02: fluxo simplificado pula histórico/investimento/avaliação
-        estado.estado = 'agendamento'
-        db.session.commit()
-        return [mensagens.AGENDAMENTO]
-    estado.estado = 'historico_cabelo'
-    db.session.commit()
-    return [mensagens.HISTORICO_CABELO]
-
-
-def _h_historico_cabelo(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 5)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.historico_cabelo_opcao = opcao
-    estado.estado_anterior = 'historico_cabelo'
-    estado.estado = 'investimento'
-    db.session.commit()
-    texto = mensagens.texto_investimento(precos.texto_investimento(empresa, estado.servico_opcao_idx))
-    return [texto]
-
-
-def _h_investimento(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 3)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.investimento_opcao = opcao
-    estado.estado_anterior = 'investimento'
-    estado.estado = 'avaliacao'
-    db.session.commit()
-    return [mensagens.AVALIACAO]
-
-
-def _h_avaliacao(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 3)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.avaliacao_opcao = opcao
-    estado.estado_anterior = 'avaliacao'
-    estado.estado = 'fotos'
-    db.session.commit()
-    return [mensagens.FOTOS]
-
-
-def _h_fotos(empresa, lead, estado, mensagem, media_id=None, media_mime_type=None, token=None):
-    """RN07 — sem menu numerado (único estado assim no funil). Imagem: baixa
-    e grava, continua nesse estado; qualquer texto: avança pra 'agendamento'
-    sem analisar o conteúdo — "ausência de foto não pode impedir a
-    continuidade" é satisfeito por desenho, não por uma opção de pular."""
-    if media_id:
-        if fotos_mod.limite_atingido(lead):
-            return [mensagens.FOTOS_LIMITE_ATINGIDO]
-        era_primeira = RenataRosaFunilFoto.query.filter_by(lead_id=lead.id).count() == 0
-        try:
-            fotos_mod.baixar_e_salvar(empresa, lead, media_id, media_mime_type, token)
-        except Exception:
-            return [mensagens.FOTO_FALHA_DOWNLOAD]
-        return [mensagens.FOTO_RECEBIDA_PRIMEIRA] if era_primeira else []
-
-    estado.estado_anterior = 'fotos'
-    estado.estado = 'agendamento'
-    db.session.commit()
-    return [mensagens.AGENDAMENTO]
-
-
-def _h_agendamento(empresa, lead, estado, mensagem):
-    opcao = _parse_opcao(mensagem, 3)
-    if opcao is None:
-        return _nao_entendido(empresa, lead, estado)
-    estado.contador_nao_entendido = 0
-    estado.agendamento_opcao = opcao
-
-    score, classificacao, _breakdown = pontuacao.calcular_pontuacao(estado)
+def _recalcular_score(estado):
+    score, classificacao, _ = pontuacao.calcular_pontuacao(estado)
     estado.score_total = score
-    estado.classificacao = classificacao
-    if lead.status not in ('convertido', 'perdido'):
-        lead.status = 'qualificado'
-    db.session.commit()
-    status_comercial.definir_status(estado, f'qualificado_{classificacao}')
-
-    # RN11/RN14: QUENTE transfere sempre; MORNO/FRIO também transferem se
-    # pediu agendamento ou quer conversar com atendente antes (opção 1 ou 2).
-    if classificacao == pontuacao.QUENTE or opcao in (1, 2):
-        return handoff.transferir(empresa, lead, estado, 'qualificacao_completa', mensagens.HANDOFF_QUALIFICACAO)
-
-    estado.estado = 'concluido'
-    db.session.commit()
-    return [mensagens.MORNO_FINAL if classificacao == pontuacao.MORNO else mensagens.FRIO_FINAL]
-
-
-_HANDLERS = {
-    'menu_principal':     _h_menu_principal,
-    'tipo_transformacao': _h_tipo_transformacao,
-    'prazo':              _h_prazo,
-    'historico_cabelo':   _h_historico_cabelo,
-    'investimento':       _h_investimento,
-    'avaliacao':          _h_avaliacao,
-    'fotos':              _h_fotos,
-    'agendamento':        _h_agendamento,
-}
+    estado.classificacao = pontuacao.QUENTE if estado.forcar_quente else classificacao
 
 
 def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=None, media_mime_type=None) -> list:
-    """Retorna a lista de textos a enviar ao cliente, em ordem. `token`/
-    `media_id`/`media_mime_type` só são usados no estado 'fotos' (RN07) —
-    opcionais pra manter chamadas antigas/diretas (testes) funcionando."""
+    """Retorna a lista de textos a enviar à cliente, em ordem."""
     estado = get_or_create_estado(empresa, lead)
 
-    # Funil já tinha concluído (transferido ou finalizado morno/frio) — uma
-    # nova mensagem é um novo atendimento, não a continuação de algo fechado.
+    # Funil já tinha concluído (transferido) — uma nova mensagem é um novo
+    # atendimento, não a continuação de algo fechado.
     if estado.estado == 'concluido':
         resetar_estado(estado)
         status_comercial.definir_status(estado, 'novo_lead')
 
-    # RN15/RN16: lead marcado 'sem_resposta' (job periódico) que volta a
-    # escrever retoma o fluxo de onde parou (se ainda não foi resetado
-    # acima) — não é mais "sem resposta".
-    if estado.status_comercial == 'sem_resposta':
-        status_comercial.definir_status(estado, 'em_qualificacao')
+    # Lead que a própria IA já marcou 'sem_interesse' reengaja sozinho — só
+    # 'perdido'/outros status manuais ficam protegidos, não reabrem sozinhos
+    # (ver STATUS_MANUAIS em status_comercial.py).
+    if estado.status_comercial == 'sem_interesse':
+        status_comercial.definir_status(estado, 'em_atendimento_ia')
 
-    # Escape hatch pra humano, disponível em qualquer etapa (RN14/RN19).
-    if _RE_ATENDENTE.search(mensagem or ''):
-        textos = handoff.transferir(empresa, lead, estado, 'pedido_humano', mensagens.HANDOFF_PEDIDO_HUMANO)
-        registrar_transcricao(estado, bot=textos, cliente=mensagem)
+    registrar_transcricao(estado, cliente=mensagem)
+
+    opcoes = menu_mod.opcoes_ativas(empresa)
+    servicos = _catalogo(empresa)
+    info_texto = texto_informacoes(empresa)
+    system_prompt = nlu.montar_system_prompt(empresa, estado, opcoes, servicos, info_texto)
+    try:
+        resultado = nlu.classificar(system_prompt, mensagem)
+    except nlu.NLUError:
+        resultado = nlu.classificar_fallback_regex(mensagem)
+
+    # Prioridades (seção 5.3) — sempre antes do score/tópico, e
+    # independentes de qualquer coisa que a cliente já tenha respondido.
+    if resultado.get('tem_reclamacao') or resultado.get('quer_humano'):
+        textos = handoff.transferir(empresa, lead, estado, 'pedido_ou_reclamacao', mensagens.HANDOFF_PADRAO)
+        registrar_transcricao(estado, bot=textos)
         return textos
 
-    # Voltar ao menu principal (RN19).
-    if _RE_MENU.match(mensagem or ''):
-        resetar_estado(estado)
-        status_comercial.definir_status(estado, 'novo_lead')
-        textos = [mensagens.MENU_PRINCIPAL]
-        registrar_transcricao(estado, bot=textos, cliente=mensagem)
+    _aplicar_sinais(estado, resultado)
+    _recalcular_score(estado)
+    db.session.commit()
+
+    if resultado.get('demonstrou_desinteresse'):
+        status_comercial.definir_status(estado, 'sem_interesse')
+        textos = [mensagens.DESINTERESSE_FINAL]
+        registrar_transcricao(estado, bot=textos)
         return textos
 
-    # Corrigir a resposta anterior (RN19).
-    if _RE_CORRIGIR.search(mensagem or '') and estado.estado_anterior:
-        estado.estado, estado.estado_anterior = estado.estado_anterior, None
+    # Lead Quente (seção 5.2) transfere sempre — seja por pontuação natural
+    # (score >= 60) ou por override explícito (forcar_quente, seção 5.3) —
+    # "evitar perguntas adicionais desnecessárias, notificar a equipe".
+    if estado.classificacao == pontuacao.QUENTE or estado.forcar_quente:
+        textos = handoff.transferir(empresa, lead, estado, 'lead_quente', mensagens.HANDOFF_PADRAO)
+        registrar_transcricao(estado, bot=textos)
+        return textos
+
+    topico = resultado.get('topico') or 'OUTRO'
+    if topico == 'OUTRO' and estado.topico_ativo:
+        topico = estado.topico_ativo  # continua o assunto em vez de voltar ao menu sozinha
+
+    if topico == 'HUMANO':
+        textos = handoff.transferir(empresa, lead, estado, 'pedido_humano', mensagens.HANDOFF_PADRAO)
+        registrar_transcricao(estado, bot=textos)
+        return textos
+
+    if topico == 'SALAO':
+        estado.topico_ativo = 'SALAO'
+        status_comercial.definir_status(estado, 'em_atendimento_ia')
         db.session.commit()
-        textos = [_texto_pergunta(empresa, estado)]
-        registrar_transcricao(estado, bot=textos, cliente=mensagem)
+        textos = [info_texto or mensagens.SALAO_SEM_INFO, mensagens.SALAO_PERGUNTA_FINAL]
+        registrar_transcricao(estado, bot=textos)
         return textos
 
-    handler = _HANDLERS.get(estado.estado, _h_menu_principal)
-    if estado.estado == 'fotos':
-        textos = handler(empresa, lead, estado, mensagem,
-                          media_id=media_id, media_mime_type=media_mime_type, token=token)
-    else:
-        textos = handler(empresa, lead, estado, mensagem)
-    registrar_transcricao(estado, bot=textos, cliente=mensagem)
+    if topico in _TOPICOS_SERVICO_SEM_FLUXO_PROPRIO:
+        estado.topico_ativo = topico
+        status_comercial.definir_status(estado, 'em_atendimento_ia')
+        db.session.commit()
+        resposta_ia = (resultado.get('resposta_ao_cliente') or '').strip()
+        textos = [resposta_ia or mensagens.TOPICO_RECEBIDO_GENERICO, mensagens.OFERECER_ENCAMINHAR]
+        registrar_transcricao(estado, bot=textos)
+        return textos
+
+    # OUTRO sem tópico ativo — responde dúvida pontual (se houver) e
+    # reapresenta o menu principal.
+    textos = []
+    pergunta_direta = (resultado.get('pergunta_direta') or '').strip()
+    resposta_ia = (resultado.get('resposta_ao_cliente') or '').strip()
+    if pergunta_direta and resposta_ia:
+        textos.append(resposta_ia)
+    textos.append(menu_mod.menu_texto(empresa))
+    registrar_transcricao(estado, bot=textos)
     return textos

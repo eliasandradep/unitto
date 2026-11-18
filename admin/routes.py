@@ -36,6 +36,8 @@ from ai_attendance.informacoes import get_or_create_info, atualizar_info
 from renata_rosa_bot.gating import funil_ativo as rr_funil_ativo
 from renata_rosa_bot.status_comercial import definir_status as rr_definir_status_comercial
 from renata_rosa_bot.indicadores import calcular_indicadores as rr_calcular_indicadores
+from renata_rosa_bot.menu import (get_or_create_menu_config as rr_get_or_create_menu_config,
+                                   atualizar_opcoes as rr_atualizar_opcoes)
 import meta_client
 from crypto_utils import encrypt_token
 
@@ -928,13 +930,18 @@ def atendimento_ia():
                 db.session.commit()
                 flash('Funil de qualificação ' +
                       ('ativado.' if empresa.funil_qualificacao_rr_ativo else 'desativado.'), 'success')
+        elif section == 'funil_rr_menu':
+            if empresa.slug == 'renatarosa':
+                rr_atualizar_opcoes(empresa, request.form)
+                flash('Menu do funil de qualificação atualizado.', 'success')
         return redirect(url_for('admin.atendimento_ia'))
 
     menu_config = get_or_create_menu_config(empresa)
     info = get_or_create_info(empresa)
     tem_whatsapp_conectado = tq(IntegracaoMeta).filter_by(canal='whatsapp', status='conectado').first() is not None
+    rr_menu_config = rr_get_or_create_menu_config(empresa) if empresa.slug == 'renatarosa' else None
     return render_template('admin/atendimento_ia.html', empresa=empresa, menu_config=menu_config, info=info,
-                            tem_whatsapp_conectado=tem_whatsapp_conectado)
+                            tem_whatsapp_conectado=tem_whatsapp_conectado, rr_menu_config=rr_menu_config)
 
 
 @admin_bp.route('/integracoes/meta/conectar/<canal>')

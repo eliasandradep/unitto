@@ -1236,17 +1236,57 @@ class AtendimentoIAEvento(db.Model):
 
 STATUS_COMERCIAL_RR = [
     ('novo_lead',                     'Novo lead'),
+    ('em_atendimento_ia',             'Em atendimento pela IA'),
     ('em_qualificacao',               'Em qualificação'),
-    ('qualificado_quente',            'Qualificado — quente'),
-    ('qualificado_morno',             'Qualificado — morno'),
-    ('qualificado_frio',              'Qualificado — frio'),
+    ('aguardando_cliente',            'Aguardando cliente'),
     ('aguardando_atendimento_humano', 'Aguardando atendimento humano'),
-    ('em_negociacao',                 'Em negociação'),
-    ('agendamento_realizado',         'Agendamento realizado'),
-    ('atendimento_realizado',         'Atendimento realizado'),
-    ('nao_convertido',                'Não convertido'),
-    ('sem_resposta',                  'Sem resposta'),
+    ('em_atendimento_humano',         'Em atendimento humano'),
+    ('agendamento_confirmado',        'Agendamento confirmado pela equipe'),
+    ('servico_realizado',             'Serviço realizado'),
+    ('perdido',                       'Perdido'),
+    ('sem_interesse',                 'Sem interesse'),
 ]
+# Substitui a lista anterior (Fase 3) pelos 10 nomes da especificação
+# funcional (Fase 5) — classificação quente/morno/frio (`classificacao`)
+# já era e continua sendo um campo independente deste.
+
+INTENTS_MENU_RR = [
+    ('ILUMINAR',   '✨ Quero iluminar meu visual'),
+    ('COR',        '🎨 Quero renovar minha cor'),
+    ('TRATAMENTO', '💆‍♀️ Quero recuperar meus cabelos'),
+    ('CORTE',      '✂️ Quero mudar meu corte'),
+    ('SALAO',      '💖 Quero conhecer o salão'),
+    ('HUMANO',     '💬 Quero falar com uma especialista'),
+]
+
+
+class RenataRosaMenuConfig(db.Model):
+    """Menu principal configurável do funil da Renata Rosa (Fase 5) — mesmo
+    padrão de AtendimentoIAMenuConfig (ai_attendance/menu.py), tabela própria
+    pra manter o isolamento do motor genérico. 1:1 com Empresa."""
+    __tablename__ = 'renata_rosa_menu_config'
+    id         = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False, unique=True)
+    titulo     = db.Column(db.Text)  # mensagem de boas-vindas completa (não só um título curto)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    opcoes = db.relationship('RenataRosaMenuOpcao', backref='menu_config',
+                              cascade='all, delete-orphan', order_by='RenataRosaMenuOpcao.ordem')
+
+
+class RenataRosaMenuOpcao(db.Model):
+    """Uma opção do menu principal do funil da Renata Rosa. `intent` é a
+    chave interna fixa (um dos valores de INTENTS_MENU_RR) — nunca editável
+    pelo tenant; `label`/`ordem`/`ativo` são o que o painel admin edita."""
+    __tablename__ = 'renata_rosa_menu_opcoes'
+    id             = db.Column(db.Integer, primary_key=True)
+    menu_config_id = db.Column(db.Integer, db.ForeignKey('renata_rosa_menu_config.id'), nullable=False)
+    intent         = db.Column(db.String(20), nullable=False)
+    label          = db.Column(db.String(150), nullable=False)
+    ordem          = db.Column(db.Integer, default=0)
+    ativo          = db.Column(db.Boolean, default=True)
+
+    __table_args__ = (db.UniqueConstraint('menu_config_id', 'intent', name='uq_rr_menu_opcao_intent'),)
 
 
 class RenataRosaFunilLead(db.Model):
@@ -1277,10 +1317,34 @@ class RenataRosaFunilLead(db.Model):
 
     contador_nao_entendido = db.Column(db.Integer, default=0)       # RN14: 2x seguidas -> handoff
 
+    # Fase 5 — motor com NLU real. `topico_ativo` substitui `fluxo`/`estado`
+    # acima (mantidos sem uso novo, só por compatibilidade aditiva de banco)
+    # como a fonte de verdade de em qual dos 6 tópicos do menu (INTENTS_MENU_RR)
+    # a conversa está, ou None = ainda no menu principal.
+    topico_ativo           = db.Column(db.String(20), nullable=True)
+    forcar_quente          = db.Column(db.Boolean, default=False)  # RN seção 5.3: pedido explícito de agendar => Quente, não importa o score
+
+    # Flags de pontuação (seção 5.1) — cada critério conta 1x por ciclo de
+    # qualificação; zeradas no reset (ver estado.py::resetar_estado).
+    pt_servico_especifico        = db.Column(db.Boolean, default=False)  # +15
+    pt_resultado_desejado        = db.Column(db.Boolean, default=False)  # +10
+    pt_referencia_foto           = db.Column(db.Boolean, default=False)  # +10
+    pt_prazo_informado           = db.Column(db.Boolean, default=False)  # +15
+    pt_prazo_15dias              = db.Column(db.Boolean, default=False)  # +20
+    pt_perguntou_valores         = db.Column(db.Boolean, default=False)  # +10
+    pt_perguntou_disponibilidade = db.Column(db.Boolean, default=False)  # +20
+    pt_pediu_humano_contratar    = db.Column(db.Boolean, default=False)  # +25
+    pt_intencao_agendar          = db.Column(db.Boolean, default=False)  # +30
+
+    # Texto livre extraído pela NLU (não pontuação em si, usado no resumo
+    # pra recepcionista, seção 8).
+    resultado_desejado_texto = db.Column(db.Text, nullable=True)
+    prazo_texto              = db.Column(db.Text, nullable=True)
+
     score_total            = db.Column(db.Integer, nullable=True)   # RN09, sempre recalculado do zero
     classificacao          = db.Column(db.String(10), nullable=True)  # 'quente'|'morno'|'frio'
 
-    # RN15 — status comercial (pipeline de 11 estágios), independente de
+    # Status comercial (ver STATUS_COMERCIAL_RR), independente de
     # `classificacao` acima. Só muda através de
     # renata_rosa_bot/status_comercial.py::definir_status(), que também
     # grava o histórico em RenataRosaFunilStatusHistorico.

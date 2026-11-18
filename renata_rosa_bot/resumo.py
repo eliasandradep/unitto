@@ -1,57 +1,53 @@
-"""RN14 — resumo estruturado entregue à atendente. Nesta fase, "entregue"
-significa gravado em Lead.notes (reaproveitando exatamente o mecanismo de
-nota com timestamp já usado por admin/routes.py::lead_detail()) — aparece
-automaticamente no card "Anotações" da tela de detalhe do Lead, sem precisar
-de nenhuma notificação por e-mail/push/WhatsApp (decisão aprovada)."""
+"""Resumo pra recepcionista (seção 8 da especificação) — entregue via
+Lead.notes (reaproveitando o mecanismo de nota com timestamp já usado por
+admin/routes.py::lead_detail()), aparece automaticamente no card
+"Anotações" da tela de detalhe do Lead, sem notificação externa (decisão
+aprovada na Fase 1, mantida)."""
 from datetime import datetime
 
 from models import db, LEAD_SOURCES
 
-_LABELS_PRAZO = {
-    1: 'Nesta semana', 2: 'Nos próximos 15 dias',
-    3: 'Ainda neste mês', 4: 'Estou apenas pesquisando',
-}
-_LABELS_HISTORICO = {
-    1: 'Cabelo natural, sem química', 2: 'Já tenho mechas ou luzes',
-    3: 'Tenho coloração', 4: 'Fiz progressiva ou outro alisamento',
-    5: 'Não tenho certeza / preciso de orientação',
-}
-_LABELS_INVESTIMENTO = {
-    1: 'Dentro do que procura', 2: 'Precisa entender melhor os valores',
-    3: 'Fora do orçamento neste momento',
-}
-_LABELS_AVALIACAO = {
-    1: 'Sim, gostaria', 2: 'Precisa confirmar', 3: 'Não neste momento',
-}
-_LABELS_AGENDAMENTO = {
-    1: 'Sim, quer agendar', 2: 'Quer conversar com atendente antes',
-    3: 'Ainda não quer agendar',
-}
+from . import pontuacao as _pontuacao_mod
+
+# Da mais forte pra mais fraca — usada só pra escolher uma frase de
+# justificativa representativa, não pro cálculo do score em si.
+_JUSTIFICATIVAS = (
+    ('pt_intencao_agendar',          'demonstrou intenção explícita de agendar'),
+    ('pt_pediu_humano_contratar',    'pediu para falar com a equipe para contratar'),
+    ('pt_perguntou_disponibilidade', 'perguntou disponibilidade de horário'),
+    ('pt_prazo_15dias',              'pretende realizar em até 15 dias'),
+    ('pt_prazo_informado',           'informou prazo para realização'),
+    ('pt_perguntou_valores',         'perguntou valores ou condições'),
+    ('pt_referencia_foto',           'compartilhou referência ou foto'),
+    ('pt_resultado_desejado',        'descreveu o resultado desejado'),
+    ('pt_servico_especifico',        'identificou serviço específico'),
+)
 
 
-def _label(mapa, opcao):
-    return mapa.get(opcao, 'Não informado') if opcao else 'Não informado'
+def _justificativa(estado):
+    motivos = [texto for campo, texto in _JUSTIFICATIVAS if getattr(estado, campo, False)]
+    if estado.forcar_quente and 'demonstrou intenção explícita de agendar' not in motivos:
+        motivos.insert(0, 'pediu para agendar')
+    return '; '.join(motivos) if motivos else 'interesse exploratório, sem sinal comercial forte'
 
 
 def montar_resumo(lead, estado, empresa):
     agora = datetime.now().strftime('%d/%m/%Y %H:%M')
-    entrada = (estado.criado_em or lead.created_at)
-    entrada_fmt = entrada.strftime('%d/%m/%Y %H:%M') if entrada else 'não registrada'
     origem = dict(LEAD_SOURCES).get(lead.source, lead.source)
+    score, classificacao, _ = _pontuacao_mod.calcular_pontuacao(estado)
+    classificacao_final = _pontuacao_mod.QUENTE if estado.forcar_quente else classificacao
 
     linhas = [
-        f'Funil Renata Rosa — classificação: {(estado.classificacao or "não calculada").upper()} '
-        f'(score {estado.score_total if estado.score_total is not None else "-"}/100)',
+        f'Nova oportunidade — Lead {classificacao_final.upper()}',
         f'Nome: {lead.name or "não informado"}',
         f'WhatsApp: {lead.phone or "não informado"}',
         f'Origem: {origem}',
-        f'Serviço desejado: {estado.servico_opcao_label or "não informado"}',
-        f'Prazo desejado: {_label(_LABELS_PRAZO, estado.prazo_opcao)}',
-        f'Histórico capilar: {_label(_LABELS_HISTORICO, estado.historico_cabelo_opcao)}',
-        f'Compatibilidade de investimento: {_label(_LABELS_INVESTIMENTO, estado.investimento_opcao)}',
-        f'Interesse em avaliação: {_label(_LABELS_AVALIACAO, estado.avaliacao_opcao)}',
-        f'Intenção de agendamento: {_label(_LABELS_AGENDAMENTO, estado.agendamento_opcao)}',
-        f'Entrada no funil: {entrada_fmt}',
+        f'Serviço: {estado.servico_opcao_label or "não identificado"}',
+        f'Objetivo: {estado.resultado_desejado_texto or "não informado"}',
+        f'Prazo: {estado.prazo_texto or "não informado"}',
+        f'Score: {score}/100',
+        f'Motivo da classificação: {_justificativa(estado)}',
+        f'Status: Aguardando atendimento humano',
         '',
         '--- Histórico da conversa ---',
         estado.transcricao or '(sem transcrição)',

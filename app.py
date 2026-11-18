@@ -491,6 +491,15 @@ with app.app_context():
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('renata_rosa_funil_leads', 'motivo_nao_convertido', 'TEXT')
     _safe_add_col('renata_rosa_funil_leads', 'agendamento_vinculado_id', 'INTEGER')
+    _safe_add_col('renata_rosa_funil_leads', 'topico_ativo', 'VARCHAR(20)')
+    _safe_add_col('renata_rosa_funil_leads', 'forcar_quente',
+                  'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    for _col in ('pt_servico_especifico', 'pt_resultado_desejado', 'pt_referencia_foto',
+                 'pt_prazo_informado', 'pt_prazo_15dias', 'pt_perguntou_valores',
+                 'pt_perguntou_disponibilidade', 'pt_pediu_humano_contratar', 'pt_intencao_agendar'):
+        _safe_add_col('renata_rosa_funil_leads', _col, 'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('renata_rosa_funil_leads', 'resultado_desejado_texto', 'TEXT')
+    _safe_add_col('renata_rosa_funil_leads', 'prazo_texto', 'TEXT')
     _safe_add_col('contas_pagar',   'categoria_id', 'INTEGER')
     _safe_add_col('contas_receber', 'categoria_id', 'INTEGER')
     _safe_add_col('contas_pagar',   'unidade_id',   'INTEGER')
@@ -687,15 +696,15 @@ def _sincronizar_todas_contas_ads():
                 app.logger.exception('Falha ao sincronizar conta de anúncios %s', integ.id)
 
 
-def _marcar_leads_rr_sem_resposta():
-    """RN15 (funil bespoke da Renata Rosa) — marca 'sem_resposta' quem ficou
+def _marcar_leads_rr_aguardando_cliente():
+    """Funil bespoke da Renata Rosa — marca 'aguardando_cliente' quem ficou
     parado demais num status ativo. Ver renata_rosa_bot/status_comercial.py."""
     with app.app_context():
-        from renata_rosa_bot.status_comercial import marcar_sem_resposta
+        from renata_rosa_bot.status_comercial import marcar_leads_aguardando_cliente
         try:
-            marcar_sem_resposta()
+            marcar_leads_aguardando_cliente()
         except Exception:
-            app.logger.exception('Falha ao marcar leads sem resposta (Renata Rosa)')
+            app.logger.exception('Falha ao marcar leads aguardando cliente (Renata Rosa)')
 
 
 # Evita registrar o job duas vezes por causa do reloader do Flask em dev
@@ -704,7 +713,7 @@ def _marcar_leads_rr_sem_resposta():
 if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.add_job(_sincronizar_todas_contas_ads, 'cron', hour=6, minute=0)
-    _scheduler.add_job(_marcar_leads_rr_sem_resposta, 'interval', hours=1)
+    _scheduler.add_job(_marcar_leads_rr_aguardando_cliente, 'interval', hours=1)
     _scheduler.start()
 
 

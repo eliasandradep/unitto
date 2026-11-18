@@ -59,6 +59,54 @@
     <button type="submit" class="btn-primary">Salvar</button>
   </form>
 </div>
+
+{% if rr_menu_config %}
+<div class="card" style="max-width:680px;margin-bottom:1.5rem">
+  <div class="card__header">
+    <h3>Menu principal do funil de qualificação</h3>
+  </div>
+  <form method="POST" action="{{ url_for('admin.atendimento_ia') }}">
+    <input type="hidden" name="section" value="funil_rr_menu" />
+    <div class="form-group">
+      <label>Mensagem de boas-vindas</label>
+      <textarea name="titulo" rows="4" style="width:100%">{{ rr_menu_config.titulo }}</textarea>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead>
+        <tr style="text-align:left;border-bottom:1px solid var(--border)">
+          <th style="padding:.4rem .3rem">Opção</th>
+          <th style="padding:.4rem .3rem">Texto exibido</th>
+          <th style="padding:.4rem .3rem;width:70px">Ordem</th>
+          <th style="padding:.4rem .3rem;width:60px">Ativa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for opcao in rr_menu_config.opcoes|sort(attribute='ordem') %}
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.4rem .3rem;color:var(--text-muted)">
+            <code style="font-size:.75rem">{{ opcao.intent }}</code>
+          </td>
+          <td style="padding:.4rem .3rem">
+            <input type="text" name="label_{{ opcao.intent }}" value="{{ opcao.label }}" style="width:100%" />
+          </td>
+          <td style="padding:.4rem .3rem">
+            <input type="number" name="ordem_{{ opcao.intent }}" value="{{ opcao.ordem }}" min="0" style="width:100%" />
+          </td>
+          <td style="padding:.4rem .3rem;text-align:center">
+            <input type="checkbox" name="ativo_{{ opcao.intent }}" {{ 'checked' if opcao.ativo else '' }} />
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:1rem">
+      <button type="submit" class="btn-primary">Salvar menu</button>
+    </div>
+  </form>
+</div>
+{% endif %}
 {% endif %}
 
 {# ── Menu ─────────────────────────────────────────────────────────────────── #}

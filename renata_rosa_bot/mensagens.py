@@ -132,3 +132,37 @@ HANDOFF_NAO_ENTENDIDO = (
 )
 
 NAO_ENTENDIDO = 'Não entendi 😅 Digite o número de uma das opções acima.'
+
+# ── Fase 5 — motor com NLU real (ver renata_rosa_bot/nlu.py) ────────────────
+# Textos acima (RN01-RN14) ficam só pra renata_rosa_bot/fotos.py, que
+# continua reaproveitado sem mudança estrutural (D7 do plano da Fase 5).
+
+MENU_INTRO_PADRAO = (
+    'Oi! 💕 Seja muito bem-vinda ao Renata Rosa Beauty Concept!\n\n'
+    'Sou a assistente virtual do salão e estou aqui para te ajudar a encontrar '
+    'o cuidado ideal para seus cabelos. ✨\n\n'
+    'Me conta o que você gostaria de fazer hoje!'
+)
+
+HANDOFF_PADRAO = (
+    'Perfeito! 💕 Vou encaminhar nossa conversa para a equipe do Renata Rosa '
+    'Beauty Concept, que poderá te orientar sobre valores, disponibilidade e '
+    'os próximos passos. ✨'
+)
+
+SALAO_PERGUNTA_FINAL = 'Qual desses cuidados combina mais com o que você está procurando neste momento?'
+SALAO_SEM_INFO = (
+    'Ainda não tenho essas informações cadastradas por aqui. Posso te '
+    'transferir para uma especialista, se preferir.'
+)
+
+DESINTERESSE_FINAL = (
+    'Claro! 💕 Pode pesquisar com tranquilidade. Se quiser, posso te mostrar '
+    'algumas opções para você se inspirar quando quiser. 😊'
+)
+
+TOPICO_RECEBIDO_GENERICO = 'Adorei saber um pouquinho do que você procura! 💕'
+OFERECER_ENCAMINHAR = (
+    'Quer que eu encaminhe suas informações para nossa equipe conversar com '
+    'você sobre os próximos passos?'
+)

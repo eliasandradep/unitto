@@ -64,21 +64,19 @@ def test_taxa_transferencia_e_conversao_em_agendamento_via_historico():
 
     l1 = _lead_simples(empresa)
     e1 = _funil(empresa, l1, classificacao='quente', status_comercial='aguardando_atendimento_humano')
-    _historico(e1, 'em_qualificacao', 'qualificado_quente', agora)
-    _historico(e1, 'qualificado_quente', 'aguardando_atendimento_humano', agora)
+    _historico(e1, 'em_qualificacao', 'aguardando_atendimento_humano', agora)
 
     l2 = _lead_simples(empresa)
-    e2 = _funil(empresa, l2, classificacao='morno', status_comercial='agendamento_realizado')
-    _historico(e2, 'em_qualificacao', 'qualificado_morno', agora)
-    _historico(e2, 'qualificado_morno', 'aguardando_atendimento_humano', agora)
-    _historico(e2, 'aguardando_atendimento_humano', 'agendamento_realizado', agora)
+    e2 = _funil(empresa, l2, classificacao='morno', status_comercial='agendamento_confirmado')
+    _historico(e2, 'em_qualificacao', 'aguardando_atendimento_humano', agora)
+    _historico(e2, 'aguardando_atendimento_humano', 'agendamento_confirmado', agora)
 
     l3 = _lead_simples(empresa)
     _funil(empresa, l3, classificacao='frio', status_comercial='concluido')  # nunca transferido
 
     ind = calcular_indicadores(empresa)
     assert ind['taxa_transferencia_humana'] == round(100 * 2 / 3, 1)  # l1 e l2 passaram por aguardando_humano
-    assert ind['taxa_conversao_agendamento'] == round(100 * 1 / 3, 1)  # só l2 chegou a agendamento_realizado
+    assert ind['taxa_conversao_agendamento'] == round(100 * 1 / 3, 1)  # só l2 chegou a agendamento_confirmado
 
 
 def test_tempo_medio_de_resposta_proxy():
@@ -88,12 +86,12 @@ def test_tempo_medio_de_resposta_proxy():
     l1 = _lead_simples(empresa)
     e1 = _funil(empresa, l1)
     _historico(e1, 'em_qualificacao', 'aguardando_atendimento_humano', agora)
-    _historico(e1, 'aguardando_atendimento_humano', 'em_negociacao', agora + timedelta(minutes=30))
+    _historico(e1, 'aguardando_atendimento_humano', 'em_atendimento_humano', agora + timedelta(minutes=30))
 
     l2 = _lead_simples(empresa)
     e2 = _funil(empresa, l2)
     _historico(e2, 'em_qualificacao', 'aguardando_atendimento_humano', agora)
-    _historico(e2, 'aguardando_atendimento_humano', 'nao_convertido', agora + timedelta(minutes=90))
+    _historico(e2, 'aguardando_atendimento_humano', 'perdido', agora + timedelta(minutes=90))
 
     l3 = _lead_simples(empresa)  # nunca foi transferido -> não entra na média
     _funil(empresa, l3)
@@ -229,7 +227,7 @@ def test_motivo_nao_conversao_salvo_via_admin_aparece_nos_indicadores(client):
     client.post('/admin/login', data={'email': user.email, 'password': 'senha123'}, follow_redirects=True)
 
     client.post(f'/admin/leads/{lead.id}', data={
-        'action': 'update_status_comercial', 'status_comercial': 'nao_convertido',
+        'action': 'update_status_comercial', 'status_comercial': 'perdido',
         'motivo': 'Achou o preço alto',
     }, follow_redirects=True)
 
