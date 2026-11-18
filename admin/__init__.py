@@ -39,7 +39,7 @@ _CATALOGO_ENDPOINTS = frozenset({
 _ADMIN_ONLY_ENDPOINTS = frozenset({
     'dashboard', 'dashboard_faturamento',
     'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete', 'lead_marcar_pessoal',
-    'lead_marcar_spam',
+    'lead_marcar_spam', 'lead_foto_serve',
     'users', 'user_new', 'user_edit', 'user_delete',
     'metrics',
     'configuracoes',

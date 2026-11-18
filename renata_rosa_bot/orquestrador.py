@@ -5,9 +5,9 @@ determinística por dígito — sem chamada a LLM/NLU (RN01-RN08 são todo menu
 numerado fixo; RN19 pede explicitamente "não inventar")."""
 import re
 
-from models import db
+from models import db, RenataRosaFunilFoto
 
-from . import mensagens, precos, pontuacao, handoff
+from . import mensagens, precos, pontuacao, handoff, fotos as fotos_mod
 from .estado import get_or_create_estado, resetar_estado, registrar_transcricao
 
 _RE_ATENDENTE = re.compile(r'(?i)atendente|humano|\bpessoa\b')
@@ -34,6 +34,8 @@ def _texto_pergunta(empresa, estado):
         return mensagens.texto_investimento(precos.texto_investimento(empresa, estado.servico_opcao_idx))
     if estado.estado == 'avaliacao':
         return mensagens.AVALIACAO
+    if estado.estado == 'fotos':
+        return mensagens.FOTOS
     if estado.estado == 'agendamento':
         return mensagens.AGENDAMENTO
     return mensagens.MENU_PRINCIPAL
@@ -145,6 +147,27 @@ def _h_avaliacao(empresa, lead, estado, mensagem):
     estado.contador_nao_entendido = 0
     estado.avaliacao_opcao = opcao
     estado.estado_anterior = 'avaliacao'
+    estado.estado = 'fotos'
+    db.session.commit()
+    return [mensagens.FOTOS]
+
+
+def _h_fotos(empresa, lead, estado, mensagem, media_id=None, media_mime_type=None, token=None):
+    """RN07 — sem menu numerado (único estado assim no funil). Imagem: baixa
+    e grava, continua nesse estado; qualquer texto: avança pra 'agendamento'
+    sem analisar o conteúdo — "ausência de foto não pode impedir a
+    continuidade" é satisfeito por desenho, não por uma opção de pular."""
+    if media_id:
+        if fotos_mod.limite_atingido(lead):
+            return [mensagens.FOTOS_LIMITE_ATINGIDO]
+        era_primeira = RenataRosaFunilFoto.query.filter_by(lead_id=lead.id).count() == 0
+        try:
+            fotos_mod.baixar_e_salvar(empresa, lead, media_id, media_mime_type, token)
+        except Exception:
+            return [mensagens.FOTO_FALHA_DOWNLOAD]
+        return [mensagens.FOTO_RECEBIDA_PRIMEIRA] if era_primeira else []
+
+    estado.estado_anterior = 'fotos'
     estado.estado = 'agendamento'
     db.session.commit()
     return [mensagens.AGENDAMENTO]
@@ -181,12 +204,15 @@ _HANDLERS = {
     'historico_cabelo':   _h_historico_cabelo,
     'investimento':       _h_investimento,
     'avaliacao':          _h_avaliacao,
+    'fotos':              _h_fotos,
     'agendamento':        _h_agendamento,
 }
 
 
-def processar_mensagem(empresa, lead, telefone, mensagem) -> list:
-    """Retorna a lista de textos a enviar ao cliente, em ordem."""
+def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=None, media_mime_type=None) -> list:
+    """Retorna a lista de textos a enviar ao cliente, em ordem. `token`/
+    `media_id`/`media_mime_type` só são usados no estado 'fotos' (RN07) —
+    opcionais pra manter chamadas antigas/diretas (testes) funcionando."""
     estado = get_or_create_estado(empresa, lead)
 
     # Funil já tinha concluído (transferido ou finalizado morno/frio) — uma
@@ -216,6 +242,10 @@ def processar_mensagem(empresa, lead, telefone, mensagem) -> list:
         return textos
 
     handler = _HANDLERS.get(estado.estado, _h_menu_principal)
-    textos = handler(empresa, lead, estado, mensagem)
+    if estado.estado == 'fotos':
+        textos = handler(empresa, lead, estado, mensagem,
+                          media_id=media_id, media_mime_type=media_mime_type, token=token)
+    else:
+        textos = handler(empresa, lead, estado, mensagem)
     registrar_transcricao(estado, bot=textos, cliente=mensagem)
     return textos

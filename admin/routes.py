@@ -27,7 +27,8 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     CategoriaProduto, CategoriaFinanceira, Produto, IntegracaoMeta, ContatoIgnorado,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
-                    META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento, RenataRosaFunilLead)
+                    META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento, RenataRosaFunilLead,
+                    RenataRosaFunilFoto)
 from themes import THEMES
 from ai_attendance.gating import ia_disponivel
 from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
@@ -404,6 +405,21 @@ def lead_detail(lead_id):
         mostrar_funil_rr=rr_funil_ativo(g.empresa))
 
 
+@admin_bp.route('/leads/<int:lead_id>/fotos/<int:foto_id>')
+@login_required
+def lead_foto_serve(lead_id, foto_id):
+    """Serve o binário de uma foto do funil RN07 — endpoint listado em
+    _ADMIN_ONLY_ENDPOINTS (admin/__init__.py), herda a mesma restrição a
+    perfil administrador que já protege a tela de Lead inteira."""
+    from flask import Response
+    foto = db.get_or_404(RenataRosaFunilFoto, foto_id)
+    if foto.lead_id != lead_id:
+        abort(404)
+    resp = Response(foto.dados, mimetype=foto.mime or 'application/octet-stream')
+    resp.headers['Cache-Control'] = 'private, max-age=3600'
+    return resp
+
+
 @admin_bp.route('/leads/<int:lead_id>/converter', methods=['POST'])
 @login_required
 def lead_convert(lead_id):
@@ -477,6 +493,7 @@ def _soltar_referencias_ia(lead):
     # Mesmo motivo acima, pro funil bespoke da Renata Rosa (renata_rosa_bot/) —
     # é estado ativo do funil, não faz sentido preservar pra um Lead apagado.
     RenataRosaFunilLead.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
+    RenataRosaFunilFoto.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
 
 
 def _ignorar_lead(lead, motivo):

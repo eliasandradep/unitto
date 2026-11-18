@@ -76,6 +76,23 @@ AVALIACAO = (
     '3. Não neste momento'
 )
 
+FOTOS = (
+    'Se desejar, você pode nos enviar uma foto atual do seu cabelo e uma '
+    'imagem de referência do resultado que gostaria de alcançar. 💕\n\n'
+    'Usamos as fotos só como referência preliminar pra nossa especialista se '
+    'preparar — elas ficam guardadas no seu cadastro e só a equipe autorizada '
+    'tem acesso. O envio é totalmente opcional.\n\n'
+    'Quando terminar (ou se preferir não enviar agora), é só me mandar '
+    'qualquer mensagem que a gente continua. 😊'
+)
+
+FOTO_RECEBIDA_PRIMEIRA = 'Recebido! 💕 Pode mandar mais uma, se quiser, ou é só seguir quando terminar.'
+FOTO_FALHA_DOWNLOAD = (
+    'Não consegui receber essa imagem agora 😕 Mas sem problemas, pode '
+    'tentar enviar de novo ou seguir sem ela.'
+)
+FOTOS_LIMITE_ATINGIDO = 'Já recebi fotos suficientes, obrigada! 💕 Pode seguir quando quiser.'
+
 AGENDAMENTO = (
     'Estamos quase terminando! 💕 Gostaria que nossa equipe verificasse os '
     'horários disponíveis para você?\n'

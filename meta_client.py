@@ -190,6 +190,27 @@ def enviar_mensagem_whatsapp(identificador_externo, destinatario_wa_id, texto, a
         raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
 
 
+def baixar_midia_whatsapp(media_id, access_token):
+    """Baixa uma mídia recebida via WhatsApp Cloud API em 2 passos: 1) GET
+    /{media_id} resolve a URL temporária + mime_type; 2) GET nessa URL com
+    'Authorization: Bearer' (exigido pela própria Cloud API pra esse download,
+    diferente do resto do arquivo — aqui o token NÃO vai em `params`) baixa o
+    binário. Retorna (bytes, mime_type). Levanta RuntimeError em qualquer
+    falha — quem chama decide se trata como best-effort."""
+    resp = requests.get(f'{GRAPH_URL}/{media_id}', params={'access_token': access_token}, timeout=15)
+    if not resp.ok:
+        raise RuntimeError(f'{resp.status_code} {resp.reason}: {resp.text[:300]}')
+    info = resp.json()
+    url = info.get('url')
+    if not url:
+        raise RuntimeError('Resposta da Meta sem url de mídia.')
+
+    resp2 = requests.get(url, headers={'Authorization': f'Bearer {access_token}'}, timeout=20)
+    if not resp2.ok:
+        raise RuntimeError(f'{resp2.status_code} {resp2.reason}: falha ao baixar binário da mídia')
+    return resp2.content, info.get('mime_type', 'application/octet-stream')
+
+
 def listar_contas_anuncio(access_token):
     """Retorna [{'identificador_externo': 'act_...', 'nome_conta': ...}] das contas de anúncio
     acessíveis — tanto as vinculadas diretamente ao perfil pessoal (/me/adaccounts) quanto as de

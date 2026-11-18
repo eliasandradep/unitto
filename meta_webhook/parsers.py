@@ -23,6 +23,10 @@ def parse_whatsapp(body):
                     continue
                 texto = msg.get('text', {}).get('body') or f'[{msg.get("type", "mensagem")}]'
                 referral = msg.get('referral') or {}
+                # media_id/media_mime_type são aditivos — só preenchidos pra type='image' (RN07
+                # do funil da Renata Rosa, ver renata_rosa_bot/fotos.py). 'mensagem' continua com
+                # o placeholder de sempre, então nenhum consumidor existente muda de comportamento.
+                imagem = msg.get('image') if msg.get('type') == 'image' else None
                 eventos.append({
                     'identificador_externo': phone_number_id,
                     'external_thread_id': wa_id,
@@ -33,6 +37,8 @@ def parse_whatsapp(body):
                     'quick_reply_payload': None,
                     'ad_id': referral.get('source_id'),
                     'ad_title': referral.get('headline'),
+                    'media_id': (imagem or {}).get('id'),
+                    'media_mime_type': (imagem or {}).get('mime_type'),
                 })
     return eventos
 

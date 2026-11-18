@@ -1274,3 +1274,21 @@ class RenataRosaFunilLead(db.Model):
     __table_args__ = (db.UniqueConstraint('lead_id', name='uq_rr_funil_lead'),)
 
     lead = db.relationship('Lead', backref=db.backref('funil_rr', uselist=False))
+
+
+class RenataRosaFunilFoto(db.Model):
+    """Fotos recebidas via WhatsApp no funil da Renata Rosa (RN07) — N por
+    Lead, diferente de RenataRosaFunilLead (que é 1:1). `papel` é atribuído
+    por ordem de chegada no ciclo atual ('atual' na 1ª, 'referencia' na 2ª,
+    None nas extras); teto de quantidade em renata_rosa_bot/fotos.py."""
+    __tablename__ = 'renata_rosa_funil_fotos'
+    id                = db.Column(db.Integer, primary_key=True)
+    lead_id           = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=False)
+    empresa_id        = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=False)
+    papel             = db.Column(db.String(20), nullable=True)  # 'atual' | 'referencia' | None
+    dados             = db.Column(db.LargeBinary, nullable=False)
+    mime              = db.Column(db.String(50))
+    media_id_whatsapp = db.Column(db.String(100))
+    criado_em         = db.Column(db.DateTime, default=datetime.utcnow)
+
+    lead = db.relationship('Lead', backref='funil_rr_fotos')

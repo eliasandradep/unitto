@@ -132,7 +132,9 @@ def _processar_turno_whatsapp(integracao, evento, lead, fallback):
         # enquanto esse flag estiver ligado (ver renata_rosa_bot/gating.py).
         try:
             token = decrypt_token(integracao.access_token_enc)
-            textos = rr_processar_mensagem(empresa, lead, evento['external_thread_id'], evento['mensagem'])
+            textos = rr_processar_mensagem(empresa, lead, evento['external_thread_id'], evento['mensagem'],
+                                            token=token, media_id=evento.get('media_id'),
+                                            media_mime_type=evento.get('media_mime_type'))
             for texto in textos:
                 meta_client.enviar_mensagem_whatsapp(
                     integracao.identificador_externo, evento['external_thread_id'], texto, token)

@@ -101,6 +101,7 @@ def test_caminho_quente_transfere_e_grava_resumo(monkeypatch):
     _enviar(integracao, '2', thread_id, monkeypatch)                  # já tenho mechas (histórico, sem score)
     _enviar(integracao, '1', thread_id, monkeypatch)                  # dentro do orçamento (25)
     _enviar(integracao, '1', thread_id, monkeypatch)                  # sim, avaliação (10)
+    _enviar(integracao, 'pronto', thread_id, monkeypatch)             # pula fotos (RN07 é opcional)
     enviados = _enviar(integracao, '1', thread_id, monkeypatch)       # sim, quer agendar (30) -> 100 = QUENTE
 
     assert enviados == ['Perfeito! 💕 Já tenho as informações necessárias para te ajudar com sua transformação!\n\n'
@@ -129,6 +130,7 @@ def test_caminho_morno_nao_transfere(monkeypatch):
     _enviar(integracao, '3', thread_id, monkeypatch)   # histórico (sem score)
     _enviar(integracao, '1', thread_id, monkeypatch)   # dentro do orçamento (25)
     _enviar(integracao, '3', thread_id, monkeypatch)   # não quer avaliação (0)
+    _enviar(integracao, 'pronto', thread_id, monkeypatch)        # pula fotos (RN07 é opcional)
     enviados = _enviar(integracao, '3', thread_id, monkeypatch)  # não quer agendar (0) -> score 55 = MORNO
 
     assert enviados == ['Combinado! 💕 Fico à disposição pra tirar qualquer dúvida sobre nossos '
@@ -154,6 +156,7 @@ def test_rn08_forca_transferencia_mesmo_com_classificacao_fria(monkeypatch):
     _enviar(integracao, '1', thread_id, monkeypatch)
     _enviar(integracao, '3', thread_id, monkeypatch)   # fora do orçamento (0)
     _enviar(integracao, '3', thread_id, monkeypatch)   # não quer avaliação (0)
+    _enviar(integracao, 'pronto', thread_id, monkeypatch)        # pula fotos (RN07 é opcional)
     enviados = _enviar(integracao, '2', thread_id, monkeypatch)  # quer conversar antes -> força transferência
 
     lead, estado = _lead_e_estado(empresa, thread_id)

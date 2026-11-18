@@ -81,6 +81,22 @@
       <p>{{ lead.message }}</p>
     </div>
     {% endif %}
+
+    <!-- Fotos do funil RN07 (Renata Rosa) -->
+    {% if mostrar_funil_rr and lead.funil_rr_fotos %}
+    <div class="lead-fotos-rr">
+      <label>Fotos enviadas pela cliente</label>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">
+        {% for foto in lead.funil_rr_fotos %}
+        <a href="{{ url_for('admin.lead_foto_serve', lead_id=lead.id, foto_id=foto.id) }}" target="_blank" rel="noopener">
+          <img src="{{ url_for('admin.lead_foto_serve', lead_id=lead.id, foto_id=foto.id) }}"
+               alt="{{ foto.papel or 'foto' }}" title="{{ foto.papel or 'foto extra' }}"
+               style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border)" />
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Status + Notas -->
