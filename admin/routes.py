@@ -2847,12 +2847,15 @@ def _find_bloqueio_conflict(profissional_id, data, hora_inicio, duracao_min, exc
 
 
 def _pode_encaixar_agendamento():
-    """Só administrador/atendente/profissional podem criar um agendamento
-    sobreposto a outro já existente pra mesma profissional ("encaixe",
-    ex: cliente em pausa de produto químico enquanto a profissional atende
-    outra) — recepção e pessoal continuam proibidos, mesma regra que já
-    vale (e nunca muda) pro agendamento online."""
-    return current_perfil() in ('administrador', 'atendente', 'profissional')
+    """Qualquer perfil interno (administrador/atendente/profissional/
+    recepção/pessoal) pode criar um agendamento sobreposto a outro já
+    existente pra mesma profissional ("encaixe", ex: cliente em pausa de
+    produto químico enquanto a profissional atende outra) — só o
+    agendamento online (cliente externo, sem login) nunca pode; essa regra
+    não passa por aqui, é outro caminho de código (public/availability.py)
+    que sempre bloqueia, sem exceção. 'leitura' nem chega a esta função —
+    já é barrado antes por não poder criar agendamento nenhum."""
+    return current_perfil() != 'leitura'
 
 
 def _find_encaixe_bloqueado(profissional_id, data, hora_inicio, duracao_min, exclude_ag_id=None):

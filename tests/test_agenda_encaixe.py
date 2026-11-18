@@ -1,8 +1,8 @@
 """Encaixe (duplo-agendamento no mesmo horário pra mesma profissional) na
-agenda interna — só administrador/atendente/profissional podem; recepção e
-pessoal continuam bloqueados, igual o agendamento online já sempre bloqueou
-(e agora bloqueia incondicionalmente, sem a brecha antiga de
-Profissional.agendamentos_simult)."""
+agenda interna — qualquer perfil interno pode (administrador/atendente/
+profissional/recepção/pessoal); só o agendamento online (cliente externo,
+sem login) nunca pode, e agora bloqueia incondicionalmente, sem a brecha
+antiga de Profissional.agendamentos_simult."""
 from datetime import date, time, timedelta
 
 from models import db, User, Profissional, Agendamento
@@ -96,7 +96,7 @@ def test_profissional_consegue_encaixar_na_propria_agenda(client):
     assert Agendamento.query.filter_by(nome_cliente='Cliente Encaixada Profissional').first() is not None
 
 
-def test_recepcao_e_bloqueada_ao_tentar_encaixar(client):
+def test_recepcao_consegue_encaixar(client):
     empresa = make_empresa()
     servico, prof = make_booking_setup(empresa)
     dia = _amanha()
@@ -105,14 +105,13 @@ def test_recepcao_e_bloqueada_ao_tentar_encaixar(client):
 
     resp = client.post('/admin/agenda/novo', data={
         'data': dia.isoformat(), 'hora_inicio': '10:00', 'profissional_id': str(prof.id),
-        'nome_cliente': 'Cliente Recusada Recepcao', 'servico_id': str(servico.id),
+        'nome_cliente': 'Cliente Encaixada Recepcao', 'servico_id': str(servico.id),
     }, follow_redirects=True)
     assert resp.status_code == 200
-    assert 'já existe um agendamento nesse horário' in resp.get_data(as_text=True)
-    assert Agendamento.query.filter_by(nome_cliente='Cliente Recusada Recepcao').first() is None
+    assert Agendamento.query.filter_by(nome_cliente='Cliente Encaixada Recepcao').first() is not None
 
 
-def test_pessoal_e_bloqueada_ao_tentar_encaixar_na_propria_agenda(client):
+def test_pessoal_consegue_encaixar_na_propria_agenda(client):
     empresa = make_empresa()
     servico, prof = make_booking_setup(empresa)
     dia = _amanha()
@@ -121,13 +120,13 @@ def test_pessoal_e_bloqueada_ao_tentar_encaixar_na_propria_agenda(client):
 
     resp = client.post('/admin/agenda/novo', data={
         'data': dia.isoformat(), 'hora_inicio': '10:00', 'profissional_id': str(prof.id),
-        'nome_cliente': 'Cliente Recusada Pessoal', 'servico_id': str(servico.id),
+        'nome_cliente': 'Cliente Encaixada Pessoal', 'servico_id': str(servico.id),
     }, follow_redirects=True)
     assert resp.status_code == 200
-    assert Agendamento.query.filter_by(nome_cliente='Cliente Recusada Pessoal').first() is None
+    assert Agendamento.query.filter_by(nome_cliente='Cliente Encaixada Pessoal').first() is not None
 
 
-def test_editar_para_sobrepor_e_bloqueado_pra_quem_nao_pode_encaixar(client):
+def test_editar_para_sobrepor_e_permitido_pra_recepcao(client):
     empresa = make_empresa()
     servico, prof = make_booking_setup(empresa)
     dia = _amanha()
@@ -146,7 +145,7 @@ def test_editar_para_sobrepor_e_bloqueado_pra_quem_nao_pode_encaixar(client):
     }, follow_redirects=True)
     assert resp.status_code == 200
     db.session.refresh(ag2)
-    assert ag2.hora_inicio == time(14, 0)  # não mudou — edição bloqueada
+    assert ag2.hora_inicio == time(10, 0)  # mudou — edição com encaixe permitida
 
 
 def test_agendamento_online_sempre_bloqueia_mesmo_com_flag_antiga_ligada():
