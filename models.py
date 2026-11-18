@@ -1234,6 +1234,21 @@ class AtendimentoIAEvento(db.Model):
     )
 
 
+STATUS_COMERCIAL_RR = [
+    ('novo_lead',                     'Novo lead'),
+    ('em_qualificacao',               'Em qualificação'),
+    ('qualificado_quente',            'Qualificado — quente'),
+    ('qualificado_morno',             'Qualificado — morno'),
+    ('qualificado_frio',              'Qualificado — frio'),
+    ('aguardando_atendimento_humano', 'Aguardando atendimento humano'),
+    ('em_negociacao',                 'Em negociação'),
+    ('agendamento_realizado',         'Agendamento realizado'),
+    ('atendimento_realizado',         'Atendimento realizado'),
+    ('nao_convertido',                'Não convertido'),
+    ('sem_resposta',                  'Sem resposta'),
+]
+
+
 class RenataRosaFunilLead(db.Model):
     """Estado do funil de qualificação de leads bespoke da Renata Rosa Beauty
     Concept (ver pacote renata_rosa_bot/) — 1:1 com Lead. Isolado do motor
@@ -1265,6 +1280,12 @@ class RenataRosaFunilLead(db.Model):
     score_total            = db.Column(db.Integer, nullable=True)   # RN09, sempre recalculado do zero
     classificacao          = db.Column(db.String(10), nullable=True)  # 'quente'|'morno'|'frio'
 
+    # RN15 — status comercial (pipeline de 11 estágios), independente de
+    # `classificacao` acima. Só muda através de
+    # renata_rosa_bot/status_comercial.py::definir_status(), que também
+    # grava o histórico em RenataRosaFunilStatusHistorico.
+    status_comercial       = db.Column(db.String(30), default='novo_lead')
+
     transcricao            = db.Column(db.Text, nullable=True)      # histórico bot/cliente pro resumo (RN14)
     resumo_enviado         = db.Column(db.Boolean, default=False)   # evita nota duplicada em retry
 
@@ -1292,3 +1313,18 @@ class RenataRosaFunilFoto(db.Model):
     criado_em         = db.Column(db.DateTime, default=datetime.utcnow)
 
     lead = db.relationship('Lead', backref='funil_rr_fotos')
+
+
+class RenataRosaFunilStatusHistorico(db.Model):
+    """RN15 — uma linha por mudança real de status_comercial de um
+    RenataRosaFunilLead. Só gravada por renata_rosa_bot/status_comercial.py
+    ::definir_status() — nunca direto, e nunca duplicada quando o status
+    não muda de verdade."""
+    __tablename__ = 'renata_rosa_funil_status_historico'
+    id              = db.Column(db.Integer, primary_key=True)
+    funil_lead_id   = db.Column(db.Integer, db.ForeignKey('renata_rosa_funil_leads.id'), nullable=False)
+    status_anterior = db.Column(db.String(30), nullable=True)
+    status_novo     = db.Column(db.String(30), nullable=False)
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+
+    funil_lead = db.relationship('RenataRosaFunilLead', backref='status_historico')

@@ -685,12 +685,24 @@ def _sincronizar_todas_contas_ads():
                 app.logger.exception('Falha ao sincronizar conta de anúncios %s', integ.id)
 
 
+def _marcar_leads_rr_sem_resposta():
+    """RN15 (funil bespoke da Renata Rosa) — marca 'sem_resposta' quem ficou
+    parado demais num status ativo. Ver renata_rosa_bot/status_comercial.py."""
+    with app.app_context():
+        from renata_rosa_bot.status_comercial import marcar_sem_resposta
+        try:
+            marcar_sem_resposta()
+        except Exception:
+            app.logger.exception('Falha ao marcar leads sem resposta (Renata Rosa)')
+
+
 # Evita registrar o job duas vezes por causa do reloader do Flask em dev
 # (processo pai sem WERKZEUG_RUN_MAIN não deve rodar; processo filho, ou
 # produção sem debug/reloader, deve).
 if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.add_job(_sincronizar_todas_contas_ads, 'cron', hour=6, minute=0)
+    _scheduler.add_job(_marcar_leads_rr_sem_resposta, 'interval', hours=1)
     _scheduler.start()
 
 

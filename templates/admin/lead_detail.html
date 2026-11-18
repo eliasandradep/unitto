@@ -119,6 +119,32 @@
       </form>
     </div>
 
+    <!-- Status comercial (RN15 — funil Renata Rosa) -->
+    {% if mostrar_funil_rr and lead.funil_rr %}
+    <div class="card">
+      <div class="card__header"><h3>Status comercial</h3></div>
+      <form method="POST" action="{{ url_for('admin.lead_detail', lead_id=lead.id) }}">
+          <input type="hidden" name="action" value="update_status_comercial" />
+        <div class="status-buttons">
+          {% for key, label in status_comercial_opcoes %}
+          <label class="status-option {% if lead.funil_rr.status_comercial == key %}selected{% endif %}">
+            <input type="radio" name="status_comercial" value="{{ key }}"
+                   {% if lead.funil_rr.status_comercial == key %}checked{% endif %} />
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn-primary btn-full" style="margin-top:1rem">Atualizar status comercial</button>
+      </form>
+      {% if lead.funil_rr.status_historico %}
+      <div class="notes-history">
+        <pre>{% for h in lead.funil_rr.status_historico|sort(attribute='criado_em', reverse=True) %}[{{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}] {{ dict(status_comercial_opcoes).get(h.status_anterior, h.status_anterior or '—') }} → {{ dict(status_comercial_opcoes).get(h.status_novo, h.status_novo) }}
+{% endfor %}</pre>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Anotações -->
     <div class="card">
       <div class="card__header"><h3>Anotações</h3></div>

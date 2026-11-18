@@ -28,12 +28,13 @@ from models import (db, User, Lead, Setting, PageView, ROLES,
                     IntegracaoMetaAds, AnuncioMeta, InsightDiarioAnuncio,
                     LEAD_STATUSES, LEAD_SOURCES, PERFIL_ACESSO, FORMA_PAGAMENTO, DIAS_SEMANA,
                     META_CANAIS, AtendimentoIAConversa, AtendimentoIAEvento, RenataRosaFunilLead,
-                    RenataRosaFunilFoto)
+                    RenataRosaFunilFoto, RenataRosaFunilStatusHistorico, STATUS_COMERCIAL_RR)
 from themes import THEMES
 from ai_attendance.gating import ia_disponivel
 from ai_attendance.menu import get_or_create_menu_config, atualizar_opcoes
 from ai_attendance.informacoes import get_or_create_info, atualizar_info
 from renata_rosa_bot.gating import funil_ativo as rr_funil_ativo
+from renata_rosa_bot.status_comercial import definir_status as rr_definir_status_comercial
 import meta_client
 from crypto_utils import encrypt_token
 
@@ -391,6 +392,12 @@ def lead_detail(lead_id):
             db.session.commit()
             flash('Informações atualizadas.', 'success')
 
+        elif action == 'update_status_comercial' and rr_funil_ativo(g.empresa) and lead.funil_rr:
+            novo_status = request.form.get('status_comercial', '')
+            if novo_status in dict(STATUS_COMERCIAL_RR):
+                rr_definir_status_comercial(lead.funil_rr, novo_status, forcar=True)
+                flash('Status comercial atualizado.', 'success')
+
         return redirect(url_for('admin.lead_detail', lead_id=lead.id))
 
     digits = ''.join(ch for ch in (lead.phone or '') if ch.isdigit())
@@ -402,7 +409,7 @@ def lead_detail(lead_id):
 
     return render_template('admin/lead_detail.html',
         lead=lead, statuses=LEAD_STATUSES, cliente_vinculado=cliente_vinculado,
-        mostrar_funil_rr=rr_funil_ativo(g.empresa))
+        mostrar_funil_rr=rr_funil_ativo(g.empresa), status_comercial_opcoes=STATUS_COMERCIAL_RR)
 
 
 @admin_bp.route('/leads/<int:lead_id>/fotos/<int:foto_id>')
@@ -492,6 +499,13 @@ def _soltar_referencias_ia(lead):
     AtendimentoIAConversa.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
     # Mesmo motivo acima, pro funil bespoke da Renata Rosa (renata_rosa_bot/) —
     # é estado ativo do funil, não faz sentido preservar pra um Lead apagado.
+    # Histórico de status (RN15) referencia renata_rosa_funil_leads.id, não
+    # leads.id diretamente — precisa ser solto ANTES do funil, mesma ordem
+    # já exigida acima pra AtendimentoIAEvento/Conversa.
+    funil_rr = RenataRosaFunilLead.query.filter_by(lead_id=lead.id).first()
+    if funil_rr:
+        RenataRosaFunilStatusHistorico.query.filter_by(funil_lead_id=funil_rr.id) \
+            .delete(synchronize_session=False)
     RenataRosaFunilLead.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
     RenataRosaFunilFoto.query.filter_by(lead_id=lead.id).delete(synchronize_session=False)
 

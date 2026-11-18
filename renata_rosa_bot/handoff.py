@@ -8,6 +8,7 @@ from models import db
 from ai_attendance.logging_ia import log_evento_ia
 
 from . import resumo as _resumo_mod
+from . import status_comercial as _status_mod
 
 
 def transferir(empresa, lead, estado, motivo, mensagem_cliente):
@@ -18,4 +19,5 @@ def transferir(empresa, lead, estado, motivo, mensagem_cliente):
     estado.estado = 'concluido'
     log_evento_ia(empresa, 'RR_HANDOFF', lead_id=lead.id, detalhes=f'motivo={motivo}')
     db.session.commit()
+    _status_mod.definir_status(estado, 'aguardando_atendimento_humano')
     return [mensagem_cliente]

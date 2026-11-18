@@ -7,7 +7,7 @@ import re
 
 from models import db, RenataRosaFunilFoto
 
-from . import mensagens, precos, pontuacao, handoff, fotos as fotos_mod
+from . import mensagens, precos, pontuacao, handoff, fotos as fotos_mod, status_comercial
 from .estado import get_or_create_estado, resetar_estado, registrar_transcricao
 
 _RE_ATENDENTE = re.compile(r'(?i)atendente|humano|\bpessoa\b')
@@ -75,12 +75,14 @@ def _h_menu_principal(empresa, lead, estado, mensagem):
         estado.estado_anterior = 'menu_principal'
         estado.estado = 'prazo'
         db.session.commit()
+        status_comercial.definir_status(estado, 'em_qualificacao')
         return [mensagens.PRAZO]
 
     estado.fluxo = 'mechas_coloracao'
     estado.estado_anterior = 'menu_principal'
     estado.estado = 'tipo_transformacao'
     db.session.commit()
+    status_comercial.definir_status(estado, 'em_qualificacao')
     return [mensagens.TIPO_TRANSFORMACAO]
 
 
@@ -186,6 +188,7 @@ def _h_agendamento(empresa, lead, estado, mensagem):
     if lead.status not in ('convertido', 'perdido'):
         lead.status = 'qualificado'
     db.session.commit()
+    status_comercial.definir_status(estado, f'qualificado_{classificacao}')
 
     # RN11/RN14: QUENTE transfere sempre; MORNO/FRIO também transferem se
     # pediu agendamento ou quer conversar com atendente antes (opção 1 ou 2).
@@ -219,6 +222,13 @@ def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=N
     # nova mensagem é um novo atendimento, não a continuação de algo fechado.
     if estado.estado == 'concluido':
         resetar_estado(estado)
+        status_comercial.definir_status(estado, 'novo_lead')
+
+    # RN15/RN16: lead marcado 'sem_resposta' (job periódico) que volta a
+    # escrever retoma o fluxo de onde parou (se ainda não foi resetado
+    # acima) — não é mais "sem resposta".
+    if estado.status_comercial == 'sem_resposta':
+        status_comercial.definir_status(estado, 'em_qualificacao')
 
     # Escape hatch pra humano, disponível em qualquer etapa (RN14/RN19).
     if _RE_ATENDENTE.search(mensagem or ''):
@@ -229,6 +239,7 @@ def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=N
     # Voltar ao menu principal (RN19).
     if _RE_MENU.match(mensagem or ''):
         resetar_estado(estado)
+        status_comercial.definir_status(estado, 'novo_lead')
         textos = [mensagens.MENU_PRINCIPAL]
         registrar_transcricao(estado, bot=textos, cliente=mensagem)
         return textos
