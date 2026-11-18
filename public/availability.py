@@ -38,9 +38,6 @@ def _find_agendamento_overlap(profissional_id, data, hora_inicio, duracao_min, a
 
     `agendamentos_do_dia` já vem carregado (uma query por dia, não por candidato).
     """
-    prof = db.session.get(Profissional, profissional_id)
-    if prof and prof.agendamentos_simult:
-        return None
     ag_ini = datetime.combine(data, hora_inicio)
     ag_fim = ag_ini + timedelta(minutes=duracao_min)
     for ex in agendamentos_do_dia:

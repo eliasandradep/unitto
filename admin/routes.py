@@ -15,7 +15,7 @@ from .tenant import tq, get_setting, save_setting, BASE_DOMAIN
 from .auth import require_role
 from .permissions import (agenda_scope, comissoes_scope, financeiro_scope,
                            financeiro_pode_acessar, current_profissional, is_administrador,
-                           bloqueios_pode_gerenciar)
+                           bloqueios_pode_gerenciar, current_perfil)
 from models import (db, User, Lead, Setting, PageView, ROLES,
                     Cliente, AnamneseCapilar, AnamneseCorporal,
                     Categoria, Unidade, Profissional, Servico,
@@ -1757,7 +1757,6 @@ def _save_profissional(p):
     p.obs               = request.form.get('obs', '').strip()      or None
     p.perfil_acesso     = request.form.get('perfil_acesso', 'profissional')
     p.agendamento_online  = bool(request.form.get('agendamento_online'))
-    p.agendamentos_simult = bool(request.form.get('agendamentos_simult'))
     p.ativo             = desired_ativo
     p.categorias        = cats
     uid = request.form.get('unidade_id', '')
@@ -2847,6 +2846,32 @@ def _find_bloqueio_conflict(profissional_id, data, hora_inicio, duracao_min, exc
     return None
 
 
+def _pode_encaixar_agendamento():
+    """Só administrador/atendente/profissional podem criar um agendamento
+    sobreposto a outro já existente pra mesma profissional ("encaixe",
+    ex: cliente em pausa de produto químico enquanto a profissional atende
+    outra) — recepção e pessoal continuam proibidos, mesma regra que já
+    vale (e nunca muda) pro agendamento online."""
+    return current_perfil() in ('administrador', 'atendente', 'profissional')
+
+
+def _find_encaixe_bloqueado(profissional_id, data, hora_inicio, duracao_min, exclude_ag_id=None):
+    """Retorna o Agendamento conflitante quando quem está criando/editando
+    NÃO pode encaixar (ver _pode_encaixar_agendamento) e o horário já está
+    ocupado pra essa profissional — ou None (sem conflito, ou tem permissão
+    de encaixe e o conflito é permitido)."""
+    if _pode_encaixar_agendamento():
+        return None
+    from public.availability import _find_agendamento_overlap  # import local — public/availability.py já importa de admin/routes.py, módulo-level criaria ciclo
+    agendamentos_do_dia = tq(Agendamento).filter(
+        Agendamento.profissional_id == profissional_id,
+        Agendamento.data == data,
+        Agendamento.status != 'cancelado',
+    ).all()
+    return _find_agendamento_overlap(profissional_id, data, hora_inicio, duracao_min,
+                                      agendamentos_do_dia, exclude_ag_id=exclude_ag_id)
+
+
 @admin_bp.route('/agenda/novo', methods=['POST'])
 @login_required
 def agenda_novo():
@@ -2872,6 +2897,10 @@ def agenda_novo():
     conflict = _find_bloqueio_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if conflict:
         flash(f'Não é possível agendar: {conflict.motivo or "Horário bloqueado"}.', 'error')
+        return redirect(url_for('admin.agenda', data=data_str))
+    encaixe_bloqueado = _find_encaixe_bloqueado(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
+    if encaixe_bloqueado:
+        flash('Não é possível agendar: já existe um agendamento nesse horário pra essa profissional.', 'error')
         return redirect(url_for('admin.agenda', data=data_str))
     db.session.add(a)
     db.session.commit()
@@ -2908,6 +2937,16 @@ def agenda_editar(ag_id):
     conflict = _find_bloqueio_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if conflict:
         flash(f'Não é possível agendar: {conflict.motivo or "Horário bloqueado"}.', 'error')
+        return redirect(url_for('admin.agenda', data=data_str))
+    encaixe_bloqueado = _find_encaixe_bloqueado(a.profissional_id, a.data, a.hora_inicio, a.duracao_min,
+                                                 exclude_ag_id=ag_id)
+    if encaixe_bloqueado:
+        # rollback: os checks acima (bloqueio/escala) já podem ter disparado
+        # autoflush das mudanças de `a` (mesmo objeto de `a_orig`, já
+        # anexado à sessão) antes de chegar aqui — sem isso, a edição
+        # bloqueada vazava pro banco mesmo sem commit explícito nenhum.
+        db.session.rollback()
+        flash('Não é possível agendar: já existe um agendamento nesse horário pra essa profissional.', 'error')
         return redirect(url_for('admin.agenda', data=data_str))
     db.session.commit()
     flash('Agendamento atualizado.', 'success')

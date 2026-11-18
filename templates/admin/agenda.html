@@ -1731,8 +1731,48 @@ function renderBloqueios(bloqueios) {
   });
 }
 
+function _toMin(hora) {
+  var p = hora.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+}
+
+// Divide a largura da coluna entre eventos que se sobrepõem no tempo (ex:
+// duas clientes "encaixadas" no mesmo horário pra mesma profissional) —
+// mesmo algoritmo clássico de day-view de calendário: agrupa por
+// sobreposição transitiva, encaixa cada evento na 1ª coluna livre do grupo.
+function _layoutColunas(evs) {
+  var sorted = evs.slice().sort(function(a, b) { return a._ini - b._ini || a._fim - b._fim; });
+  var i = 0;
+  while (i < sorted.length) {
+    var grupo = [sorted[i]], fimGrupo = sorted[i]._fim, j = i + 1;
+    while (j < sorted.length && sorted[j]._ini < fimGrupo) {
+      fimGrupo = Math.max(fimGrupo, sorted[j]._fim);
+      grupo.push(sorted[j]);
+      j++;
+    }
+    var colunas = [];
+    grupo.forEach(function(ev) {
+      var colIdx = colunas.findIndex(function(fim) { return fim <= ev._ini; });
+      if (colIdx === -1) { colIdx = colunas.length; colunas.push(0); }
+      colunas[colIdx] = ev._fim;
+      ev._col = colIdx;
+    });
+    grupo.forEach(function(ev) { ev._totalCols = colunas.length; });
+    i = j;
+  }
+}
+
 function renderEvents(events) {
   document.querySelectorAll('.ag-event').forEach(function(el) { el.remove(); });
+
+  var porProfissional = {};
+  events.forEach(function(ev) {
+    ev._ini = _toMin(ev.hora_inicio);
+    ev._fim = ev._ini + ev.duracao_min;
+    (porProfissional[ev.profissional_id] = porProfissional[ev.profissional_id] || []).push(ev);
+  });
+  Object.keys(porProfissional).forEach(function(pid) { _layoutColunas(porProfissional[pid]); });
+
   events.forEach(function(ev) {
     var col = document.getElementById('agCol-' + ev.profissional_id);
     if (!col) return;
@@ -1741,6 +1781,10 @@ function renderEvents(events) {
     div.className = 'ag-event ' + evClass;
     div.style.top    = timeToTop(ev.hora_inicio) + 'px';
     div.style.height = durToH(ev.duracao_min) + 'px';
+    var largura = 100 / ev._totalCols;
+    div.style.left  = 'calc(' + (ev._col * largura) + '% + 2px)';
+    div.style.width = 'calc(' + largura + '% - 4px)';
+    div.style.right = 'auto';
     div.dataset.id   = ev.id;
     var svcHtml = ev.servico_nome
       ? '<br><span style="opacity:.75;font-size:.7rem">' + ev.servico_nome + '</span>'
