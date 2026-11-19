@@ -2067,10 +2067,11 @@ def unidades():
         uid    = request.form.get('id', '')
 
         if action == 'save':
-            nome     = request.form.get('nome', '').strip()
-            cidade   = request.form.get('cidade', '').strip() or None
-            estado   = request.form.get('estado', '').strip() or None
-            telefone = request.form.get('telefone', '').strip() or None
+            nome      = request.form.get('nome', '').strip()
+            cidade    = request.form.get('cidade', '').strip() or None
+            estado    = request.form.get('estado', '').strip() or None
+            telefone  = request.form.get('telefone', '').strip() or None
+            street_view_url = request.form.get('street_view_url', '').strip() or None
             if not nome:
                 flash('Nome da unidade é obrigatório.', 'error')
             else:
@@ -2081,6 +2082,7 @@ def unidades():
                 u.cidade   = cidade
                 u.estado   = estado
                 u.telefone = telefone
+                u.street_view_url = street_view_url
                 db.session.commit()
                 flash('Unidade salva com sucesso.', 'success')
 

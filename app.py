@@ -258,6 +258,29 @@ def _seed_unidades():
         db.session.rollback()
 
 
+def _seed_street_view_unidades_renata_rosa():
+    """Links de teste pro Street View das 2 unidades reais da Renata Rosa
+    (pedido do usuário) — só preenche se o campo ainda estiver vazio, nunca
+    sobrescreve um link que a equipe já tenha trocado pelo admin. Roda depois
+    de _backfill_empresa_id(), que é quem associa essas unidades (seed
+    histórico, sem empresa_id na origem) à empresa 'renatarosa'."""
+    from models import Unidade, Empresa
+    empresa = Empresa.query.filter_by(slug='renatarosa').first()
+    if not empresa:
+        return
+    for pedaco_nome, url in [
+        ('José', 'https://maps.app.goo.gl/vU9buweSrbq2KwF37'),
+        ('Varginha', 'https://maps.app.goo.gl/RyZaDTHpjpu5TXBfA'),
+    ]:
+        u = Unidade.query.filter_by(empresa_id=empresa.id).filter(Unidade.nome.ilike(f'%{pedaco_nome}%')).first()
+        if u and not u.street_view_url:
+            u.street_view_url = url
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 def _seed_formas_pagamento():
     from models import FormaPagamento, FORMA_PAGAMENTO
     if db.session.query(FormaPagamento.id).first():
@@ -566,6 +589,7 @@ with app.app_context():
     _safe_add_col('contatos_ignorados',   'motivo', "VARCHAR(20) DEFAULT 'pessoal'")
     _safe_add_col('categorias',           'empresa_id', _fk_emp)
     _safe_add_col('unidades',             'empresa_id', _fk_emp)
+    _safe_add_col('unidades',             'street_view_url', 'VARCHAR(500)')
     _safe_add_col('expedientes',          'empresa_id', _fk_emp)
     _safe_add_col('profissionais',        'empresa_id', _fk_emp)
     _safe_add_col('servicos',             'empresa_id', _fk_emp)
@@ -588,6 +612,7 @@ with app.app_context():
     _seed_formas_pagamento()
     _seed_empresa()
     _backfill_empresa_id()
+    _seed_street_view_unidades_renata_rosa()
     _backfill_profissional_logins()
     _seed_servicos()
     _seed_planos()

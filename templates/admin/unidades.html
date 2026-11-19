@@ -53,6 +53,16 @@
         </svg>
         {{ u.profissionais | selectattr('ativo') | list | length }} profissional(is) ativo(s)
       </span>
+      {% if u.street_view_url %}
+      <span>
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"
+             style="vertical-align:middle;margin-right:.2rem">
+          <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10
+                   15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <a href="{{ u.street_view_url }}" target="_blank" rel="noopener">Ver no Street View</a>
+      </span>
+      {% endif %}
     </div>
 
     <div style="display:flex;gap:.35rem;margin-top:.3rem;padding-top:.6rem;border-top:1px solid var(--border)">
@@ -62,6 +72,7 @@
               data-cidade="{{ u.cidade or '' }}"
               data-estado="{{ u.estado or '' }}"
               data-telefone="{{ u.telefone or '' }}"
+              data-street-view-url="{{ u.street_view_url or '' }}"
               onclick="editUnidade(this)">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -154,6 +165,12 @@
           <label>Telefone</label>
           <input type="tel" name="telefone" id="fldTelefone" placeholder="(00) 00000-0000" />
         </div>
+        <div class="form-group">
+          <label>Link do Street View</label>
+          <input type="url" name="street_view_url" id="fldStreetViewUrl"
+                 placeholder="https://maps.app.goo.gl/..." />
+          <small style="color:var(--text-muted)">Usado pelo atendimento por IA pra mostrar o espaço à cliente.</small>
+        </div>
         <div class="form-actions" style="margin-top:1.2rem">
           <button type="submit" class="btn-primary">Salvar</button>
           <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -170,7 +187,7 @@ function openModal() {
 }
 function closeModal() {
   document.getElementById('modalBackdrop').classList.remove('open');
-  ['fldId','fldNome','fldCidade','fldEstado','fldTelefone'].forEach(function(id) {
+  ['fldId','fldNome','fldCidade','fldEstado','fldTelefone','fldStreetViewUrl'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('modalTitle').textContent = 'Nova Unidade';
@@ -184,6 +201,7 @@ function editUnidade(btn) {
   document.getElementById('fldCidade').value   = btn.dataset.cidade;
   document.getElementById('fldEstado').value   = btn.dataset.estado;
   document.getElementById('fldTelefone').value = btn.dataset.telefone;
+  document.getElementById('fldStreetViewUrl').value = btn.dataset.streetViewUrl;
   document.getElementById('modalTitle').textContent = 'Editar Unidade';
   openModal();
 }

@@ -54,6 +54,21 @@ def _unidades_ativas(empresa):
     return Unidade.query.filter_by(empresa_id=empresa.id, ativo=True).order_by(Unidade.nome).all()
 
 
+def _texto_street_view(empresa):
+    """Opção 5 do menu (SALAO) — disponibiliza o link do Street View de
+    cada unidade que tiver um cadastrado (admin → Unidades). None quando
+    nenhuma unidade ativa tem o campo preenchido, pra não mandar uma
+    mensagem vazia (campo opcional, não é obrigatório pro tenant cadastrar)."""
+    links = [(u.label(), u.street_view_url) for u in _unidades_ativas(empresa) if u.street_view_url]
+    if not links:
+        return None
+    if len(links) == 1:
+        return f'📍 Dá uma espiadinha no nosso espaço: {links[0][1]}'
+    linhas = ['📍 Dá uma espiadinha nos nossos espaços:']
+    linhas += [f'{label}: {url}' for label, url in links]
+    return '\n'.join(linhas)
+
+
 def _normalizar(texto):
     texto = unicodedata.normalize('NFKD', texto or '').encode('ascii', 'ignore').decode().lower().strip()
     return re.sub(r'\s+', ' ', texto)
@@ -399,7 +414,11 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
         estado.topico_ativo = 'SALAO'
         status_comercial.definir_status(estado, 'em_atendimento_ia')
         db.session.commit()
-        textos = [info_texto or mensagens.SALAO_SEM_INFO, _com_dica_menu(mensagens.SALAO_PERGUNTA_FINAL)]
+        textos = [info_texto or mensagens.SALAO_SEM_INFO]
+        street_view = _texto_street_view(empresa)
+        if street_view:
+            textos.append(street_view)
+        textos.append(_com_dica_menu(mensagens.SALAO_PERGUNTA_FINAL))
         registrar_transcricao(estado, bot=textos)
         return textos
 

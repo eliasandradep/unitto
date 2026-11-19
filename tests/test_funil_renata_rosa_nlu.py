@@ -89,8 +89,12 @@ def test_topico_salao_mostra_info_e_pergunta_final(monkeypatch):
     enviados = _enviar(integracao, 'quero conhecer o salão', thread_id, monkeypatch,
                         nlu_result=_resultado(topico='SALAO'))
 
-    assert len(enviados) == 2
-    assert 'combina mais' in enviados[1]
+    # 3 mensagens: info do salão, links do Street View das 2 unidades
+    # (Fase 5e — cadastrados via seed de teste em app.py) e a pergunta final
+    assert len(enviados) == 3
+    assert 'https://maps.app.goo.gl/RyZaDTHpjpu5TXBfA' in enviados[1]  # Varginha
+    assert 'https://maps.app.goo.gl/vU9buweSrbq2KwF37' in enviados[1]  # São José dos Campos
+    assert 'combina mais' in enviados[2]
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.topico_ativo == 'SALAO'
     assert estado.status_comercial == 'em_atendimento_ia'

@@ -551,6 +551,7 @@ class Unidade(db.Model):
     ativo      = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id'), nullable=True)
+    street_view_url = db.Column(db.String(500), nullable=True)  # link do Google Street View do espaço
 
     def label(self):
         if self.cidade and self.estado:

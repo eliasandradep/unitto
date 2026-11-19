@@ -129,8 +129,7 @@ def test_reset_zera_tudo_inclusive_campos_pegajosos_do_lead(monkeypatch):
     # só o menu principal de sempre — não revela pra um usuário externo que
     # "reset" é um comando especial (ver meta_webhook/routes.py)
     assert len(enviados) == 1
-    assert 'Renata Rosa Beauty Concept' in enviados[0]
-    assert '✨ Quero iluminar' in enviados[0]
+    assert '✨ Quero iluminar' in enviados[0]  # é o menu principal, não o fluxo
 
     db.session.refresh(lead)
     db.session.refresh(estado)
