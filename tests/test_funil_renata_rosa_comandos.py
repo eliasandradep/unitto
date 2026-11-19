@@ -126,8 +126,11 @@ def test_reset_zera_tudo_inclusive_campos_pegajosos_do_lead(monkeypatch):
     assert estado.score_total == 15
 
     enviados = _enviar(integracao, 'reset', thread_id, monkeypatch)
-    assert len(enviados) == 2  # confirmação + menu principal
-    assert 'reiniciada' in enviados[0].lower()
+    # só o menu principal de sempre — não revela pra um usuário externo que
+    # "reset" é um comando especial (ver meta_webhook/routes.py)
+    assert len(enviados) == 1
+    assert 'Renata Rosa Beauty Concept' in enviados[0]
+    assert '✨ Quero iluminar' in enviados[0]
 
     db.session.refresh(lead)
     db.session.refresh(estado)
@@ -158,7 +161,7 @@ def test_reset_funciona_mesmo_com_handoff_em_andamento(monkeypatch):
     assert lead.contato_etapa == 'transferido'  # handoff concluído, updated_at acabou de avançar
 
     enviados = _enviar(integracao, 'reset', thread_id, monkeypatch)
-    assert len(enviados) == 2
+    assert len(enviados) == 1  # só o menu principal, nada que revele o comando
     db.session.refresh(lead)
     assert lead.contato_etapa is None  # destravado
     db.session.refresh(estado)

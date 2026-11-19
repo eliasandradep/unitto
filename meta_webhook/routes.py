@@ -379,13 +379,13 @@ def _upsert_lead(integracao, evento):
             # qualquer gating normal (inclusive conversa transferida, que
             # senão bloquearia justamente o cenário onde mais se precisa
             # resetar: logo depois de um handoff de teste). Nunca passa
-            # disso daqui pra baixo nesta mensagem.
+            # disso daqui pra baixo nesta mensagem. A resposta é só o menu
+            # principal de sempre — igual um contato novo veria — pra não
+            # revelar pra um usuário externo que "reset" é um comando
+            # especial, só ficando explícito pra quem já sabe o que fez.
             resetar_interacao_teste(integracao.empresa, lead)
             try:
                 token = decrypt_token(integracao.access_token_enc)
-                meta_client.enviar_mensagem_whatsapp(
-                    integracao.identificador_externo, evento['external_thread_id'],
-                    'Conversa reiniciada do zero (comando de teste). 🔄', token)
                 meta_client.enviar_mensagem_whatsapp(
                     integracao.identificador_externo, evento['external_thread_id'],
                     rr_menu_texto(integracao.empresa), token)
