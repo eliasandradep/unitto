@@ -161,3 +161,10 @@ DESINTERESSE_FINAL = (
     'algumas opções para você se inspirar quando quiser. 😊'
 )
 
+PEDIR_EMAIL = (
+    'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
+    'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
+    'mensagem que a gente continua. 📧'
+)
+EMAIL_ANOTADO = 'Anotado! ✉️'
+

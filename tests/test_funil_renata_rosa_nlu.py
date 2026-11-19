@@ -143,7 +143,9 @@ def test_topico_de_servico_entra_no_fluxo_de_perguntas_fase5b(monkeypatch):
     """Fase 5b — ao entrar num tópico de serviço (ILUMINAR/COR/TRATAMENTO/
     CORTE), o bot não só reconhece com empatia: já inicia o roteiro de
     perguntas próprio (ver renata_rosa_bot/fluxos.py e
-    test_funil_renata_rosa_fluxos.py pros cenários completos)."""
+    test_funil_renata_rosa_fluxos.py pros cenários completos). Essa empresa
+    ('renatarosa') tem 2 unidades reais (Fase 5c), então a 1ª coisa que o
+    fluxo faz é perguntar qual — só depois entra no roteiro."""
     empresa = _empresa_rr()
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
@@ -152,15 +154,22 @@ def test_topico_de_servico_entra_no_fluxo_de_perguntas_fase5b(monkeypatch):
                         nlu_result=_resultado(topico='ILUMINAR', servico_mencionado='Mechas',
                                                resposta_ao_cliente='Que escolha maravilhosa! ✨'))
 
-    assert len(enviados) == 2
-    assert 'iluminação' in enviados[0]
-    assert 'já tem mechas' in enviados[1]
+    assert len(enviados) == 1
+    assert 'unidade' in enviados[0].lower()
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.topico_ativo == 'ILUMINAR'
-    assert estado.pergunta_idx == 0
+    assert estado.pergunta_idx == -1
     assert estado.pt_servico_especifico is True
     assert estado.servico_opcao_label == 'Mechas'
     assert lead.contato_etapa != 'transferido'  # ainda não transfere sozinho
+
+    enviados = _enviar(integracao, '1', thread_id, monkeypatch)  # escolhe a unidade
+    assert len(enviados) == 2
+    assert 'iluminação' in enviados[0]
+    assert 'já tem mechas' in enviados[1]
+    db.session.refresh(estado)
+    assert estado.pergunta_idx == 0
+    assert lead.unit == 'sao_jose'  # unidades ordenadas por nome: "São..." vem antes de "Varginha"
 
 
 def test_score_natural_quente_transfere_mesmo_sem_pedir_pra_agendar(monkeypatch):

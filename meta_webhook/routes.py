@@ -433,7 +433,13 @@ def _upsert_lead(integracao, evento):
             if lead.contato_etapa == 'transferido':
                 lead.contato_etapa = None  # reativa: mais de 1h em silêncio desde a transferência
             _processar_turno_whatsapp(integracao, evento, lead, _fluxo_regex_whatsapp)
-        lead.message = evento['mensagem']
+        if not funil_ativo(integracao.empresa):
+            # Enquanto o funil bespoke da Renata Rosa está ativo, é ele quem
+            # decide o que fica em Lead.message (resumo formatado das
+            # respostas já coletadas, ver renata_rosa_bot/orquestrador.py::
+            # _atualizar_mensagem_lead) — sobrescrever aqui de novo com o
+            # texto cru perderia isso a cada mensagem nova.
+            lead.message = evento['mensagem']
         if not lead.name and nome:
             lead.name = nome
         if not lead.ad_id and evento.get('ad_id'):

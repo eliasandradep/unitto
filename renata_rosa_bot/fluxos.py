@@ -9,9 +9,14 @@ visual) liga a etapa de fotos (renata_rosa_bot/fotos.py, Fase 2) ao final das
 perguntas de texto — Tratamento (seção 4.3) encaminha direto, sem essa etapa,
 pois a avaliação final é sempre presencial com a profissional.
 
-Cada pergunta é (texto, opcoes) — `opcoes` é um dict {numero: label} só
-quando a pergunta já lista alternativas numeradas (caso do Tratamento), pra
-dígito solto virar um rótulo legível no resumo em vez do número cru."""
+Cada pergunta é (texto, opcoes, campo) — `opcoes` é um dict {numero: label}
+só quando a pergunta já lista alternativas numeradas (caso do Tratamento),
+pra dígito solto virar um rótulo legível no resumo em vez do número cru.
+`campo` marca qual pergunta do roteiro É a pergunta de objetivo/prazo
+daquele tópico (None | 'resultado_desejado' | 'prazo') — serve de fallback
+determinístico (Fase 5c) pra garantir que esses dois campos nunca ficam em
+branco no resumo só por depender da IA inferir isso sozinha de um texto
+livre (ver orquestrador.py)."""
 
 _CAUSAS_TRATAMENTO = {
     1: 'Ressecamento',
@@ -20,6 +25,13 @@ _CAUSAS_TRATAMENTO = {
     4: 'Falta de brilho',
     5: 'Danos químicos',
     6: 'Não sei, quero uma avaliação',
+}
+
+TOPICO_LABEL = {
+    'ILUMINAR':   'Iluminação / Mechas',
+    'COR':        'Coloração',
+    'TRATAMENTO': 'Tratamento capilar',
+    'CORTE':      'Corte',
 }
 
 FLUXOS = {
@@ -32,10 +44,11 @@ FLUXOS = {
             'pra nossa especialista te atender super bem.'
         ),
         'perguntas': [
-            ('Pra começar: você já tem mechas ou luzes, ou seria a sua primeira vez? 💛', None),
-            ('Seu cabelo tem alguma química no momento, como alisamento ou coloração?', None),
-            ('Você imagina algo mais discreto e natural, ou um resultado bem marcante e cheio de luz? ✨', None),
-            ('E pra quando você está pensando em fazer essa transformação?', None),
+            ('Pra começar: você já tem mechas ou luzes, ou seria a sua primeira vez? 💛', None, None),
+            ('Seu cabelo tem alguma química no momento, como alisamento ou coloração?', None, None),
+            ('Você imagina algo mais discreto e natural, ou um resultado bem marcante e cheio de luz? ✨',
+             None, 'resultado_desejado'),
+            ('E pra quando você está pensando em fazer essa transformação?', None, 'prazo'),
         ],
         'permite_foto': True,
     },
@@ -46,10 +59,11 @@ FLUXOS = {
             'adiantar seu atendimento.'
         ),
         'perguntas': [
-            ('Qual é a cor atual do seu cabelo?', None),
-            ('Seu cabelo já tem alguma química, como alisamento ou outra coloração?', None),
-            ('Você já tem uma tonalidade em mente, ou prefere sugestões da nossa especialista? 💭', None),
-            ('E pra quando você pretende fazer essa mudança?', None),
+            ('Qual é a cor atual do seu cabelo?', None, None),
+            ('Seu cabelo já tem alguma química, como alisamento ou outra coloração?', None, None),
+            ('Você já tem uma tonalidade em mente, ou prefere sugestões da nossa especialista? 💭',
+             None, 'resultado_desejado'),
+            ('E pra quando você pretende fazer essa mudança?', None, 'prazo'),
         ],
         'permite_foto': True,
     },
@@ -64,9 +78,9 @@ FLUXOS = {
                 'O que mais está te incomodando no seu cabelo hoje?\n'
                 '1. Ressecamento\n2. Quebra e fragilidade\n3. Frizz\n'
                 '4. Falta de brilho\n5. Danos químicos\n6. Não sei, quero uma avaliação',
-                _CAUSAS_TRATAMENTO,
+                _CAUSAS_TRATAMENTO, None,
             ),
-            ('Entendido! 💕 E pra quando você pretende fazer esse tratamento?', None),
+            ('Entendido! 💕 E pra quando você pretende fazer esse tratamento?', None, 'prazo'),
         ],
         'permite_foto': False,
     },
@@ -76,9 +90,9 @@ FLUXOS = {
             'visual! ✂️ Vou te fazer algumas perguntinhas rápidas.'
         ),
         'perguntas': [
-            ('Qual é o comprimento atual do seu cabelo?', None),
-            ('Como você imagina o resultado final? Me conta um pouquinho! 💫', None),
-            ('E pra quando você está pensando em fazer esse corte?', None),
+            ('Qual é o comprimento atual do seu cabelo?', None, None),
+            ('Como você imagina o resultado final? Me conta um pouquinho! 💫', None, 'resultado_desejado'),
+            ('E pra quando você está pensando em fazer esse corte?', None, 'prazo'),
         ],
         'permite_foto': True,
     },
@@ -99,6 +113,10 @@ def pergunta_texto(topico, idx):
 
 def opcoes_da_pergunta(topico, idx):
     return FLUXOS[topico]['perguntas'][idx][1]
+
+
+def campo_da_pergunta(topico, idx):
+    return FLUXOS[topico]['perguntas'][idx][2]
 
 
 def permite_foto(topico):

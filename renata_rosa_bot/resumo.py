@@ -8,6 +8,13 @@ from datetime import datetime
 from models import db, LEAD_SOURCES
 
 from . import pontuacao as _pontuacao_mod
+from . import fluxos as _fluxos_mod
+
+# O <select> de Unidade em templates/admin/lead_detail.html só tem esses 2
+# valores fixos (específicos deste tenant) — Lead.unit grava o slug (ver
+# orquestrador.py), aqui só traduzimos de volta pro texto amigável que o
+# próprio dropdown já usa, sem reconsultar o banco.
+_UNIDADE_LABEL = {'varginha': 'Varginha – MG', 'sao_jose': 'São José dos Campos – SP'}
 
 # Da mais forte pra mais fraca — usada só pra escolher uma frase de
 # justificativa representativa, não pro cálculo do score em si.
@@ -53,6 +60,30 @@ def montar_resumo(lead, estado, empresa):
         estado.transcricao or '(sem transcrição)',
     ]
     return f"[{agora}] " + '\n'.join(linhas)
+
+
+def montar_mensagem_lead(lead, estado):
+    """Resumo curto e formatado (com labels) das respostas já coletadas, pro
+    campo "Mensagem original" do Lead (admin) — Fase 5c. Bem mais útil pra
+    identificação rápida do que o texto cru da última mensagem recebida, que
+    meta_webhook/routes.py deixa de sobrescrever pra esse tenant enquanto o
+    funil está ativo (ver renata_rosa_bot.gating.funil_ativo). None quando
+    ainda não há nada de estruturado coletado — nesse caso quem chama
+    preserva o que já estava em Lead.message."""
+    linhas = []
+    unidade_label = _UNIDADE_LABEL.get(lead.unit)
+    if unidade_label:
+        linhas.append(f'Unidade: {unidade_label}')
+    servico = estado.servico_opcao_label or _fluxos_mod.TOPICO_LABEL.get(estado.topico_ativo)
+    if servico:
+        linhas.append(f'Serviço de interesse: {servico}')
+    if estado.resultado_desejado_texto:
+        linhas.append(f'Objetivo: {estado.resultado_desejado_texto}')
+    if estado.prazo_texto:
+        linhas.append(f'Prazo: {estado.prazo_texto}')
+    if lead.email:
+        linhas.append(f'E-mail: {lead.email}')
+    return '\n'.join(linhas) if linhas else None
 
 
 def gravar_em_notes(lead, texto):

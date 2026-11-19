@@ -1,10 +1,16 @@
-"""Fase 5b do funil da Renata Rosa — fluxos completos de qualificação por
+"""Fase 5b/5c do funil da Renata Rosa — fluxos completos de qualificação por
 tópico de serviço (renata_rosa_bot/fluxos.py + orquestrador.py). Mesmo
 padrão das demais fases (_processar_evento direto, NLU sempre mockada).
 
+A empresa 'renatarosa' usada aqui tem 2 unidades reais (Varginha/São José
+dos Campos — seed histórico do tenant original, ver app.py::_seed_unidades/
+_backfill_empresa_id, mesmo cenário documentado em test_unidade_filtro.py),
+então TODO fluxo de serviço pergunta a unidade antes do roteiro propriamente
+dito — ver _entrar_topico() abaixo, que resolve essa etapa.
+
 Usa ILUMINAR como representante da mecânica comum a ILUMINAR/COR/CORTE
-(pergunta a pergunta -> fotos -> encaminha); TRATAMENTO tem casos próprios
-(sem etapa de fotos, 1ª pergunta com alternativas numeradas)."""
+(pergunta a pergunta -> e-mail -> fotos -> encaminha); TRATAMENTO tem casos
+próprios (sem etapa de fotos, 1ª pergunta com alternativas numeradas)."""
 import uuid
 from unittest.mock import patch
 
@@ -69,7 +75,27 @@ def _lead_e_estado(empresa, thread_id):
     return lead, estado
 
 
-def test_atalho_por_numero_entra_no_topico_sem_chamar_nlu(monkeypatch):
+def _entrar_topico(integracao, digito_menu, thread_id, monkeypatch):
+    """Escolhe um tópico pelo número do menu principal e já resolve a
+    pergunta de unidade (sempre feita, pra essa empresa — ver docstring do
+    módulo) escolhendo a opção 1. Retorna os textos de entrada no fluxo
+    (intro + pergunta 1)."""
+    pergunta_unidade = _enviar(integracao, digito_menu, thread_id, monkeypatch)
+    assert any('unidade' in t.lower() for t in pergunta_unidade)
+    return _enviar(integracao, '1', thread_id, monkeypatch)
+
+
+def _avancar_perguntas_texto(integracao, thread_id, monkeypatch, topico, quantidade):
+    """Responde `quantidade` perguntas de texto seguidas (resposta genérica,
+    mesmo tópico) e devolve os textos da última resposta do bot."""
+    enviados = []
+    for _ in range(quantidade):
+        enviados = _enviar(integracao, 'resposta qualquer', thread_id, monkeypatch,
+                            nlu_result=_resultado(topico=topico))
+    return enviados
+
+
+def test_pergunta_unidade_so_uma_vez_e_atalho_nao_chama_nlu(monkeypatch):
     empresa = _empresa_rr()
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
@@ -78,13 +104,22 @@ def test_atalho_por_numero_entra_no_topico_sem_chamar_nlu(monkeypatch):
     monkeypatch.setattr(meta_client, 'enviar_mensagem_whatsapp',
                          lambda *a, **k: enviados.append(a[2]))
     with patch('renata_rosa_bot.nlu.classificar') as mock_nlu:
-        _processar_evento(_evento(integracao, '2', thread_id))
+        _processar_evento(_evento(integracao, '2', thread_id))  # opção 2 = COR
+        assert any('unidade' in t.lower() for t in enviados)
+        enviados.clear()
+        _processar_evento(_evento(integracao, '1', thread_id))  # escolhe a 1ª unidade
         assert mock_nlu.called is False
 
-    assert len(enviados) == 2
+    assert len(enviados) == 2  # intro + primeira pergunta
     lead, estado = _lead_e_estado(empresa, thread_id)
-    assert estado.topico_ativo == 'COR'  # opção 2 do menu (INTENTS_MENU_RR)
+    assert estado.topico_ativo == 'COR'
     assert estado.pergunta_idx == 0
+    assert lead.unit == 'sao_jose'  # unidades ordenadas por nome: "São..." vem antes de "Varginha"
+
+    # trocando de tópico sem resetar o lead, a unidade já é conhecida — não pergunta de novo
+    enviados2 = _enviar(integracao, 'na verdade quero saber de corte', thread_id, monkeypatch,
+                         nlu_result=_resultado(topico='CORTE'))
+    assert not any('unidade' in t.lower() for t in enviados2)
 
 
 def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
@@ -93,17 +128,25 @@ def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
     thread_id = uuid.uuid4().hex[:13]
 
     total = fluxos.total_perguntas('ILUMINAR')
-    _enviar(integracao, '1', thread_id, monkeypatch)  # entra pelo atalho de número
-    for _ in range(total - 1):
-        enviados = _enviar(integracao, 'resposta qualquer', thread_id, monkeypatch,
-                            nlu_result=_resultado(topico='ILUMINAR'))
-        assert len(enviados) == 1
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)
+    _avancar_perguntas_texto(integracao, thread_id, monkeypatch, 'ILUMINAR', total - 1)
 
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.pergunta_idx == total - 1
 
-    # última pergunta de texto respondida -> etapa de fotos
+    # última pergunta de texto respondida -> pergunta de e-mail (opcional)
     enviados = _enviar(integracao, 'pra semana que vem', thread_id, monkeypatch,
+                        nlu_result=_resultado(topico='ILUMINAR'))
+    assert enviados == [
+        'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
+        'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
+        'mensagem que a gente continua. 📧'
+    ]
+    db.session.refresh(estado)
+    assert estado.pergunta_idx == total
+
+    # pula o e-mail (qualquer texto) -> etapa de fotos
+    enviados = _enviar(integracao, 'pode pular', thread_id, monkeypatch,
                         nlu_result=_resultado(topico='ILUMINAR'))
     assert enviados == [
         'Se desejar, você pode nos enviar uma foto atual do seu cabelo e uma '
@@ -115,7 +158,9 @@ def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
         'qualquer mensagem que a gente continua. 😊'
     ]
     db.session.refresh(estado)
-    assert estado.pergunta_idx == total
+    assert estado.pergunta_idx == total + 1
+    db.session.refresh(lead)
+    assert lead.email is None
 
     # qualquer texto na etapa de fotos encaminha pra equipe
     enviados = _enviar(integracao, 'pode seguir sem foto', thread_id, monkeypatch,
@@ -125,17 +170,56 @@ def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
     assert lead.contato_etapa == 'transferido'
 
 
+def test_email_valido_grava_e_avisa_antes_das_fotos(monkeypatch):
+    empresa = _empresa_rr()
+    integracao = make_integracao_whatsapp(empresa)
+    thread_id = uuid.uuid4().hex[:13]
+
+    total = fluxos.total_perguntas('ILUMINAR')
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)
+    _avancar_perguntas_texto(integracao, thread_id, monkeypatch, 'ILUMINAR', total)
+
+    enviados = _enviar(integracao, 'pode ser fulana@exemplo.com', thread_id, monkeypatch,
+                        nlu_result=_resultado(topico='ILUMINAR'))
+    assert enviados[0] == 'Anotado! ✉️'
+    assert len(enviados) == 2  # ack + mensagens.FOTOS
+
+    lead, estado = _lead_e_estado(empresa, thread_id)
+    assert lead.email == 'fulana@exemplo.com'
+
+    # ciclo seguinte (mesmo lead) nunca mais pergunta e-mail
+    db.session.refresh(estado)
+    assert estado.pergunta_idx == total + 1
+
+
+def test_email_ja_conhecido_pula_pergunta_sem_perguntar_de_novo(monkeypatch):
+    empresa = _empresa_rr()
+    integracao = make_integracao_whatsapp(empresa)
+    thread_id = uuid.uuid4().hex[:13]
+
+    _entrar_topico(integracao, '3', thread_id, monkeypatch)  # TRATAMENTO, sem fotos
+    lead, estado = _lead_e_estado(empresa, thread_id)
+    lead.email = 'ja-conhecido@exemplo.com'
+    db.session.commit()
+
+    total = fluxos.total_perguntas('TRATAMENTO')
+    enviados = _avancar_perguntas_texto(integracao, thread_id, monkeypatch, 'TRATAMENTO', total)
+    # última pergunta respondida, e-mail já conhecido -> pula direto pro encaminhamento
+    assert len(enviados) == 1
+    db.session.refresh(lead)
+    assert lead.contato_etapa == 'transferido'
+    assert lead.email == 'ja-conhecido@exemplo.com'  # não foi sobrescrito
+
+
 def test_fluxo_iluminar_recebe_foto_e_marca_pontuacao(monkeypatch):
     empresa = _empresa_rr()
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
 
     total = fluxos.total_perguntas('ILUMINAR')
-    _enviar(integracao, '1', thread_id, monkeypatch)
-    for _ in range(total - 1):
-        _enviar(integracao, 'resposta', thread_id, monkeypatch, nlu_result=_resultado(topico='ILUMINAR'))
-    _enviar(integracao, 'ok', thread_id, monkeypatch, nlu_result=_resultado(topico='ILUMINAR'))  # etapa de fotos
-
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)
+    _avancar_perguntas_texto(integracao, thread_id, monkeypatch, 'ILUMINAR', total)
+    _enviar(integracao, 'pular', thread_id, monkeypatch, nlu_result=_resultado(topico='ILUMINAR'))  # e-mail
     lead, estado = _lead_e_estado(empresa, thread_id)
 
     with patch('meta_client.baixar_midia_whatsapp', return_value=(b'fake-bytes', 'image/jpeg')):
@@ -167,17 +251,28 @@ def test_tratamento_nao_tem_etapa_de_fotos(monkeypatch):
 
     total = fluxos.total_perguntas('TRATAMENTO')
     assert total == 2
-    _enviar(integracao, '3', thread_id, monkeypatch)  # opção 3 do menu principal
+    _entrar_topico(integracao, '3', thread_id, monkeypatch)  # opção 3 do menu principal
     enviados = _enviar(integracao, '1', thread_id, monkeypatch,
-                        nlu_result=_resultado(topico='TRATAMENTO'))  # responde a 1ª pergunta
+                        nlu_result=_resultado(topico='TRATAMENTO'))  # responde a 1ª pergunta (causas)
     assert len(enviados) == 1
 
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.servico_opcao_label == 'Ressecamento'
     assert estado.pt_servico_especifico is True
 
-    # última pergunta -> encaminha direto, sem pedir foto
+    # última pergunta de texto -> pergunta de e-mail
     enviados = _enviar(integracao, 'quero fazer essa semana', thread_id, monkeypatch,
+                        nlu_result=_resultado(topico='TRATAMENTO'))
+    assert enviados == [
+        'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
+        'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
+        'mensagem que a gente continua. 📧'
+    ]
+    db.session.refresh(estado)
+    assert estado.prazo_texto == 'quero fazer essa semana'  # fallback determinístico (E4)
+
+    # pula o e-mail -> encaminha direto, sem pedir foto
+    enviados = _enviar(integracao, 'pode pular', thread_id, monkeypatch,
                         nlu_result=_resultado(topico='TRATAMENTO'))
     assert len(enviados) == 1
     db.session.refresh(lead)
@@ -189,7 +284,7 @@ def test_interesse_forte_no_meio_do_fluxo_transfere_antes_de_terminar(monkeypatc
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
 
-    _enviar(integracao, '1', thread_id, monkeypatch)  # entra no fluxo ILUMINAR
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)  # entra no fluxo ILUMINAR
     _enviar(integracao, 'ja tenho mechas', thread_id, monkeypatch, nlu_result=_resultado(topico='ILUMINAR'))
 
     lead, estado = _lead_e_estado(empresa, thread_id)
@@ -210,7 +305,7 @@ def test_troca_de_topico_no_meio_do_fluxo_reinicia_pergunta_idx(monkeypatch):
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
 
-    _enviar(integracao, '1', thread_id, monkeypatch)  # ILUMINAR
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)  # ILUMINAR
     _enviar(integracao, 'resposta', thread_id, monkeypatch, nlu_result=_resultado(topico='ILUMINAR'))
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.topico_ativo == 'ILUMINAR'
@@ -221,7 +316,7 @@ def test_troca_de_topico_no_meio_do_fluxo_reinicia_pergunta_idx(monkeypatch):
     db.session.refresh(estado)
     assert estado.topico_ativo == 'COR'
     assert estado.pergunta_idx == 0
-    assert len(enviados) == 2  # intro + primeira pergunta do novo tópico
+    assert len(enviados) == 2  # intro + primeira pergunta do novo tópico — não pergunta unidade de novo
 
 
 def test_desinteresse_no_meio_do_fluxo_interrompe_sem_transferir(monkeypatch):
@@ -229,7 +324,7 @@ def test_desinteresse_no_meio_do_fluxo_interrompe_sem_transferir(monkeypatch):
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
 
-    _enviar(integracao, '1', thread_id, monkeypatch)
+    _entrar_topico(integracao, '1', thread_id, monkeypatch)
     enviados = _enviar(integracao, 'na verdade deixa pra lá', thread_id, monkeypatch,
                         nlu_result=_resultado(topico='ILUMINAR', demonstrou_desinteresse=True))
 
