@@ -10,7 +10,7 @@ _CAMPOS_RESPOSTA = (
     'fluxo', 'servico_opcao_idx', 'servico_opcao_label', 'servico_identificado',
     'prazo_opcao', 'historico_cabelo_opcao', 'investimento_opcao',
     'avaliacao_opcao', 'agendamento_opcao', 'score_total', 'classificacao',
-    'topico_ativo',
+    'topico_ativo', 'pergunta_idx',
 )
 
 _CAMPOS_PONTUACAO = (

@@ -502,6 +502,7 @@ with app.app_context():
         _safe_add_col('renata_rosa_funil_leads', _col, 'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('renata_rosa_funil_leads', 'resultado_desejado_texto', 'TEXT')
     _safe_add_col('renata_rosa_funil_leads', 'prazo_texto', 'TEXT')
+    _safe_add_col('renata_rosa_funil_leads', 'pergunta_idx', 'INTEGER')
     _safe_add_col('contas_pagar',   'categoria_id', 'INTEGER')
     _safe_add_col('contas_receber', 'categoria_id', 'INTEGER')
     _safe_add_col('contas_pagar',   'unidade_id',   'INTEGER')

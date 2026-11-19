@@ -1324,6 +1324,11 @@ class RenataRosaFunilLead(db.Model):
     topico_ativo           = db.Column(db.String(20), nullable=True)
     forcar_quente          = db.Column(db.Boolean, default=False)  # RN seção 5.3: pedido explícito de agendar => Quente, não importa o score
 
+    # Fase 5b — posição na sequência de perguntas do fluxo de qualificação do
+    # tópico de serviço ativo (ver renata_rosa_bot/fluxos.py). None = fora de
+    # um fluxo de serviço (menu principal, SALAO, ou ainda não entrou em um).
+    pergunta_idx           = db.Column(db.Integer, nullable=True)
+
     # Flags de pontuação (seção 5.1) — cada critério conta 1x por ciclo de
     # qualificação; zeradas no reset (ver estado.py::resetar_estado).
     pt_servico_especifico        = db.Column(db.Boolean, default=False)  # +15

@@ -6,7 +6,7 @@ dígitos — a chamada real à Anthropic nunca acontece em teste."""
 import uuid
 from unittest.mock import patch
 
-from models import db, Lead, RenataRosaFunilLead, User
+from models import db, INTENTS_MENU_RR, Lead, RenataRosaFunilLead, User
 from renata_rosa_bot.nlu import NLUError
 import meta_client
 from meta_webhook.routes import _processar_evento
@@ -139,7 +139,11 @@ def test_intencao_de_agendar_forca_quente_e_transfere(monkeypatch):
     assert 'QUENTE' in lead.notes
 
 
-def test_servico_sem_fluxo_proprio_reconhece_e_oferece_encaminhar(monkeypatch):
+def test_topico_de_servico_entra_no_fluxo_de_perguntas_fase5b(monkeypatch):
+    """Fase 5b — ao entrar num tópico de serviço (ILUMINAR/COR/TRATAMENTO/
+    CORTE), o bot não só reconhece com empatia: já inicia o roteiro de
+    perguntas próprio (ver renata_rosa_bot/fluxos.py e
+    test_funil_renata_rosa_fluxos.py pros cenários completos)."""
     empresa = _empresa_rr()
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
@@ -148,11 +152,12 @@ def test_servico_sem_fluxo_proprio_reconhece_e_oferece_encaminhar(monkeypatch):
                         nlu_result=_resultado(topico='ILUMINAR', servico_mencionado='Mechas',
                                                resposta_ao_cliente='Que escolha maravilhosa! ✨'))
 
-    assert enviados == ['Que escolha maravilhosa! ✨',
-                         'Quer que eu encaminhe suas informações para nossa equipe conversar com '
-                         'você sobre os próximos passos?']
+    assert len(enviados) == 2
+    assert 'iluminação' in enviados[0]
+    assert 'já tem mechas' in enviados[1]
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.topico_ativo == 'ILUMINAR'
+    assert estado.pergunta_idx == 0
     assert estado.pt_servico_especifico is True
     assert estado.servico_opcao_label == 'Mechas'
     assert lead.contato_etapa != 'transferido'  # ainda não transfere sozinho
@@ -240,7 +245,16 @@ def test_menu_editavel_pelo_admin_reflete_no_texto_enviado(monkeypatch):
     integracao = make_integracao_whatsapp(empresa)
     thread_id = uuid.uuid4().hex[:13]
 
-    atualizar_opcoes(empresa, {'titulo': 'Bem-vinda ao novo texto de boas-vindas!'})
+    # Simula um envio real do form admin — precisa incluir `ativo_<intent>`
+    # pra cada opção que deve continuar ligada (ausência = checkbox
+    # desmarcado, igual um form HTML de verdade). Faltando isso, a empresa
+    # 'renatarosa' (reaproveitada por toda a sessão de testes, ver
+    # tests/conftest.py::make_empresa) ficaria com o menu inteiro desativado
+    # pros testes que rodam depois deste.
+    form = {'titulo': 'Bem-vinda ao novo texto de boas-vindas!'}
+    for intent, _ in INTENTS_MENU_RR:
+        form[f'ativo_{intent}'] = '1'
+    atualizar_opcoes(empresa, form)
 
     enviados = _enviar(integracao, 'oi', thread_id, monkeypatch, nlu_result=_resultado(topico='OUTRO'))
     assert 'Bem-vinda ao novo texto de boas-vindas!' in enviados[0]

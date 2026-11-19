@@ -3,19 +3,33 @@ ver plano em C:\\Users\\elias\\.claude\\plans\\lovely-kindling-wind.md).
 Chamado pelo webhook do WhatsApp quando renata_rosa_bot.gating.funil_ativo
 (empresa) é True (ver meta_webhook/routes.py::_processar_turno_whatsapp).
 
-Fase 5a cobre os tópicos SALAO e HUMANO de ponta a ponta. Os 4 tópicos de
-serviço (ILUMINAR/COR/TRATAMENTO/CORTE) ainda não têm qualificação própria
-por pergunta — a IA reconhece o interesse com empatia e oferece encaminhar
-pra equipe, pra nunca deixar a cliente travada esperando uma pergunta que
-ainda não existe (Fase 5b implementa a qualificação completa desses 4,
-reaproveitando renata_rosa_bot/fotos.py nesse momento)."""
-from models import db, Servico
+Fase 5a cobre SALAO e HUMANO de ponta a ponta. Fase 5b (atual) cobre os 4
+tópicos de serviço (ILUMINAR/COR/TRATAMENTO/CORTE) com um fluxo completo de
+perguntas (ver fluxos.py) — uma pergunta por mensagem, terminando numa etapa
+de fotos opcional (reaproveita renata_rosa_bot/fotos.py, Fase 2) pros 3
+tópicos que fazem sentido (não Tratamento, cuja causa real só a avaliação
+presencial confirma) e encaminhando pra equipe ao final.
 
-from . import mensagens, menu as menu_mod, pontuacao, handoff, status_comercial, nlu
+Fase 5b também adiciona um atalho determinístico por número (replica
+ai_attendance/orquestrador.py::_intent_por_numero) — responder só o dígito
+da opção, no menu principal ou numa pergunta com alternativas numeradas,
+nunca precisa de uma chamada à IA pra ser entendido."""
+from models import db, Servico, RenataRosaFunilFoto
+
+from . import mensagens, menu as menu_mod, pontuacao, handoff, status_comercial, nlu, fluxos as fluxos_mod
+from . import fotos as fotos_mod
 from .estado import get_or_create_estado, resetar_estado, registrar_transcricao
 from ai_attendance.informacoes import texto_informacoes
 
-_TOPICOS_SERVICO_SEM_FLUXO_PROPRIO = ('ILUMINAR', 'COR', 'TRATAMENTO', 'CORTE')
+
+def _intent_por_numero_menu(mensagem, opcoes):
+    texto = (mensagem or '').strip()
+    if not texto.isdigit():
+        return None
+    idx = int(texto) - 1
+    if 0 <= idx < len(opcoes):
+        return opcoes[idx].intent
+    return None
 
 
 def _catalogo(empresa):
@@ -40,7 +54,7 @@ def _aplicar_sinais(estado, resultado):
         estado.pt_perguntou_valores = True
     if resultado.get('perguntou_disponibilidade'):
         estado.pt_perguntou_disponibilidade = True
-    if resultado.get('quer_humano') and estado.topico_ativo in _TOPICOS_SERVICO_SEM_FLUXO_PROPRIO:
+    if resultado.get('quer_humano') and estado.topico_ativo in fluxos_mod.FLUXOS:
         # pediu atendente já estando numa qualificação de serviço = sinal de
         # quem quer contratar, não só tirar dúvida (seção 5.1).
         estado.pt_pediu_humano_contratar = True
@@ -53,6 +67,63 @@ def _recalcular_score(estado):
     score, classificacao, _ = pontuacao.calcular_pontuacao(estado)
     estado.score_total = score
     estado.classificacao = pontuacao.QUENTE if estado.forcar_quente else classificacao
+
+
+def _avancar_fluxo_servico(empresa, lead, estado, topico, mensagem, media_id, media_mime_type, token):
+    """Fase 5b — avança a sequência de perguntas de um dos 4 tópicos de
+    serviço (fluxos.py). Entra/troca de tópico sempre do zero (mesmo no meio
+    de outro fluxo, RN seção 4: a cliente pode mudar de assunto quando
+    quiser); dentro do mesmo tópico, cada mensagem é a resposta da pergunta
+    atual e avança pra próxima, pra etapa de fotos (se o tópico aceitar) ou
+    direto pro encaminhamento — sem pergunta extra de confirmação, pra não
+    criar fricção com quem já demonstrou engajamento respondendo tudo."""
+    if estado.topico_ativo != topico:
+        estado.topico_ativo = topico
+        estado.pergunta_idx = 0
+        status_comercial.definir_status(estado, 'em_atendimento_ia')
+        db.session.commit()
+        return [fluxos_mod.intro(topico), fluxos_mod.pergunta_texto(topico, 0)]
+
+    total = fluxos_mod.total_perguntas(topico)
+    idx = estado.pergunta_idx if estado.pergunta_idx is not None else 0
+
+    if idx < total:
+        label = fluxos_mod.opcao_por_numero(fluxos_mod.opcoes_da_pergunta(topico, idx), mensagem)
+        if label:
+            estado.pt_servico_especifico = True
+            estado.servico_opcao_label = label
+            _recalcular_score(estado)
+
+        next_idx = idx + 1
+        if next_idx < total:
+            estado.pergunta_idx = next_idx
+            db.session.commit()
+            return [fluxos_mod.pergunta_texto(topico, next_idx)]
+
+        if fluxos_mod.permite_foto(topico):
+            estado.pergunta_idx = total  # sentinela: terminou as perguntas de texto, aguardando fotos
+            db.session.commit()
+            return [mensagens.FOTOS]
+
+        return handoff.transferir(empresa, lead, estado, 'fluxo_concluido', mensagens.HANDOFF_PADRAO)
+
+    # idx == total — etapa de fotos (só alcançável quando permite_foto)
+    if media_id:
+        if fotos_mod.limite_atingido(lead):
+            return [mensagens.FOTOS_LIMITE_ATINGIDO]
+        era_primeira = RenataRosaFunilFoto.query.filter_by(lead_id=lead.id).count() == 0
+        try:
+            fotos_mod.baixar_e_salvar(empresa, lead, media_id, media_mime_type, token)
+        except Exception:
+            return [mensagens.FOTO_FALHA_DOWNLOAD]
+        if era_primeira:
+            estado.pt_referencia_foto = True
+            _recalcular_score(estado)
+            db.session.commit()
+            return [mensagens.FOTO_RECEBIDA_PRIMEIRA]
+        return []
+
+    return handoff.transferir(empresa, lead, estado, 'fluxo_concluido_com_fotos', mensagens.HANDOFF_PADRAO)
 
 
 def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=None, media_mime_type=None) -> list:
@@ -76,11 +147,32 @@ def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=N
     opcoes = menu_mod.opcoes_ativas(empresa)
     servicos = _catalogo(empresa)
     info_texto = texto_informacoes(empresa)
-    system_prompt = nlu.montar_system_prompt(empresa, estado, opcoes, servicos, info_texto)
-    try:
-        resultado = nlu.classificar(system_prompt, mensagem)
-    except nlu.NLUError:
-        resultado = nlu.classificar_fallback_regex(mensagem)
+
+    # Atalhos determinísticos (D1 do plano) — nunca gastam uma chamada à IA
+    # pra entender um dígito solto (menu principal, ou pergunta de fluxo que
+    # já lista alternativas numeradas, caso do Tratamento) nem pra processar
+    # uma foto na etapa de fotos (mensagem é só o placeholder '[image]', não
+    # há nada pra classificar).
+    resultado = None
+    if estado.topico_ativo is None:
+        intent_numero = _intent_por_numero_menu(mensagem, opcoes)
+        if intent_numero:
+            resultado = {'topico': intent_numero, 'resposta_ao_cliente': ''}
+    elif estado.topico_ativo in fluxos_mod.FLUXOS and estado.pergunta_idx is not None:
+        total_topico = fluxos_mod.total_perguntas(estado.topico_ativo)
+        if estado.pergunta_idx < total_topico:
+            opcoes_pergunta = fluxos_mod.opcoes_da_pergunta(estado.topico_ativo, estado.pergunta_idx)
+            if fluxos_mod.opcao_por_numero(opcoes_pergunta, mensagem):
+                resultado = {'topico': estado.topico_ativo, 'resposta_ao_cliente': ''}
+        elif media_id and estado.pergunta_idx == total_topico:
+            resultado = {'topico': estado.topico_ativo, 'resposta_ao_cliente': ''}
+
+    if resultado is None:
+        system_prompt = nlu.montar_system_prompt(empresa, estado, opcoes, servicos, info_texto)
+        try:
+            resultado = nlu.classificar(system_prompt, mensagem)
+        except nlu.NLUError:
+            resultado = nlu.classificar_fallback_regex(mensagem)
 
     # Prioridades (seção 5.3) — sempre antes do score/tópico, e
     # independentes de qualquer coisa que a cliente já tenha respondido.
@@ -124,12 +216,8 @@ def processar_mensagem(empresa, lead, telefone, mensagem, token=None, media_id=N
         registrar_transcricao(estado, bot=textos)
         return textos
 
-    if topico in _TOPICOS_SERVICO_SEM_FLUXO_PROPRIO:
-        estado.topico_ativo = topico
-        status_comercial.definir_status(estado, 'em_atendimento_ia')
-        db.session.commit()
-        resposta_ia = (resultado.get('resposta_ao_cliente') or '').strip()
-        textos = [resposta_ia or mensagens.TOPICO_RECEBIDO_GENERICO, mensagens.OFERECER_ENCAMINHAR]
+    if topico in fluxos_mod.FLUXOS:
+        textos = _avancar_fluxo_servico(empresa, lead, estado, topico, mensagem, media_id, media_mime_type, token)
         registrar_transcricao(estado, bot=textos)
         return textos
 

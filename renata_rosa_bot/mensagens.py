@@ -161,8 +161,3 @@ DESINTERESSE_FINAL = (
     'algumas opções para você se inspirar quando quiser. 😊'
 )
 
-TOPICO_RECEBIDO_GENERICO = 'Adorei saber um pouquinho do que você procura! 💕'
-OFERECER_ENCAMINHAR = (
-    'Quer que eu encaminhe suas informações para nossa equipe conversar com '
-    'você sobre os próximos passos?'
-)
