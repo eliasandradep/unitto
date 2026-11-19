@@ -16,7 +16,8 @@ from ai_attendance.gating import ia_disponivel
 from ai_attendance.orquestrador import processar_mensagem
 from ai_attendance.logging_ia import log_evento_ia
 from renata_rosa_bot.gating import funil_ativo
-from renata_rosa_bot.orquestrador import processar_mensagem as rr_processar_mensagem
+from renata_rosa_bot.orquestrador import processar_mensagem as rr_processar_mensagem, resetar_interacao_teste
+from renata_rosa_bot.menu import menu_texto as rr_menu_texto
 
 _PARSERS = {
     'whatsapp_business_account': parse_whatsapp,
@@ -372,6 +373,25 @@ def _upsert_lead(integracao, evento):
             nome = None
 
     if lead:
+        if evento['canal'] == 'whatsapp' and funil_ativo(integracao.empresa) \
+                and (evento['mensagem'] or '').strip().lower() == 'reset':
+            # Comando de teste da Renata Rosa — intercepta ANTES de
+            # qualquer gating normal (inclusive conversa transferida, que
+            # senão bloquearia justamente o cenário onde mais se precisa
+            # resetar: logo depois de um handoff de teste). Nunca passa
+            # disso daqui pra baixo nesta mensagem.
+            resetar_interacao_teste(integracao.empresa, lead)
+            try:
+                token = decrypt_token(integracao.access_token_enc)
+                meta_client.enviar_mensagem_whatsapp(
+                    integracao.identificador_externo, evento['external_thread_id'],
+                    'Conversa reiniciada do zero (comando de teste). 🔄', token)
+                meta_client.enviar_mensagem_whatsapp(
+                    integracao.identificador_externo, evento['external_thread_id'],
+                    rr_menu_texto(integracao.empresa), token)
+            except Exception:
+                current_app.logger.exception('Falha ao confirmar reset de teste da Renata Rosa')
+            return
         if lead.aguardando_contato:
             etapa = lead.contato_etapa or 'tudo'  # leads em andamento antes do deploy caem no fallback antigo
 

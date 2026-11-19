@@ -71,10 +71,14 @@ def _selecionar_unidade(mensagem, unidades):
     return None
 
 
+def _com_dica_menu(texto):
+    return f'{texto}{mensagens.DICA_VOLTAR_MENU}'
+
+
 def _texto_pergunta_unidade(unidades):
     linhas = ['Antes de continuar, em qual unidade você prefere ser atendida?']
     linhas += [f'{i}. {u.label()}' for i, u in enumerate(unidades, start=1)]
-    return '\n'.join(linhas)
+    return _com_dica_menu('\n'.join(linhas))
 
 
 def _slug_unidade_admin(unidade):
@@ -97,6 +101,26 @@ _RE_EMAIL = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+')
 def _extrair_email(mensagem):
     m = _RE_EMAIL.search(mensagem or '')
     return m.group(0) if m else None
+
+
+def resetar_interacao_teste(empresa, lead):
+    """Comando de teste ('reset', digitado a qualquer momento — ver
+    meta_webhook/routes.py::_upsert_lead, que intercepta ANTES do bloqueio
+    normal de conversa transferida, senão um reset pedido logo após um
+    handoff nunca chegaria até aqui) — reinicia a conversa inteira,
+    inclusive os campos "pegajosos" do Lead (e-mail/serviço/unidade, pra
+    poder re-testar essas perguntas também) e destrava um handoff em
+    andamento. Não é algo que um cliente real deveria usar no dia a dia —
+    é só uma porta de testes, mantida simples de propósito."""
+    estado = get_or_create_estado(empresa, lead)
+    resetar_estado(estado)
+    status_comercial.definir_status(estado, 'novo_lead', forcar=True)
+    lead.contato_etapa = None
+    lead.email = None
+    lead.unit = None
+    lead.service = None
+    lead.message = None
+    db.session.commit()
 
 
 def _atualizar_mensagem_lead(lead, estado):
@@ -152,7 +176,7 @@ def _avancar_para_email_ou_seguinte(empresa, lead, estado, topico):
         return _avancar_apos_email(empresa, lead, estado, topico, mostrar_ack=False)
     estado.pergunta_idx = fluxos_mod.total_perguntas(topico)
     db.session.commit()
-    return [mensagens.PEDIR_EMAIL]
+    return [_com_dica_menu(mensagens.PEDIR_EMAIL)]
 
 
 def _avancar_apos_email(empresa, lead, estado, topico, mostrar_ack):
@@ -160,7 +184,7 @@ def _avancar_apos_email(empresa, lead, estado, topico, mostrar_ack):
     if fluxos_mod.permite_foto(topico):
         estado.pergunta_idx = total + 1
         db.session.commit()
-        textos = [mensagens.FOTOS]
+        textos = [_com_dica_menu(mensagens.FOTOS)]
         return ([mensagens.EMAIL_ANOTADO] + textos) if mostrar_ack else textos
     textos = handoff.transferir(empresa, lead, estado, 'fluxo_concluido', mensagens.HANDOFF_PADRAO)
     return ([mensagens.EMAIL_ANOTADO] + textos) if mostrar_ack else textos
@@ -187,7 +211,7 @@ def _avancar_fluxo_servico(empresa, lead, estado, topico, mensagem, media_id, me
                 lead.unit = slug
         estado.pergunta_idx = 0
         db.session.commit()
-        return [fluxos_mod.intro(topico), fluxos_mod.pergunta_texto(topico, 0)]
+        return [fluxos_mod.intro(topico), _com_dica_menu(fluxos_mod.pergunta_texto(topico, 0))]
 
     idx = estado.pergunta_idx if estado.pergunta_idx is not None else 0
 
@@ -201,7 +225,7 @@ def _avancar_fluxo_servico(empresa, lead, estado, topico, mensagem, media_id, me
             lead.unit = slug
         estado.pergunta_idx = 0
         db.session.commit()
-        return [fluxos_mod.intro(topico), fluxos_mod.pergunta_texto(topico, 0)]
+        return [fluxos_mod.intro(topico), _com_dica_menu(fluxos_mod.pergunta_texto(topico, 0))]
 
     total = fluxos_mod.total_perguntas(topico)
 
@@ -231,7 +255,7 @@ def _avancar_fluxo_servico(empresa, lead, estado, topico, mensagem, media_id, me
         if next_idx < total:
             estado.pergunta_idx = next_idx
             db.session.commit()
-            return [fluxos_mod.pergunta_texto(topico, next_idx)]
+            return [_com_dica_menu(fluxos_mod.pergunta_texto(topico, next_idx))]
 
         return _avancar_para_email_ou_seguinte(empresa, lead, estado, topico)
 
@@ -287,6 +311,18 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
         status_comercial.definir_status(estado, 'em_atendimento_ia')
 
     registrar_transcricao(estado, cliente=mensagem)
+
+    # "0" volta pro menu principal a partir de qualquer ponto do fluxo
+    # (pergunta de unidade, perguntas de texto, e-mail, fotos ou SALAO) —
+    # reset "leve": só tira do tópico atual, mantém pontuação/sinais já
+    # coletados (diferente do comando de teste "reset", ver mais abaixo).
+    if estado.topico_ativo and (mensagem or '').strip() == '0':
+        estado.topico_ativo = None
+        estado.pergunta_idx = None
+        db.session.commit()
+        textos = [menu_mod.menu_texto(empresa)]
+        registrar_transcricao(estado, bot=textos)
+        return textos
 
     opcoes = menu_mod.opcoes_ativas(empresa)
     servicos = _catalogo(empresa)
@@ -363,7 +399,7 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
         estado.topico_ativo = 'SALAO'
         status_comercial.definir_status(estado, 'em_atendimento_ia')
         db.session.commit()
-        textos = [info_texto or mensagens.SALAO_SEM_INFO, mensagens.SALAO_PERGUNTA_FINAL]
+        textos = [info_texto or mensagens.SALAO_SEM_INFO, _com_dica_menu(mensagens.SALAO_PERGUNTA_FINAL)]
         registrar_transcricao(estado, bot=textos)
         return textos
 

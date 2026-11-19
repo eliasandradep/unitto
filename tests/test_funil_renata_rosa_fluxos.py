@@ -141,6 +141,7 @@ def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
         'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
         'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
         'mensagem que a gente continua. 📧'
+        '\n\nDigite *0* para voltar ao menu principal.'
     ]
     db.session.refresh(estado)
     assert estado.pergunta_idx == total
@@ -156,6 +157,7 @@ def test_fluxo_iluminar_completo_ate_fotos_e_encaminha(monkeypatch):
         'tem acesso. O envio é totalmente opcional.\n\n'
         'Quando terminar (ou se preferir não enviar agora), é só me mandar '
         'qualquer mensagem que a gente continua. 😊'
+        '\n\nDigite *0* para voltar ao menu principal.'
     ]
     db.session.refresh(estado)
     assert estado.pergunta_idx == total + 1
@@ -267,6 +269,7 @@ def test_tratamento_nao_tem_etapa_de_fotos(monkeypatch):
         'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
         'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
         'mensagem que a gente continua. 📧'
+        '\n\nDigite *0* para voltar ao menu principal.'
     ]
     db.session.refresh(estado)
     assert estado.prazo_texto == 'quero fazer essa semana'  # fallback determinístico (E4)

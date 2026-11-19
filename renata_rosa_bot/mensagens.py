@@ -161,6 +161,8 @@ DESINTERESSE_FINAL = (
     'algumas opções para você se inspirar quando quiser. 😊'
 )
 
+DICA_VOLTAR_MENU = '\n\nDigite *0* para voltar ao menu principal.'
+
 PEDIR_EMAIL = (
     'Perfeito! 💕 Se quiser, me passa também seu e-mail pra mantermos contato? '
     'É totalmente opcional — se preferir não informar, é só me mandar qualquer '
