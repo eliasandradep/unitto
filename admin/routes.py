@@ -2475,12 +2475,9 @@ def agenda_listagem():
     dt_ini = request.args.get('dt_ini', '')
     dt_fim = request.args.get('dt_fim', '')
 
+    # Visualização liberada pra qualquer perfil ver a listagem de qualquer
+    # profissional — só excluir (abaixo, no POST) continua restrito.
     q = tq(Agendamento).join(Agendamento.profissional)
-
-    scope = agenda_scope()
-    if scope in ('own_ro', 'own'):
-        prof = current_profissional()
-        q = q.filter(Agendamento.profissional_id == (prof.id if prof else -1))
 
     if resp_q:
         q = q.filter(Profissional.nome.ilike(f'%{resp_q}%'))
@@ -2672,10 +2669,11 @@ def agenda_dados():
     if data_fim < data_sel:
         data_fim = data_sel
 
+    # Visualização da agenda é liberada pra qualquer perfil ver qualquer
+    # profissional (web e mobile usam este mesmo endpoint) — só CRIAR/EDITAR
+    # um agendamento continua restrito por agenda_scope() (ver agenda_novo/
+    # agenda_editar), a visualização em si não.
     ags_q = tq(Agendamento).filter(Agendamento.data >= data_sel, Agendamento.data <= data_fim)
-    if agenda_scope() in ('own_ro', 'own'):
-        prof = current_profissional()
-        ags_q = ags_q.filter(Agendamento.profissional_id == (prof.id if prof else -1))
     ags = ags_q.order_by(Agendamento.data, Agendamento.hora_inicio).all()
     bls = tq(BloqueioAgenda).filter(
         BloqueioAgenda.data_inicio <= data_fim,
