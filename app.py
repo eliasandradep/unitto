@@ -489,6 +489,8 @@ with app.app_context():
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
     _safe_add_col('empresas',        'funil_qualificacao_rr_ativo',
                   'BOOLEAN DEFAULT FALSE' if _pg else 'INTEGER DEFAULT 0')
+    _safe_add_col('renata_rosa_funil_leads', 'status_comercial',
+                  "VARCHAR(30) DEFAULT 'novo_lead'")
     _safe_add_col('renata_rosa_funil_leads', 'motivo_nao_convertido', 'TEXT')
     _safe_add_col('renata_rosa_funil_leads', 'agendamento_vinculado_id', 'INTEGER')
     _safe_add_col('renata_rosa_funil_leads', 'topico_ativo', 'VARCHAR(20)')
