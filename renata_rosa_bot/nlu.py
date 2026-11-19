@@ -115,6 +115,12 @@ def montar_system_prompt(empresa, estado, opcoes_menu, servicos, info_texto) -> 
     linhas.append('Opções do menu principal (labels customizados pelo salão):')
     for opcao in opcoes_menu:
         linhas.append(f'- {opcao.intent}: "{opcao.label}"')
+    linhas.append(
+        'Se a cliente responder com a frase completa de uma dessas opções, ou até só uma '
+        'palavra claramente associada a uma delas (ex: "corte", "cor", "coloração", "salão", '
+        '"especialista", "atendente"), classifique o tópico certo mesmo sem nenhuma outra '
+        'explicação na mensagem — não precisa de confirmação extra pra isso.'
+    )
     linhas.append('')
 
     if servicos:
@@ -189,11 +195,11 @@ _RE_HUMANO     = re.compile(r'(?i)atendente|especialista|humano|\bpessoa\b|falar
 _RE_RECLAMACAO = re.compile(r'(?i)reclama|p[ée]ssimo|horr[ií]vel|insatisfe|decep|absurdo')
 _RE_AGENDAR    = re.compile(r'(?i)agend|marcar|marca[cç][aã]o|quero fazer (j[aá]|agora)')
 _RE_DESINTERESSE = re.compile(r'(?i)s[oó] (estou |to )?pesquisando|n[aã]o quero|n[aã]o tenho interesse|deixa pra l[aá]|agora n[aã]o')
-_RE_ILUMINAR   = re.compile(r'(?i)mecha|loiro|ilumina[çc][aã]o|morena ilumin')
-_RE_COR        = re.compile(r'(?i)colora[çc][aã]o|tingir|cor do cabelo|mudar a cor')
+_RE_ILUMINAR   = re.compile(r'(?i)mecha|loiro|ilumina[çc][aã]o|iluminar|morena ilumin')
+_RE_COR        = re.compile(r'(?i)colora[çc][aã]o|tingir|cor do cabelo|mudar a cor|\bcor\b')
 _RE_TRATAMENTO = re.compile(r'(?i)tratamento|hidrata|ressecad|quebra|frizz|recuperar')
 _RE_CORTE      = re.compile(r'(?i)corte|cortar|franja')
-_RE_SALAO      = re.compile(r'(?i)conhecer o sal[aã]o|endere[çc]o|onde fica|localiza[çc][aã]o|funcionamento')
+_RE_SALAO      = re.compile(r'(?i)conhecer o sal[aã]o|endere[çc]o|onde fica|localiza[çc][aã]o|funcionamento|\bsal[aã]o\b')
 
 
 def classificar_fallback_regex(mensagem: str) -> dict:

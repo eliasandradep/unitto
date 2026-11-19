@@ -13,7 +13,12 @@ presencial confirma) e encaminhando pra equipe ao final.
 Fase 5b também adiciona um atalho determinístico por número (replica
 ai_attendance/orquestrador.py::_intent_por_numero) — responder só o dígito
 da opção, no menu principal ou numa pergunta com alternativas numeradas,
-nunca precisa de uma chamada à IA pra ser entendido.
+nunca precisa de uma chamada à IA pra ser entendido. Fase 5g estende isso:
+responder a frase completa de uma opção do menu (com ou sem emoji) também
+vira atalho determinístico; uma frase parecida ou só uma palavra (ex:
+"corte") passa pela NLU normal, com instrução reforçada em
+nlu.py::montar_system_prompt pra reconhecer isso sem exigir confirmação —
+e o fallback por regex (nlu.py) cobre os mesmos casos quando a IA falha.
 
 Fase 5c adiciona, dentro do mesmo fluxo: a pergunta de unidade (só quando a
 empresa tem mais de uma, só uma vez por lead — mesmo padrão de
@@ -42,6 +47,23 @@ def _intent_por_numero_menu(mensagem, opcoes):
     idx = int(texto) - 1
     if 0 <= idx < len(opcoes):
         return opcoes[idx].intent
+    return None
+
+
+def _intent_por_texto_menu(mensagem, opcoes):
+    """Atalho determinístico (além do número) pra quando a cliente digita a
+    frase completa de uma opção do menu, com ou sem o emoji (_normalizar
+    descarta emoji/acento/caixa) — evita uma chamada à IA pro caso óbvio de
+    "copiou e colou" a opção. Pra frases parecidas ou uma única palavra
+    (ex: só "corte"), quem resolve é a NLU normal — ver instrução reforçada
+    em nlu.py::montar_system_prompt, e o fallback por regex em nlu.py pra
+    quando a IA falha."""
+    alvo = _normalizar(mensagem)
+    if not alvo:
+        return None
+    for opcao in opcoes:
+        if _normalizar(opcao.label) == alvo:
+            return opcao.intent
     return None
 
 
@@ -365,9 +387,9 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
     # humano nessa etapa.
     resultado = None
     if estado.topico_ativo is None:
-        intent_numero = _intent_por_numero_menu(mensagem, opcoes)
-        if intent_numero:
-            resultado = {'topico': intent_numero, 'resposta_ao_cliente': ''}
+        intent_opcao = _intent_por_numero_menu(mensagem, opcoes) or _intent_por_texto_menu(mensagem, opcoes)
+        if intent_opcao:
+            resultado = {'topico': intent_opcao, 'resposta_ao_cliente': ''}
     elif estado.topico_ativo in fluxos_mod.FLUXOS and estado.pergunta_idx is not None:
         if estado.pergunta_idx == _AGUARDANDO_UNIDADE:
             if _selecionar_unidade(mensagem, _unidades_ativas(empresa)):
