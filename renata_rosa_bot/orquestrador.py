@@ -25,7 +25,7 @@ _atualizar_mensagem_lead e resumo.montar_mensagem_lead."""
 import re
 import unicodedata
 
-from models import db, Servico, Unidade, RenataRosaFunilFoto
+from models import db, Servico, Unidade, RenataRosaFunilFoto, InformacaoEstabelecimento
 
 from . import mensagens, menu as menu_mod, pontuacao, handoff, status_comercial, nlu, resumo, fluxos as fluxos_mod
 from . import fotos as fotos_mod
@@ -47,6 +47,18 @@ def _intent_por_numero_menu(mensagem, opcoes):
 
 def _catalogo(empresa):
     return Servico.query.filter_by(empresa_id=empresa.id, ativo=True).order_by(Servico.nome).all()
+
+
+def _tem_informacoes_reais(empresa):
+    """`ai_attendance.informacoes.texto_informacoes()` (reaproveitado pro
+    contexto da IA) sempre devolve algum texto — inclusive uma frase de "não
+    tenho essa informação" quando nada foi cadastrado, pensada pra resposta
+    de um intent de dúvida pontual. No SALAO não queremos mandar essa frase
+    negativa: só mostramos info quando ela é real (checagem igual à
+    interna de texto_informacoes, sem repetir a frase de fallback)."""
+    info = InformacaoEstabelecimento.query.filter_by(empresa_id=empresa.id).first()
+    return bool(info and any([info.endereco, info.horario_funcionamento,
+                               info.formas_pagamento_texto, info.observacoes]))
 
 
 def _unidades_ativas(empresa):
@@ -335,7 +347,7 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
         estado.topico_ativo = None
         estado.pergunta_idx = None
         db.session.commit()
-        textos = [menu_mod.menu_texto(empresa)]
+        textos = [menu_mod.menu_texto(empresa, lead)]
         registrar_transcricao(estado, bot=textos)
         return textos
 
@@ -414,7 +426,12 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
         estado.topico_ativo = 'SALAO'
         status_comercial.definir_status(estado, 'em_atendimento_ia')
         db.session.commit()
-        textos = [info_texto or mensagens.SALAO_SEM_INFO]
+        # Nunca manda a frase de "não tenho essa informação" — só mostra o
+        # que realmente estiver cadastrado (endereço/horário, link de Street
+        # View por unidade), nunca um texto genérico no lugar do que falta.
+        textos = []
+        if _tem_informacoes_reais(empresa):
+            textos.append(info_texto)
         street_view = _texto_street_view(empresa)
         if street_view:
             textos.append(street_view)
@@ -434,6 +451,6 @@ def _processar_mensagem_interno(empresa, lead, estado, mensagem, token, media_id
     resposta_ia = (resultado.get('resposta_ao_cliente') or '').strip()
     if pergunta_direta and resposta_ia:
         textos.append(resposta_ia)
-    textos.append(menu_mod.menu_texto(empresa))
+    textos.append(menu_mod.menu_texto(empresa, lead))
     registrar_transcricao(estado, bot=textos)
     return textos

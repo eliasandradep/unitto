@@ -2,6 +2,11 @@
 de regras de negócio do cliente. RN12/RN13 e as mensagens de erro/handoff
 genérico não vieram prontas no documento — são rascunho e devem ser validadas
 com o cliente antes de produção."""
+import random
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+_TZ_BRASIL = ZoneInfo('America/Sao_Paulo')
 
 MENU_PRINCIPAL = (
     'Olá! 💕 Seja muito bem-vinda ao Renata Rosa Beauty Concept!\n\n'
@@ -144,6 +149,47 @@ MENU_INTRO_PADRAO = (
     'Me conta o que você gostaria de fazer hoje!'
 )
 
+# Complementos variados do menu principal (pedido do usuário — nunca repetir
+# sempre o mesmo parágrafo padrão), usados quando o tenant NÃO customizou
+# `RenataRosaMenuConfig.titulo` pelo admin (quem customizou, usa o próprio
+# texto, só com a saudação dinâmica na frente — ver menu.py::menu_texto).
+MENU_COMPLEMENTOS_PADRAO = (
+    'É um prazer tê-la aqui conosco! Como podemos ajudar? Selecione uma opção '
+    'do nosso menu para poder lhe proporcionar uma experiência ainda melhor. ✨',
+    'Que bom ter você por aqui! 💕 Pra te atender do jeitinho certo, escolha '
+    'uma das opções abaixo.',
+    'Ficamos felizes com seu contato! Me conta o que você procura hoje, '
+    'escolhendo uma das opções abaixo. 💫',
+    'Seja muito bem-vinda ao Renata Rosa Beauty Concept! 💖 Escolha uma opção '
+    'abaixo pra começarmos.',
+)
+
+
+def _primeiro_nome(nome_completo):
+    """Primeiro token com alguma letra — pula emoji/símbolos que às vezes
+    vêm junto do nome de perfil do WhatsApp (ex: '🌸 Ana')."""
+    for token in (nome_completo or '').strip().split(' '):
+        limpo = token.strip()
+        if limpo and any(c.isalpha() for c in limpo):
+            return limpo
+    return None
+
+
+def saudacao_dinamica(lead=None):
+    """'Bom dia'/'Boa tarde'/'Boa noite' conforme o horário de Brasília,
+    chamando a cliente pelo primeiro nome quando o WhatsApp informar um
+    (Lead.name) — nunca inventa nome, só usa o que o próprio WhatsApp deu."""
+    hora = datetime.now(_TZ_BRASIL).hour
+    if 5 <= hora < 12:
+        saudacao = 'Bom dia'
+    elif 12 <= hora < 18:
+        saudacao = 'Boa tarde'
+    else:
+        saudacao = 'Boa noite'
+    nome = _primeiro_nome(lead.name) if lead else None
+    return f'{saudacao}, {nome}!' if nome else f'{saudacao}!'
+
+
 HANDOFF_PADRAO = (
     'Perfeito! 💕 Vou encaminhar nossa conversa para a equipe do Renata Rosa '
     'Beauty Concept, que poderá te orientar sobre valores, disponibilidade e '
@@ -151,10 +197,6 @@ HANDOFF_PADRAO = (
 )
 
 SALAO_PERGUNTA_FINAL = 'Qual desses cuidados combina mais com o que você está procurando neste momento?'
-SALAO_SEM_INFO = (
-    'Ainda não tenho essas informações cadastradas por aqui. Posso te '
-    'transferir para uma especialista, se preferir.'
-)
 
 DESINTERESSE_FINAL = (
     'Claro! 💕 Pode pesquisar com tranquilidade. Se quiser, posso te mostrar '

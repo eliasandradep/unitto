@@ -75,7 +75,9 @@ def test_saudacao_livre_mostra_menu_principal(monkeypatch):
                         nlu_result=_resultado(topico='OUTRO'))
 
     assert len(enviados) == 1
-    assert 'Renata Rosa Beauty Concept' in enviados[0]
+    # saudação dinâmica (Fase 5f) — varia por horário/nome, nunca mais o
+    # parágrafo fixo de sempre; só confere a estrutura (saudação + opções)
+    assert any(s in enviados[0] for s in ('Bom dia', 'Boa tarde', 'Boa noite'))
     assert '✨ Quero iluminar' in enviados[0]
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.status_comercial == 'novo_lead'
@@ -89,12 +91,14 @@ def test_topico_salao_mostra_info_e_pergunta_final(monkeypatch):
     enviados = _enviar(integracao, 'quero conhecer o salão', thread_id, monkeypatch,
                         nlu_result=_resultado(topico='SALAO'))
 
-    # 3 mensagens: info do salão, links do Street View das 2 unidades
-    # (Fase 5e — cadastrados via seed de teste em app.py) e a pergunta final
-    assert len(enviados) == 3
-    assert 'https://maps.app.goo.gl/RyZaDTHpjpu5TXBfA' in enviados[1]  # Varginha
-    assert 'https://maps.app.goo.gl/vU9buweSrbq2KwF37' in enviados[1]  # São José dos Campos
-    assert 'combina mais' in enviados[2]
+    # 2 mensagens: sem endereço/horário cadastrado (texto_informacoes não
+    # tem nada real pra essa empresa de teste), a frase negativa de "não
+    # tenho essa informação" não aparece (Fase 5f) — só o link do Street
+    # View das 2 unidades (Fase 5e) e a pergunta final.
+    assert len(enviados) == 2
+    assert 'https://maps.app.goo.gl/RyZaDTHpjpu5TXBfA' in enviados[0]  # Varginha
+    assert 'https://maps.app.goo.gl/vU9buweSrbq2KwF37' in enviados[0]  # São José dos Campos
+    assert 'combina mais' in enviados[1]
     lead, estado = _lead_e_estado(empresa, thread_id)
     assert estado.topico_ativo == 'SALAO'
     assert estado.status_comercial == 'em_atendimento_ia'

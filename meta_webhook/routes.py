@@ -388,7 +388,7 @@ def _upsert_lead(integracao, evento):
                 token = decrypt_token(integracao.access_token_enc)
                 meta_client.enviar_mensagem_whatsapp(
                     integracao.identificador_externo, evento['external_thread_id'],
-                    rr_menu_texto(integracao.empresa), token)
+                    rr_menu_texto(integracao.empresa, lead), token)
             except Exception:
                 current_app.logger.exception('Falha ao confirmar reset de teste da Renata Rosa')
             return

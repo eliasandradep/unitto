@@ -4,7 +4,11 @@ tabela própria pra manter o isolamento.
 
 `intent` é sempre a chave interna fixa (INTENTS_MENU_RR); só `label`/
 `ordem`/`ativo` e o texto de boas-vindas (`titulo`) podem vir de input do
-tenant."""
+tenant. `titulo` funciona como o "complemento" da saudação dinâmica (ver
+menu_texto) — quando o tenant customiza, esse texto é usado todo turno, só
+com a saudação (hora do dia + nome, se houver) na frente."""
+import random
+
 from models import db, INTENTS_MENU_RR, RenataRosaMenuConfig, RenataRosaMenuOpcao
 
 from . import mensagens
@@ -53,11 +57,21 @@ def atualizar_opcoes(empresa, form):
     db.session.commit()
 
 
-def menu_texto(empresa) -> str:
-    """Texto do menu numerado enviado ao cliente."""
+def menu_texto(empresa, lead=None) -> str:
+    """Texto do menu numerado enviado ao cliente. Sempre começa com a
+    saudação dinâmica (Bom dia/Boa tarde/Boa noite, com o nome quando o
+    WhatsApp informar um — ver mensagens.saudacao_dinamica). O complemento é
+    o texto customizado pelo tenant (`cfg.titulo`, se diferente do padrão)
+    ou, por padrão, varia a cada chamada em vez de repetir sempre o mesmo
+    parágrafo fixo (pedido do usuário)."""
     cfg = get_or_create_menu_config(empresa)
     opcoes = opcoes_ativas(empresa)
-    linhas = [cfg.titulo or mensagens.MENU_INTRO_PADRAO, '']
+    saudacao = mensagens.saudacao_dinamica(lead)
+    if cfg.titulo and cfg.titulo != mensagens.MENU_INTRO_PADRAO:
+        complemento = cfg.titulo
+    else:
+        complemento = random.choice(mensagens.MENU_COMPLEMENTOS_PADRAO)
+    linhas = [f'{saudacao}\n\n{complemento}', '']
     for i, opcao in enumerate(opcoes, start=1):
         linhas.append(f'{i}. {opcao.label}')
     return '\n'.join(linhas)
