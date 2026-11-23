@@ -127,7 +127,7 @@
           <input type="hidden" name="action" value="update_status_comercial" />
         <div class="status-buttons">
           {% for key, label in status_comercial_opcoes %}
-          <label class="status-option {% if lead.funil_rr.status_comercial == key %}selected{% endif %}">
+          <label class="status-option status-option-rr--{{ key }} {% if lead.funil_rr.status_comercial == key %}selected{% endif %}">
             <input type="radio" name="status_comercial" value="{{ key }}"
                    {% if lead.funil_rr.status_comercial == key %}checked{% endif %} />
             {{ label }}
@@ -135,7 +135,7 @@
           {% endfor %}
         </div>
         <div class="form-group" style="margin-top:.6rem">
-          <label>Motivo (opcional — usado ao marcar "Não convertido")</label>
+          <label>Motivo (opcional — usado ao marcar "Perdido" ou "Sem interesse")</label>
           <input type="text" name="motivo" value="{{ lead.funil_rr.motivo_nao_convertido or '' }}" />
         </div>
         <button type="submit" class="btn-primary btn-full" style="margin-top:1rem">Atualizar status comercial</button>

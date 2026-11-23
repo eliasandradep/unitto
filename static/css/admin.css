@@ -588,6 +588,21 @@ body.sidebar--collapsed .sidebar__nav {
 .status-option--convertido.selected     { border-color: #1E8449; background: #E9F7EF; color: #1E8449; }
 .status-option--perdido.selected        { border-color: #717D7E; background: #F2F3F4; color: #717D7E; }
 
+/* Status comercial (funil Renata Rosa) — mesmo padrão acima, cores próprias
+   pros 10 status da Fase 5. Sem isso, nenhuma opção aparecia destacada
+   (nem antes nem depois de salvar), dando a impressão de que o botão
+   "Atualizar status comercial" não fazia nada. */
+.status-option-rr--novo_lead.selected                     { border-color: #2980B9; background: #EBF5FB; color: #2980B9; }
+.status-option-rr--em_atendimento_ia.selected              { border-color: #CA6F1E; background: #FEF5E7; color: #CA6F1E; }
+.status-option-rr--em_qualificacao.selected                { border-color: #B7950B; background: #FEF9E7; color: #B7950B; }
+.status-option-rr--aguardando_cliente.selected              { border-color: #7D3C98; background: #F4ECF7; color: #7D3C98; }
+.status-option-rr--aguardando_atendimento_humano.selected   { border-color: #D35400; background: #FBEEE6; color: #D35400; }
+.status-option-rr--em_atendimento_humano.selected           { border-color: #148F77; background: #E8F8F5; color: #148F77; }
+.status-option-rr--agendamento_confirmado.selected           { border-color: #1E8449; background: #E9F7EF; color: #1E8449; }
+.status-option-rr--servico_realizado.selected               { border-color: #196F3D; background: #D5F5E3; color: #196F3D; }
+.status-option-rr--perdido.selected                         { border-color: #717D7E; background: #F2F3F4; color: #717D7E; }
+.status-option-rr--sem_interesse.selected                   { border-color: #A93226; background: #FDEDEC; color: #A93226; }
+
 .notes-input { width: 100%; padding: .6rem .8rem; border: 1px solid var(--border);
                border-radius: var(--radius); resize: vertical; }
 .notes-history {
