@@ -338,6 +338,7 @@ def leads():
         q=q,
         mostrar_funil_rr=mostrar_funil_rr,
         temperatura_filter=temperatura_filter,
+        texto_whatsapp_lead=_texto_whatsapp_lead,
     )
 
 
@@ -365,6 +366,39 @@ def lead_new():
 
     return render_template('admin/lead_form.html',
         lead=None, statuses=LEAD_STATUSES, sources=LEAD_SOURCES)
+
+
+def _texto_whatsapp_lead(lead, empresa):
+    """Mensagem pré-preenchida no botão de WhatsApp da tela de Lead — nunca
+    enviada sozinha (só preenche o campo de texto no WhatsApp, quem manda é
+    a pessoa que clicou), puxando o que já foi coletado (serviço/objetivo/
+    prazo — inclusive os dados mais ricos do funil da Renata Rosa quando
+    houver) pra puxar a conversa o mais perto possível do fechamento."""
+    primeiro_nome = (lead.name or '').strip().split(' ')[0] if lead.name else None
+    saudacao = f'Oi, {primeiro_nome}!' if primeiro_nome else 'Oi!'
+
+    funil = getattr(lead, 'funil_rr', None)
+    servico = lead.service or (funil.servico_opcao_label if funil else None)
+    objetivo = funil.resultado_desejado_texto if funil else None
+    prazo = funil.prazo_texto if funil else None
+
+    partes = [f'{saudacao} Aqui é da equipe {empresa.nome}. 😊']
+    if servico and objetivo:
+        partes.append(f'Vi que você tem interesse em {servico} e quer {objetivo}.')
+    elif servico:
+        partes.append(f'Vi que você tem interesse em {servico}.')
+    elif objetivo:
+        partes.append(f'Vi que seu objetivo é: {objetivo}.')
+    else:
+        partes.append('Vi seu contato por aqui e já quero te ajudar a dar o próximo passo!')
+
+    if prazo:
+        partes.append(f'Como você comentou "{prazo}", já separei um horário pra você. ✨')
+    else:
+        partes.append('Já separei um horário pensando em você. ✨')
+
+    partes.append('Posso confirmar seu agendamento agora?')
+    return ' '.join(partes)
 
 
 @admin_bp.route('/leads/<int:lead_id>', methods=['GET', 'POST'])
@@ -446,7 +480,8 @@ def lead_detail(lead_id):
         lead=lead, statuses=LEAD_STATUSES, cliente_vinculado=cliente_vinculado,
         mostrar_funil_rr=rr_funil_ativo(g.empresa), status_comercial_opcoes=STATUS_COMERCIAL_RR,
         agendamentos_cliente_vinculado=agendamentos_cliente_vinculado,
-        agendamento_status_labels=AGENDAMENTO_STATUS)
+        agendamento_status_labels=AGENDAMENTO_STATUS,
+        whatsapp_text=_texto_whatsapp_lead(lead, g.empresa))
 
 
 @admin_bp.route('/leads/<int:lead_id>/fotos/<int:foto_id>')
@@ -2865,6 +2900,22 @@ def _pode_encaixar_agendamento():
     return current_perfil() != 'leitura'
 
 
+def _redirect_agenda_sem_permissao(acao, data_str, outro_profissional):
+    """Em vez do 403 genérico (abort), explica a regra de negócio pro
+    usuário entender o que está acontecendo: perfil Profissional só mexe na
+    própria agenda; perfil leitura não mexe em agendamento nenhum. Pedido
+    do usuário depois de um caso real de confusão com uma atendente."""
+    if outro_profissional:
+        msg = (f'Seu perfil só permite {acao} agendamentos da sua própria agenda. Para '
+               f'{acao} o agendamento de outra profissional, peça a alguém com perfil '
+               'Atendente, Recepção ou Administrador.')
+    else:
+        msg = (f'Seu perfil de acesso (somente leitura) não permite {acao} agendamentos. '
+               'Fale com a administração se precisar de outro nível de acesso.')
+    flash(msg, 'error')
+    return redirect(url_for('admin.agenda', data=data_str))
+
+
 def _find_encaixe_bloqueado(profissional_id, data, hora_inicio, duracao_min, exclude_ag_id=None):
     """Retorna o Agendamento conflitante quando quem está criando/editando
     NÃO pode encaixar (ver _pode_encaixar_agendamento) e o horário já está
@@ -2887,14 +2938,14 @@ def _find_encaixe_bloqueado(profissional_id, data, hora_inicio, duracao_min, exc
 def agenda_novo():
     scope = agenda_scope()
     if scope == 'own_ro':
-        abort(403)
+        return _redirect_agenda_sem_permissao('criar', request.form.get('data', ''), outro_profissional=False)
     a, data_str = _build_agendamento(Agendamento())
     if a is None:
         return redirect(url_for('admin.agenda', data=data_str))
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
-            abort(403)
+            return _redirect_agenda_sem_permissao('criar', data_str, outro_profissional=True)
     # Expediente (dias/horários de trabalho cadastrados) só restringe o
     # agendamento online — recepção e profissional podem agendar fora dele
     # pelo painel interno. Bloqueio manual e escala por unidade continuam
@@ -2923,12 +2974,12 @@ def agenda_novo():
 def agenda_editar(ag_id):
     scope = agenda_scope()
     if scope == 'own_ro':
-        abort(403)
+        return _redirect_agenda_sem_permissao('editar', request.form.get('data', ''), outro_profissional=False)
     a_orig = db.get_or_404(Agendamento, ag_id)
     if scope == 'own':
         prof = current_profissional()
         if not prof or a_orig.profissional_id != prof.id:
-            abort(403)
+            return _redirect_agenda_sem_permissao('editar', a_orig.data.isoformat(), outro_profissional=True)
     orig_date = a_orig.data.isoformat()
     a, data_str = _build_agendamento(a_orig)
     if a is None:
@@ -2936,7 +2987,7 @@ def agenda_editar(ag_id):
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
-            abort(403)
+            return _redirect_agenda_sem_permissao('editar', data_str, outro_profissional=True)
     # Expediente só restringe o agendamento online (ver comentário em
     # agenda_novo) — não barra edição feita pelo painel interno.
     if a.unidade_id:
@@ -2968,12 +3019,12 @@ def agenda_editar(ag_id):
 def agenda_excluir(ag_id):
     scope = agenda_scope()
     if scope == 'own_ro':
-        abort(403)
+        return _redirect_agenda_sem_permissao('excluir', request.form.get('data', ''), outro_profissional=False)
     a = db.get_or_404(Agendamento, ag_id)
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
-            abort(403)
+            return _redirect_agenda_sem_permissao('excluir', a.data.isoformat(), outro_profissional=True)
     data_str = a.data.isoformat()
     db.session.delete(a)
     db.session.commit()
@@ -2986,12 +3037,16 @@ def agenda_excluir(ag_id):
 def agenda_status(ag_id):
     scope = agenda_scope()
     if scope == 'own_ro':
-        abort(403)
+        return jsonify({'ok': False, 'message': 'Seu perfil de acesso (somente leitura) não '
+                         'permite alterar o status de agendamentos.'}), 403
     a = db.get_or_404(Agendamento, ag_id)
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
-            abort(403)
+            return jsonify({'ok': False, 'message': 'Seu perfil só permite alterar o status de '
+                             'agendamentos da sua própria agenda. Para alterar o de outra '
+                             'profissional, peça a alguém com perfil Atendente, Recepção ou '
+                             'Administrador.'}), 403
     data = request.get_json(silent=True) or {}
     novo = data.get('status') or request.form.get('status', '')
     if novo not in {'agendado', 'confirmado', 'concluido', 'cancelado', 'faltou'}:

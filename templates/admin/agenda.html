@@ -1888,7 +1888,7 @@ function _actSetStatus(novoStatus) {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (!data.ok) return;
+    if (!data.ok) { _showAgToast(data.message || 'Não foi possível alterar o status.'); return; }
     _actEv.status = novoStatus;
 
     // Atualizar badge no painel 1

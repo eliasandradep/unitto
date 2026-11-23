@@ -56,7 +56,7 @@
         <td>{{ lead.name or '—' }}</td>
         <td>
           {% if lead.phone %}
-          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
+          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}?text={{ texto_whatsapp_lead(lead, g.empresa) | urlencode }}"
              target="_blank" rel="noopener" class="wa-link">{{ lead.phone }}</a>
           {% else %}
           —

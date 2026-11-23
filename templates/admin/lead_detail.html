@@ -40,7 +40,7 @@
         <div class="input-with-action">
           <input type="text" value="{{ lead.phone or '' }}" readonly />
           {% if lead.phone %}
-          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}"
+          <a href="https://wa.me/55{{ lead.phone | replace('(','') | replace(')','') | replace(' ','') | replace('-','') }}?text={{ whatsapp_text | urlencode }}"
              target="_blank" rel="noopener" class="btn-sm btn-wa">WhatsApp</a>
           {% endif %}
         </div>

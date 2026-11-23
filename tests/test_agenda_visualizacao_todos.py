@@ -102,6 +102,63 @@ def test_criacao_de_agendamento_continua_restrita_a_propria_agenda(client):
     resp = client.post('/admin/agenda/novo', data={
         'data': dia.isoformat(), 'hora_inicio': '15:00', 'profissional_id': str(prof_b.id),
         'nome_cliente': 'Tentativa Indevida', 'servico_id': str(Servico.query.first().id),
-    })
-    assert resp.status_code == 403
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    assert 'Atendente' in resp.get_data(as_text=True)  # mensagem explicando a regra, não 403 genérico
     assert Agendamento.query.filter_by(nome_cliente='Tentativa Indevida').first() is None
+
+
+def test_edicao_de_agendamento_de_outro_profissional_mostra_mensagem_explicativa(client):
+    empresa = make_empresa()
+    prof_a, prof_b, ag_a, ag_b, dia = _dois_profissionais_com_agendamento(empresa)
+    _login_perfil(client, empresa, 'profissional', prof_a)
+
+    resp = client.post(f'/admin/agenda/{ag_b.id}/editar', data={
+        'data': dia.isoformat(), 'hora_inicio': '16:00', 'profissional_id': str(prof_b.id),
+        'nome_cliente': 'Nome Alterado', 'servico_id': str(Servico.query.first().id),
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    assert 'Atendente' in resp.get_data(as_text=True)
+    db.session.refresh(ag_b)
+    assert ag_b.nome_cliente == 'Cliente da B'  # não foi alterado
+
+
+def test_exclusao_de_agendamento_de_outro_profissional_mostra_mensagem_explicativa(client):
+    empresa = make_empresa()
+    prof_a, prof_b, ag_a, ag_b, dia = _dois_profissionais_com_agendamento(empresa)
+    _login_perfil(client, empresa, 'profissional', prof_a)
+
+    resp = client.post(f'/admin/agenda/{ag_b.id}/excluir', follow_redirects=True)
+    assert resp.status_code == 200
+    assert 'Atendente' in resp.get_data(as_text=True)
+    assert db.session.get(Agendamento, ag_b.id) is not None  # não foi excluído
+
+
+def test_status_de_agendamento_de_outro_profissional_retorna_json_com_mensagem(client):
+    empresa = make_empresa()
+    prof_a, prof_b, ag_a, ag_b, dia = _dois_profissionais_com_agendamento(empresa)
+    _login_perfil(client, empresa, 'profissional', prof_a)
+
+    resp = client.post(f'/admin/agenda/{ag_b.id}/status', json={'status': 'concluido'})
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body['ok'] is False
+    assert 'Atendente' in body['message']
+    db.session.refresh(ag_b)
+    assert ag_b.status == 'agendado'  # não foi alterado
+
+
+def test_perfil_leitura_recebe_mensagem_explicativa_ao_tentar_criar(client):
+    empresa = make_empresa()
+    prof_a, prof_b, ag_a, ag_b, dia = _dois_profissionais_com_agendamento(empresa)
+    prof_a.perfil_acesso = 'leitura'
+    db.session.commit()
+    _login_perfil(client, empresa, 'leitura', prof_a)
+
+    resp = client.post('/admin/agenda/novo', data={
+        'data': dia.isoformat(), 'hora_inicio': '17:00', 'profissional_id': str(prof_a.id),
+        'nome_cliente': 'Tentativa Leitura', 'servico_id': str(Servico.query.first().id),
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    assert 'somente leitura' in resp.get_data(as_text=True).lower()
+    assert Agendamento.query.filter_by(nome_cliente='Tentativa Leitura').first() is None
