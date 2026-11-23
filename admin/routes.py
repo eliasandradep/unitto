@@ -2760,6 +2760,35 @@ def agenda_dados():
     })
 
 
+def _tel_normalizado_sql(coluna):
+    """Mesma normalização usada nos templates (replace de '(', ')', ' ', '-')
+    só que em SQL, pra poder comparar/buscar por telefone ignorando formatação."""
+    return db.func.replace(db.func.replace(db.func.replace(db.func.replace(
+        coluna, '(', ''), ')', ''), ' ', ''), '-', '')
+
+
+def _tel_digitos(tel):
+    return re.sub(r'\D', '', tel or '')
+
+
+def _localizar_ou_criar_cliente_por_telefone(nome, telefone):
+    """Usado ao salvar um agendamento sem cliente_id selecionado no autocomplete:
+    tenta achar uma cliente já cadastrada com o mesmo telefone (ignorando
+    formatação) antes de criar uma nova, pra não duplicar cadastro."""
+    tel_digitos = _tel_digitos(telefone)
+    if not tel_digitos:
+        return None
+    existente = (tq(Cliente)
+                 .filter(_tel_normalizado_sql(Cliente.telefone) == tel_digitos)
+                 .first())
+    if existente:
+        return existente
+    novo = Cliente(nome=nome, telefone=telefone)
+    db.session.add(novo)
+    db.session.flush()
+    return novo
+
+
 def _build_agendamento(a):
     from datetime import date, time as _time
     data_str = request.form.get('data', '')
@@ -2805,7 +2834,14 @@ def _build_agendamento(a):
     a.nome_cliente    = nome
     a.telefone        = request.form.get('telefone', '').strip() or None
     cid = request.form.get('cliente_id', '').strip()
-    a.cliente_id      = int(cid) if cid else None
+    if cid:
+        a.cliente_id = int(cid)
+    else:
+        # Cliente não veio do autocomplete — procura por telefone (mesmo
+        # critério usado na busca) antes de cadastrar uma nova, pra não
+        # duplicar quem já existe no sistema.
+        cliente = _localizar_ou_criar_cliente_por_telefone(nome, a.telefone)
+        a.cliente_id = cliente.id if cliente else None
     a.profissional_id = int(prof_id)
     a.servico_id      = servicos_sel[0].id if servicos_sel else None
     a.servicos_lista  = servicos_sel
@@ -2942,9 +2978,14 @@ def agenda_novo():
     a, data_str = _build_agendamento(Agendamento())
     if a is None:
         return redirect(url_for('admin.agenda', data=data_str))
+    # A partir daqui `_build_agendamento` já pode ter dado flush numa Cliente
+    # nova (telefone sem correspondência cadastrada) — qualquer saída sem
+    # salvar o agendamento precisa desfazer isso, senão a cliente fica
+    # registrada mesmo sem o agendamento ter sido criado.
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
+            db.session.rollback()
             return _redirect_agenda_sem_permissao('criar', data_str, outro_profissional=True)
     # Expediente (dias/horários de trabalho cadastrados) só restringe o
     # agendamento online — recepção e profissional podem agendar fora dele
@@ -2953,14 +2994,17 @@ def agenda_novo():
     if a.unidade_id:
         escala_err = _find_escala_conflict(a.profissional_id, a.unidade_id, a.data)
         if escala_err:
+            db.session.rollback()
             flash(f'Não é possível agendar: {escala_err}.', 'error')
             return redirect(url_for('admin.agenda', data=data_str))
     conflict = _find_bloqueio_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if conflict:
+        db.session.rollback()
         flash(f'Não é possível agendar: {conflict.motivo or "Horário bloqueado"}.', 'error')
         return redirect(url_for('admin.agenda', data=data_str))
     encaixe_bloqueado = _find_encaixe_bloqueado(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if encaixe_bloqueado:
+        db.session.rollback()
         flash('Não é possível agendar: já existe um agendamento nesse horário pra essa profissional.', 'error')
         return redirect(url_for('admin.agenda', data=data_str))
     db.session.add(a)
@@ -2984,19 +3028,26 @@ def agenda_editar(ag_id):
     a, data_str = _build_agendamento(a_orig)
     if a is None:
         return redirect(url_for('admin.agenda', data=orig_date))
+    # A partir daqui `_build_agendamento` já pode ter dado flush numa Cliente
+    # nova (telefone sem correspondência cadastrada) além das mudanças em
+    # `a` (mesmo objeto de `a_orig`) — qualquer saída sem salvar a edição
+    # precisa desfazer os dois, senão algo fica persistido sem o commit.
     if scope == 'own':
         prof = current_profissional()
         if not prof or a.profissional_id != prof.id:
+            db.session.rollback()
             return _redirect_agenda_sem_permissao('editar', data_str, outro_profissional=True)
     # Expediente só restringe o agendamento online (ver comentário em
     # agenda_novo) — não barra edição feita pelo painel interno.
     if a.unidade_id:
         escala_err = _find_escala_conflict(a.profissional_id, a.unidade_id, a.data)
         if escala_err:
+            db.session.rollback()
             flash(f'Não é possível agendar: {escala_err}.', 'error')
             return redirect(url_for('admin.agenda', data=data_str))
     conflict = _find_bloqueio_conflict(a.profissional_id, a.data, a.hora_inicio, a.duracao_min)
     if conflict:
+        db.session.rollback()
         flash(f'Não é possível agendar: {conflict.motivo or "Horário bloqueado"}.', 'error')
         return redirect(url_for('admin.agenda', data=data_str))
     encaixe_bloqueado = _find_encaixe_bloqueado(a.profissional_id, a.data, a.hora_inicio, a.duracao_min,
@@ -4906,8 +4957,13 @@ def api_clientes_busca():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
         return jsonify([])
+    filtros = [Cliente.nome.ilike(f'%{q}%')]
+    q_digitos = re.sub(r'\D', '', q)
+    if len(q_digitos) >= 2:
+        tel_normalizado = _tel_normalizado_sql(Cliente.telefone)
+        filtros.append(tel_normalizado.ilike(f'%{q_digitos}%'))
     clientes = (tq(Cliente)
-                .filter(Cliente.nome.ilike(f'%{q}%'), Cliente.bloqueado == False)
+                .filter(db.or_(*filtros), Cliente.bloqueado == False)
                 .order_by(Cliente.nome)
                 .limit(10).all())
     return jsonify([{'id': c.id, 'nome': c.nome, 'telefone': c.telefone or ''} for c in clientes])
