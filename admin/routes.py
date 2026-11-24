@@ -2578,7 +2578,7 @@ def _ler_filtro_mobile():
     if not isinstance(dado, dict):
         return default
     tipo = dado.get('tipo')
-    if tipo not in ('dia', 'semana', 'listagem'):
+    if tipo not in ('dia', 'semana', 'grade', 'listagem'):
         tipo = 'dia'
     ids = dado.get('profissional_ids')
     if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
@@ -2605,6 +2605,15 @@ def agenda():
         'cor': p.avatar_cor(), 'iniciais': p.avatar_iniciais(),
         'foto_url': url_for('profissional_foto_serve', prof_id=p.id) if p.foto_data else None,
     } for p in profissionais_ativos]
+    filtro_mobile = _ler_filtro_mobile()
+    # ?tipo= permite trocar de visão vindo de outra tela (ex: os links da
+    # Listagem pra voltar direto pra Dia/Semana/Grade) sem passar pelas
+    # abas dentro da própria agenda — e já fica salvo pra próxima vez.
+    tipo_param = request.args.get('tipo')
+    if tipo_param in ('dia', 'semana', 'grade', 'listagem') and tipo_param != filtro_mobile['tipo']:
+        filtro_mobile['tipo'] = tipo_param
+        current_user.agenda_filtro_mobile = json.dumps(filtro_mobile)
+        db.session.commit()
     return render_template('admin/agenda.html',
         data_sel=data_sel,
         profissionais=profissionais_ativos,
@@ -2612,7 +2621,7 @@ def agenda():
         servicos=servicos_ativos,
         unidades=unidades_ativas,
         formas=FORMA_PAGAMENTO,
-        filtro_mobile=_ler_filtro_mobile(),
+        filtro_mobile=filtro_mobile,
     )
 
 
@@ -2641,7 +2650,7 @@ def agenda_filtro_mobile_salvar():
     agenda_ordem_colunas, mas aqui é específico da visão mobile."""
     body = request.get_json(silent=True) or {}
     tipo = body.get('tipo')
-    if tipo not in ('dia', 'semana', 'listagem'):
+    if tipo not in ('dia', 'semana', 'grade', 'listagem'):
         tipo = 'dia'
     ids_brutos = body.get('profissional_ids')
     if not isinstance(ids_brutos, list):

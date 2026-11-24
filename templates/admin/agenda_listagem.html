@@ -4,6 +4,15 @@
 
 {% block content %}
 
+<!-- Alternância de visão (mobile): sem isso, quem vinha pra Listagem não
+     tinha como voltar fácil pra Dia/Semana/Grade sem usar o menu lateral. -->
+<div class="agl-view-tabs">
+  <a href="{{ url_for('admin.agenda', tipo='dia') }}" class="agl-view-tab">Dia</a>
+  <a href="{{ url_for('admin.agenda', tipo='semana') }}" class="agl-view-tab">Semana</a>
+  <a href="{{ url_for('admin.agenda', tipo='grade') }}" class="agl-view-tab">Grade</a>
+  <span class="agl-view-tab active">Lista</span>
+</div>
+
 <!-- Filtros -->
 <div class="card" style="padding:1rem 1.2rem;margin-bottom:1rem">
   <form method="GET" style="display:flex;flex-wrap:wrap;gap:.7rem;align-items:flex-end">
@@ -121,6 +130,28 @@
 <style>
 .badge--info    { background:#dbeafe; color:#1e40af; }
 .badge--warning { background:#fef3c7; color:#92400e; }
+
+.agl-view-tabs { display: none; }
+@media (max-width: 760px) {
+  .agl-view-tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
+  .agl-view-tab {
+    flex: 1;
+    text-align: center;
+    padding: .5rem .2rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .agl-view-tab.active {
+    border-color: var(--gold);
+    color: var(--gold-dark);
+    background: color-mix(in srgb, var(--gold) 14%, var(--card-bg));
+  }
+}
 </style>
 
 <script>

@@ -87,12 +87,21 @@
 
 </div> <!-- /agDesktopView -->
 
-<!-- ═══════════ Visão mobile: 1 profissional por vez, dia ou semana ═══════════ -->
+<!-- ═══════════ Visão mobile: 1 profissional por vez, dia, semana ou grade ═══════════ -->
 <div class="ag-mobile-only" id="agMobile">
 
-  <!-- Toolbar: filtro + navegação de data -->
+  <!-- Alternância de visão: sempre visível, 1 toque — sem isso, quem ia pra
+       Listagem (ou qualquer outra visão) não tinha como voltar fácil. -->
+  <div class="agm-view-tabs" id="agmViewTabs">
+    <button type="button" class="agm-view-tab" data-tipo="dia">Dia</button>
+    <button type="button" class="agm-view-tab" data-tipo="semana">Semana</button>
+    <button type="button" class="agm-view-tab" data-tipo="grade">Grade</button>
+    <button type="button" class="agm-view-tab" data-tipo="listagem">Lista</button>
+  </div>
+
+  <!-- Toolbar: filtro de profissionais + navegação de data -->
   <div class="agm-toolbar">
-    <button type="button" class="btn-icon ag-nav-btn" id="agmFiltroBtn" title="Filtro da agenda">
+    <button type="button" class="btn-icon ag-nav-btn" id="agmFiltroBtn" title="Filtrar profissionais">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
         <circle cx="9" cy="6" r="1.8" fill="currentColor"/><circle cx="16" cy="12" r="1.8" fill="currentColor"/><circle cx="9" cy="18" r="1.8" fill="currentColor"/>
@@ -123,39 +132,40 @@
   <!-- Dias + cards de agendamento -->
   <div id="agmDias"></div>
 
+  <!-- Grade por hora (1 profissional, linha do tempo — igual ao conceito da
+       grade desktop, só que com uma única coluna ocupando a tela toda) -->
+  <div class="agm-grade" id="agmGrade" style="display:none">
+    <div class="agm-grade-time-col">
+      {% for h in range(7, 22) %}
+      <div class="ag-time-label">{{ '%02d:00'|format(h) }}</div>
+      <div class="ag-time-label ag-time-label--half"></div>
+      {% endfor %}
+    </div>
+    <div class="agm-grade-col" id="agmGradeCol">
+      {% for h in range(7, 22) %}
+      <div class="ag-bg-slot" data-time="{{ '%02d:00'|format(h) }}" onclick="agmAbrirNovoNaGrade(this)"></div>
+      <div class="ag-bg-slot ag-bg-slot--half" data-time="{{ '%02d:30'|format(h) }}" onclick="agmAbrirNovoNaGrade(this)"></div>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Botão flutuante: novo agendamento -->
   <button type="button" class="agm-fab" id="agmFab" title="Novo agendamento">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
 </div>
 
-<!-- Modal: filtro (tipo de agenda + profissionais) -->
+<!-- Modal: filtro de profissionais (a visão — dia/semana/grade/listagem — já
+     troca na hora pelas abas do topo, não precisa mais de modal pra isso) -->
 <div class="modal-backdrop" id="agmFiltroBg" onclick="if(event.target===this)agmFecharFiltro()">
   <div class="modal" style="max-width:420px">
     <div class="modal__header">
-      <h3>Filtro da Agenda</h3>
+      <h3>Filtrar Profissionais</h3>
       <button type="button" class="modal__close" onclick="agmFecharFiltro()">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="modal__body">
-      <div class="agm-filtro-label">Tipo de agenda</div>
-      <div class="agm-tipo-grid" id="agmTipoGrid">
-        <button type="button" class="agm-tipo-opt" data-tipo="dia">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-          Diária
-        </button>
-        <button type="button" class="agm-tipo-opt" data-tipo="semana">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M3 14h18"/></svg>
-          Semanal
-        </button>
-        <button type="button" class="agm-tipo-opt" data-tipo="listagem">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          Listagem
-        </button>
-      </div>
-
-      <div class="agm-filtro-label" style="margin-top:1.2rem">Profissionais</div>
       <p style="font-size:.76rem;color:var(--text-muted);margin:0 0 .6rem">Nenhum selecionado mostra todos.</p>
       <div class="agm-prof-grid" id="agmFiltroProfGrid"></div>
     </div>
@@ -1513,26 +1523,42 @@
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.agm-tipo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
-.agm-tipo-opt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: .3rem;
-  padding: .7rem .3rem;
+/* Abas de alternância de visão (Dia/Semana/Grade/Lista) — sempre visíveis
+   no topo da agenda mobile, pra trocar de visão com um toque só. */
+.agm-view-tabs { display: flex; gap: .4rem; margin-bottom: .7rem; }
+.agm-view-tab {
+  flex: 1;
+  text-align: center;
+  padding: .5rem .2rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg);
   color: var(--text-muted);
   font-size: .78rem;
+  font-weight: 600;
   cursor: pointer;
   transition: background .15s, border-color .15s, color .15s;
 }
-.agm-tipo-opt.active {
+.agm-view-tab.active {
   border-color: var(--gold);
   color: var(--gold-dark);
   background: color-mix(in srgb, var(--gold) 14%, var(--card-bg));
-  font-weight: 600;
+}
+
+/* Visão Grade: mesma mecânica da grade desktop (ag-time-label/ag-bg-slot/
+   ag-event), só que com uma única coluna de largura total — 1 profissional
+   por vez, igual ao resto da agenda mobile. */
+.agm-grade { display: flex; align-items: flex-start; }
+.agm-grade-time-col {
+  width: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+.agm-grade-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
 }
 
 .agm-prof-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; max-height: 46vh; overflow-y: auto; }
@@ -2945,17 +2971,72 @@ function _escH(s) {
     agmAtualizarProfBar();
   }
 
+  // Visão Grade: 1 dia, 1 profissional, linha do tempo por hora — reaproveita
+  // timeToTop/durToH/_layoutColunas, as mesmas funções da grade desktop.
+  function agmRenderGrade() {
+    var col = document.getElementById('agmGradeCol');
+    col.querySelectorAll('.ag-event').forEach(function(el) { el.remove(); });
+
+    var evs = agmEstado.cache.events.filter(function(ev) {
+      return ev.data === agmEstado.dataSel && ev.profissional_id === agmEstado.profAtualId;
+    });
+    evs.forEach(function(ev) { ev._ini = _toMin(ev.hora_inicio); ev._fim = ev._ini + ev.duracao_min; });
+    _layoutColunas(evs);
+
+    evs.forEach(function(ev) {
+      var div = document.createElement('div');
+      var evClass = (ev.comanda_status === 'fechada') ? 'ag-event--pago' : ('ag-event--' + ev.status);
+      div.className = 'ag-event ' + evClass;
+      div.style.top    = timeToTop(ev.hora_inicio) + 'px';
+      div.style.height = durToH(ev.duracao_min) + 'px';
+      var largura = 100 / ev._totalCols;
+      div.style.left  = 'calc(' + (ev._col * largura) + '% + 2px)';
+      div.style.width = 'calc(' + largura + '% - 4px)';
+      div.style.right = 'auto';
+      div.dataset.id  = ev.id;
+      var svcHtml = ev.servico_nome
+        ? '<br><span style="opacity:.75;font-size:.7rem">' + _escH(ev.servico_nome) + '</span>'
+        : '';
+      div.innerHTML = '<strong>' + ev.hora_inicio + '</strong> ' + _escH(ev.nome_cliente) + svcHtml;
+      div.addEventListener('click', function(e) { e.stopPropagation(); openActsModal(ev); });
+      col.appendChild(div);
+    });
+
+    agmAtualizarDateLabel();
+    agmAtualizarProfBar();
+  }
+
+  window.agmAbrirNovoNaGrade = function(el) {
+    currentDate = agmEstado.dataSel;
+    openNewAg(el.dataset.time, agmEstado.profAtualId);
+  };
+
+  // Despacha pra o renderizador certo conforme a visão ativa.
+  function agmRenderAtual() {
+    var dias  = document.getElementById('agmDias');
+    var grade = document.getElementById('agmGrade');
+    if (agmEstado.tipo === 'grade') {
+      dias.style.display  = 'none';
+      grade.style.display = 'flex';
+      agmRenderGrade();
+    } else {
+      grade.style.display = 'none';
+      dias.style.display  = '';
+      agmRenderDias();
+    }
+  }
+
   function agmCarregar() {
     var r = agmRangeAtual();
     if (agmEstado.cache.ini === r.ini && agmEstado.cache.fim === r.fim) {
-      agmRenderDias();
+      agmRenderAtual();
       return;
     }
     fetch('/admin/agenda/dados?data=' + r.ini + '&data_fim=' + r.fim)
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
         agmEstado.cache = { ini: r.ini, fim: r.fim, events: data.events || [] };
-        agmRenderDias();
+        agmRenderAtual();
       })
       .catch(function() {});
   }
@@ -3010,7 +3091,7 @@ function _escH(s) {
       row.addEventListener('click', function() {
         agmEstado.profAtualId = p.id;
         agmFecharProfPicker();
-        agmRenderDias();
+        agmRenderAtual();
       });
       lista.appendChild(row);
     });
@@ -3018,25 +3099,41 @@ function _escH(s) {
   }
   document.getElementById('agmProfBar').addEventListener('click', agmAbrirProfPicker);
 
-  // ── Modal de filtro (tipo de agenda + profissionais) ──────────────────────
-  var _filtroTipoSelecionado = agmEstado.tipo;
+  // ── Abas de visão (Dia/Semana/Grade/Lista) — troca na hora, 1 toque ───────
+  function agmAtualizarViewTabs() {
+    document.querySelectorAll('.agm-view-tab').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.tipo === agmEstado.tipo);
+    });
+  }
+
+  function agmSalvarFiltroServidor() {
+    fetch(FILTRO_MOBILE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: agmEstado.tipo, profissional_ids: agmEstado.profissionalIds }),
+    }).catch(function() {});
+  }
+
+  document.querySelectorAll('.agm-view-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var tipo = btn.dataset.tipo;
+      if (tipo === agmEstado.tipo) return;
+      agmEstado.tipo = tipo;
+      agmAtualizarViewTabs();
+      agmSalvarFiltroServidor();
+      if (tipo === 'listagem') {
+        window.location.href = AGENDA_LISTAGEM_URL;
+        return;
+      }
+      agmCarregar();
+    });
+  });
+
+  // ── Modal de filtro (só profissionais) ─────────────────────────────────────
   var _filtroProfSelecionados = agmEstado.profissionalIds.slice();
 
   function agmFecharFiltro() { document.getElementById('agmFiltroBg').classList.remove('open'); }
   window.agmFecharFiltro = agmFecharFiltro;
-
-  function agmMarcarTipoAtivo() {
-    document.querySelectorAll('.agm-tipo-opt').forEach(function(btn) {
-      btn.classList.toggle('active', btn.dataset.tipo === _filtroTipoSelecionado);
-    });
-  }
-
-  document.querySelectorAll('.agm-tipo-opt').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      _filtroTipoSelecionado = btn.dataset.tipo;
-      agmMarcarTipoAtivo();
-    });
-  });
 
   function agmMontarGradeFiltroProf() {
     var grid = document.getElementById('agmFiltroProfGrid');
@@ -3063,30 +3160,17 @@ function _escH(s) {
   }
 
   document.getElementById('agmFiltroBtn').addEventListener('click', function() {
-    _filtroTipoSelecionado = agmEstado.tipo;
     _filtroProfSelecionados = agmEstado.profissionalIds.slice();
-    agmMarcarTipoAtivo();
     agmMontarGradeFiltroProf();
     document.getElementById('agmFiltroBg').classList.add('open');
   });
 
   document.getElementById('agmFiltroSalvarBtn').addEventListener('click', function() {
-    var tipo = _filtroTipoSelecionado;
     var ids = _filtroProfSelecionados.slice();
-    fetch(FILTRO_MOBILE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: tipo, profissional_ids: ids }),
-    }).catch(function() {});
-
-    agmFecharFiltro();
-    if (tipo === 'listagem') {
-      window.location.href = AGENDA_LISTAGEM_URL;
-      return;
-    }
-    agmEstado.tipo = tipo;
     agmEstado.profissionalIds = ids;
     agmEstado.profAtualId = agmEscolherProfInicial();
+    agmSalvarFiltroServidor();
+    agmFecharFiltro();
     agmCarregar();
   });
 
@@ -3108,6 +3192,7 @@ function _escH(s) {
     agmEstado.tipo = 'dia';
   }
 
+  agmAtualizarViewTabs();
   agmEstado.profAtualId = agmEscolherProfInicial();
   agmCarregar();
 })();
