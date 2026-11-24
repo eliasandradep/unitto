@@ -246,4 +246,22 @@
   </div>
 </div>
 
+<script>
+// Os cartões "Status" e "Status comercial" usam <input type="radio"> escondido
+// (CSS: .status-option input[type=radio] { display: none }) e só pintavam a
+// opção marcada quando a página recarregava depois de salvar — clicar numa
+// opção diferente não mudava nada na tela, dando a impressão de que o clique
+// não tinha feito efeito (bug relatado pelo usuário). Isso aqui só espelha a
+// seleção ao vivo; quem persiste a mudança continua sendo o botão "Atualizar".
+document.querySelectorAll('.status-buttons').forEach(function (grupo) {
+  grupo.addEventListener('change', function (ev) {
+    if (ev.target.type !== 'radio') return;
+    grupo.querySelectorAll('.status-option').forEach(function (opt) {
+      var input = opt.querySelector('input[type=radio]');
+      opt.classList.toggle('selected', !!(input && input.checked));
+    });
+  });
+});
+</script>
+
 {% endblock %}
