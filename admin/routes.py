@@ -3255,6 +3255,35 @@ def _check_financeiro_scope(c=None):
         abort(403)
 
 
+def _financeiro_mensagem_bloqueio():
+    """Explica a regra de negócio por trás do bloqueio de financeiro_pode_acessar,
+    em vez do 403 genérico — mesmo espírito de _redirect_agenda_sem_permissao,
+    pra quem recebe o bloqueio entender o motivo (perfil Recepção só mexe em
+    comandas do dia de hoje; perfil Profissional só nas próprias)."""
+    scope = financeiro_scope()
+    if scope == 'none':
+        return ('Seu perfil de acesso não permite abrir comandas ou lançar pagamentos. '
+                'Fale com a administração se precisar desse acesso.')
+    if scope == 'limited':
+        return ('Seu perfil (Recepção) só permite abrir ou lançar pagamento em comandas '
+                'do dia de hoje. Para uma comanda de outra data, peça a alguém com perfil '
+                'Profissional (responsável por ela) ou Administrador.')
+    if scope == 'own':
+        return ('Seu perfil só permite mexer nas próprias comandas. Para a comanda de '
+                'outra profissional, peça a ela ou a alguém com perfil Administrador.')
+    return 'Seu perfil de acesso não permite esta ação.'
+
+
+def _financeiro_scope_bloqueado_json(c=None):
+    """Para endpoints JSON do modal de comanda: retorna a response (com
+    mensagem explicativa, mesma chave 'error' que os demais erros desses
+    endpoints já usam) se o usuário não tiver acesso financeiro a `c`, ou
+    None se tiver acesso — quem chamar segue o fluxo normal nesse caso."""
+    if financeiro_pode_acessar(c):
+        return None
+    return jsonify({'ok': False, 'error': _financeiro_mensagem_bloqueio()})
+
+
 @admin_bp.route('/financeiro')
 @login_required
 def financeiro():
@@ -3442,7 +3471,8 @@ def comanda_nova():
 def comanda_detalhe(comanda_id):
     from datetime import date
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    if not financeiro_pode_acessar(c):
+        abort(403, description=_financeiro_mensagem_bloqueio())
     if request.method == 'POST':
         scope = financeiro_scope()
         if _save_comanda(c):
@@ -3639,7 +3669,9 @@ def comanda_autosave(comanda_id):
     """Salva itens e campos da comanda silenciosamente (sem flash, retorna JSON)."""
     from datetime import date
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    bloqueado = _financeiro_scope_bloqueado_json(c)
+    if bloqueado:
+        return bloqueado
     scope = financeiro_scope()
     try:
         if _save_comanda(c):
@@ -3659,7 +3691,8 @@ def comanda_pagamento_add(comanda_id):
     from datetime import date
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    if not financeiro_pode_acessar(c):
+        abort(403, description=_financeiro_mensagem_bloqueio())
     forma = request.form.get('forma_pagamento', '').strip()
     valor_s = _parse_valor_br(request.form.get('valor', ''))
     parcelas = request.form.get('parcelas', '1')
@@ -3714,7 +3747,8 @@ def comanda_pagamento_excluir(comanda_id, pag_id):
     from decimal import Decimal
     p = db.get_or_404(PagamentoComanda, pag_id)
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    if not financeiro_pode_acessar(c):
+        abort(403, description=_financeiro_mensagem_bloqueio())
 
     # Reverter fechamento (desfaz ajuste de saldo do cliente)
     if c.status == 'fechada':
@@ -3734,7 +3768,8 @@ def comanda_pagamento_excluir(comanda_id, pag_id):
 @login_required
 def comanda_fechar(comanda_id):
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    if not financeiro_pode_acessar(c):
+        abort(403, description=_financeiro_mensagem_bloqueio())
     if c.saldo > 0 and not c.cliente_id:
         flash('Esta comanda ficaria com saldo devedor, mas não está vinculada a nenhum cliente '
               'cadastrado. Vincule um cliente antes de fechar, para a dívida poder ser cobrada depois.', 'error')
@@ -4545,12 +4580,16 @@ def api_ag_comanda(ag_id):
     a = db.get_or_404(Agendamento, ag_id)
     scope = financeiro_scope()
     if scope == 'none':
-        abort(403)
+        return jsonify({'ok': False, 'error': _financeiro_mensagem_bloqueio()})
     if a.comanda:
-        _check_financeiro_scope(a.comanda)
+        bloqueado = _financeiro_scope_bloqueado_json(a.comanda)
+        if bloqueado:
+            return bloqueado
         _sync_servicos_agendamento_comanda(a.comanda, a)
         return jsonify(_comanda_to_json(a.comanda))
-    _check_financeiro_scope(a)
+    bloqueado = _financeiro_scope_bloqueado_json(a)
+    if bloqueado:
+        return bloqueado
     # Tenta auto-vincular cliente pelo telefone quando agendamento não tem cliente_id
     cliente_id = a.cliente_id
     if not cliente_id and a.telefone:
@@ -4581,7 +4620,9 @@ def api_comanda_pag_add(comanda_id):
     from datetime import date as _date
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    bloqueado = _financeiro_scope_bloqueado_json(c)
+    if bloqueado:
+        return bloqueado
     pl = request.get_json(silent=True) or {}
     forma = pl.get('forma_pagamento', '').strip()
     try:
@@ -4618,7 +4659,9 @@ def api_comanda_pag_add(comanda_id):
 def api_comanda_pag_del(comanda_id, pag_id):
     from decimal import Decimal
     c = db.get_or_404(Comanda, comanda_id)
-    _check_financeiro_scope(c)
+    bloqueado = _financeiro_scope_bloqueado_json(c)
+    if bloqueado:
+        return bloqueado
     p = db.get_or_404(PagamentoComanda, pag_id)
     if p.comanda_id != comanda_id:
         return jsonify({'ok': False, 'error': 'Pagamento não pertence a esta comanda.'}), 400

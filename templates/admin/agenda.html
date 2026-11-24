@@ -2410,6 +2410,11 @@ async function abrirComandaModal(agId, finalizar) {
     }
     var r = await fetch('/admin/api/ag/' + agId + '/comanda', {method: 'POST'});
     var data = await r.json();
+    if (data.ok === false) {
+      _showAgToast(data.error || 'Você não tem permissão para esta comanda.');
+      fecharComandaModal();
+      return;
+    }
     _cmdId = data.id;
     _carregarCmdUI(data);
   } catch(e) {
