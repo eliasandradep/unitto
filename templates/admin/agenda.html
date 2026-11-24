@@ -2417,6 +2417,8 @@ document.addEventListener('DOMContentLoaded', function() {
 var _cmdId   = null;
 var _cmdAgId = null;
 var _cmdClienteId = null;
+var _cmdProfissionalId = null;
+var _cmdUnidadeId = null;
 var _cmdItens = [];   // [{descricao, valor, quantidade, servico_id, venda_pacote_item_id}]
 var _cmdFmt = function(n) { return 'R$ ' + parseFloat(n || 0).toFixed(2).replace('.', ','); };
 var _cmdFmtInput = function(n) { return parseFloat(n || 0).toFixed(2).replace('.', ','); };
@@ -2452,6 +2454,7 @@ async function abrirComandaModal(agId, finalizar) {
 function fecharComandaModal() {
   document.getElementById('cmdModalBg').classList.remove('open');
   _cmdId = null; _cmdAgId = null; _cmdItens = [];
+  _cmdClienteId = null; _cmdProfissionalId = null; _cmdUnidadeId = null;
   fetch('/admin/agenda/dados?data=' + currentDate)
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -2464,6 +2467,8 @@ function fecharComandaModal() {
 
 function _carregarCmdUI(data) {
   _cmdClienteId = data.cliente_id || null;
+  _cmdProfissionalId = data.profissional_id || null;
+  _cmdUnidadeId = data.unidade_id || null;
   document.getElementById('cmdTitle').textContent = 'Comanda #' + data.codigo;
   document.getElementById('cmdHeaderSub').textContent = data.nome_cliente ? data.nome_cliente + (data.profissional_nome ? ' · ' + data.profissional_nome : '') : '';
   document.getElementById('cmdLinkExterno').href = '/admin/financeiro/comandas/' + data.id;
@@ -2705,9 +2710,14 @@ function _buildCmdFormData() {
   fd.append('observacoes', document.getElementById('cmdObs').value);
   fd.append('status', document.querySelector('input[name="cmdStatus"]:checked').value);
   fd.append('desconto', (document.getElementById('cmdDesconto').value || '0').replace(',', '.'));
-  fd.append('profissional_id', '');
+  // Responsável e unidade são só leitura neste modal (campo "Responsável" é
+  // texto readonly) — sem isso, qualquer autosave zerava os dois na comanda
+  // (bug real: Administrador/Recepção salvando a comanda apagava o
+  // profissional_id, e a próxima vez que a própria profissional tentasse
+  // abrir/fechar essa comanda era bloqueada como se fosse de outra pessoa).
+  fd.append('profissional_id', _cmdProfissionalId || '');
   fd.append('cliente_id', _cmdClienteId || '');
-  fd.append('unidade_id', '');
+  fd.append('unidade_id', _cmdUnidadeId || '');
   _cmdItens.forEach(function(i) {
     fd.append('item_descricao', i.descricao);
     fd.append('item_valor', String(i.valor));

@@ -4554,6 +4554,7 @@ def _comanda_to_json(c):
         'cliente_nome': c.cliente.nome if c.cliente else '',
         'profissional_id': c.profissional_id,
         'profissional_nome': c.profissional.nome if c.profissional else '',
+        'unidade_id': c.unidade_id,
         'desconto': float(c.desconto or 0),
         'observacoes': c.observacoes or '',
         'status': c.status,
