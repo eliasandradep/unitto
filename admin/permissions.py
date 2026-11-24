@@ -11,7 +11,7 @@ PERFIL_CAPS = {
     'pessoal':       {'agenda': 'own',    'comissoes': 'own',  'financeiro': 'none'},
     'profissional':  {'agenda': 'own',    'comissoes': 'own',  'financeiro': 'own'},
     'atendente':     {'agenda': 'all',    'comissoes': 'own',  'financeiro': 'none'},
-    'recepcao':      {'agenda': 'all',    'comissoes': 'own',  'financeiro': 'limited'},
+    'recepcao':      {'agenda': 'all',    'comissoes': 'own',  'financeiro': 'full'},
     'administrador': {'agenda': 'all',    'comissoes': 'all',  'financeiro': 'full'},
 }
 # financeiro: 'none' sem acesso · 'own' só comandas do próprio profissional (qualquer
