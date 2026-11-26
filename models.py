@@ -554,7 +554,13 @@ class Unidade(db.Model):
     street_view_url = db.Column(db.String(500), nullable=True)  # link do Google Street View do espaço
 
     def label(self):
+        # Quando a unidade já se chama como a cidade (ex: nome="São José dos
+        # Campos", cidade="São José dos Campos"), repetir os dois só duplica
+        # a informação ("São José dos Campos — São José dos Campos/SP") —
+        # nesse caso mostra só nome e estado.
         if self.cidade and self.estado:
+            if self.nome.strip().casefold() == self.cidade.strip().casefold():
+                return f'{self.nome} — {self.estado}'
             return f'{self.nome} — {self.cidade}/{self.estado}'
         return self.nome
 

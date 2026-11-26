@@ -94,9 +94,7 @@
           <select name="unidade_id" {% if readonly %}disabled{% endif %}>
             <option value="">Não identificada</option>
             {% for u in unidades %}
-            <option value="{{ u.id }}" {% if c and c.unidade_id == u.id %}selected{% endif %}>
-              {{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}
-            </option>
+            <option value="{{ u.id }}" {% if c and c.unidade_id == u.id %}selected{% endif %}>{{ u.label() }}</option>
             {% endfor %}
           </select>
         </div>

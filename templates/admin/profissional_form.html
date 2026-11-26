@@ -109,9 +109,7 @@
             <option value="">Sem unidade definida</option>
             {% for u in unidades %}
             <option value="{{ u.id }}"
-              {% if p and p.unidade_id == u.id %}selected{% endif %}>
-              {{ u.nome }}{% if u.cidade %} — {{ u.cidade }}/{{ u.estado }}{% endif %}
-            </option>
+              {% if p and p.unidade_id == u.id %}selected{% endif %}>{{ u.label() }}</option>
             {% endfor %}
           </select>
         </div>
@@ -310,7 +308,7 @@
               <select id="escalaUnidade" style="flex:1;min-width:110px">
                 <option value="">Unidade</option>
                 {% for u in unidades %}
-                <option value="{{ u.id }}">{{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}</option>
+                <option value="{{ u.id }}">{{ u.label() }}</option>
                 {% endfor %}
               </select>
               <input type="date" id="escalaInicio" />

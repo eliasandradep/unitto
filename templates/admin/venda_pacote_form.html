@@ -81,7 +81,7 @@
         <select name="unidade_id">
           <option value="">Não identificada</option>
           {% for u in unidades %}
-          <option value="{{ u.id }}">{{ u.nome }}{% if u.cidade %} — {{ u.cidade }}{% endif %}</option>
+          <option value="{{ u.id }}">{{ u.label() }}</option>
           {% endfor %}
         </select>
       </div>
