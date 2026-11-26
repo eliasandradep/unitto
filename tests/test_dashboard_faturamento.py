@@ -2,10 +2,11 @@
 GET /admin/dashboard/faturamento, com filtro padrão "dia atual" e opções de
 semana, mês e período específico. Mesma fonte de dados do dashboard
 Financeiro (PagamentoComanda de comandas fechadas + RecebimentoCliente,
-atribuídos à data da comanda) — por isso só aparece/funciona pra quem tem
-acesso de administrador, igual ao link "Financeiro / Dashboard" no menu
-(perm.financeiro == 'full'). Ver admin/routes.py (dashboard_faturamento,
-_faturamento_por_dia) e admin/__init__.py (_ADMIN_ONLY_ENDPOINTS)."""
+atribuídos à data da comanda) — administrador e recepção têm acesso (ambos
+precisam acompanhar o resumo financeiro no dia a dia, ver
+tem_acesso_dashboard() em admin/permissions.py). Ver admin/routes.py
+(dashboard_faturamento, _faturamento_por_dia) e admin/__init__.py
+(_ADMIN_OU_RECEPCAO_ENDPOINTS)."""
 from datetime import date, timedelta
 
 from models import db, User, Profissional, Comanda, ComandaItem, PagamentoComanda
@@ -155,14 +156,14 @@ def test_filtro_personalizado_com_periodo_maior_que_366_dias_retorna_erro(client
     assert 'error' in resp.get_json()
 
 
-def test_recepcao_nao_acessa_dashboard_nem_o_endpoint_de_faturamento(client):
-    """Faturamento no Dashboard é a mesma visão (empresa toda, todos os
-    profissionais) do dashboard Financeiro — restrito a administrador."""
+def test_recepcao_acessa_dashboard_e_o_endpoint_de_faturamento(client):
+    """Recepção também acompanha o dashboard geral (leads + resumo
+    financeiro da empresa toda) no dia a dia — ver tem_acesso_dashboard()."""
     empresa = make_empresa()
     _login_recepcionista(client, empresa)
 
     resp = client.get('/admin/dashboard')
-    assert resp.status_code == 403
+    assert resp.status_code == 200
 
     resp = client.get('/admin/dashboard/faturamento?periodo=dia')
-    assert resp.status_code == 403
+    assert resp.status_code == 200

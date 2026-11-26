@@ -65,6 +65,14 @@ def is_administrador():
     return current_perfil() == 'administrador'
 
 
+def tem_acesso_dashboard():
+    """Dashboard geral e tela de Leads — administrador e recepção, que no
+    dia a dia também precisam acompanhar leads e o resumo financeiro
+    (Contas a Pagar/Receber continuam fora, são cadastros estratégicos à
+    parte — ver _ADMIN_ONLY_ENDPOINTS em admin/__init__.py)."""
+    return current_perfil() in ('administrador', 'recepcao')
+
+
 def financeiro_pode_acessar(c=None):
     """True se o usuário logado pode ver/editar/fechar/lançar pagamento em `c`
     (uma Comanda ou um Agendamento — ambos têm .data e .profissional_id),

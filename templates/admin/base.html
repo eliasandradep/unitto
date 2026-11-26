@@ -41,7 +41,7 @@
       {% set in_configurar = ep in ['admin.users','admin.user_new','admin.user_edit','admin.user_delete','admin.themes','admin.theme_set','admin.configuracoes','admin.integracoes','admin.integracoes_meta_conectar','admin.integracoes_meta_callback','admin.integracoes_meta_desconectar','admin.integracoes_meta_ads_conectar','admin.integracoes_meta_ads_sincronizar','admin.integracoes_meta_ads_desconectar','admin.contatos_ignorados','admin.contato_ignorado_remover'] %}
 
       <!-- Dashboard -->
-      {% if perm.admin %}
+      {% if perm.dashboard %}
       <a href="{{ url_for('admin.dashboard') }}"
          class="snav-link {% if ep == 'admin.dashboard' %}active{% endif %}"
          data-tooltip="Dashboard">
@@ -114,7 +114,7 @@
           <svg class="snav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
         <div class="snav-group-items">
-          {% if perm.admin %}
+          {% if perm.dashboard %}
           <a href="{{ url_for('admin.leads') }}"         class="snav-sub {% if 'lead' in ep %}active{% endif %}">Leads</a>
           {% endif %}
           <a href="{{ url_for('admin.clientes') }}"      class="snav-sub {% if 'cliente' in ep %}active{% endif %}">Listagem</a>

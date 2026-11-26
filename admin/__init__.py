@@ -37,9 +37,6 @@ _CATALOGO_ENDPOINTS = frozenset({
 # do negócio, sem sentido para quem só atende clientes (Agenda/Comissões/
 # Financeiro têm suas próprias regras de escopo, aplicadas nas rotas).
 _ADMIN_ONLY_ENDPOINTS = frozenset({
-    'dashboard', 'dashboard_faturamento',
-    'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete', 'lead_marcar_pessoal',
-    'lead_marcar_spam', 'lead_foto_serve',
     'users', 'user_new', 'user_edit', 'user_delete',
     'metrics',
     'configuracoes',
@@ -50,7 +47,6 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'profissional_escala_add', 'profissional_escala_delete',
     'expediente_excluir',
     'boas_vindas',
-    'financeiro',
     'vendas_pacote', 'venda_pacote_nova', 'venda_pacote_detalhe',
     'venda_pacote_usar_sessao', 'venda_pacote_cancelar',
     'contas_pagar', 'conta_pagar_baixa', 'conta_pagar_excluir',
@@ -62,6 +58,17 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     'integracoes_meta_ads_sincronizar', 'integracoes_meta_ads_desconectar',
     'contatos_ignorados', 'contato_ignorado_remover',
     'campanhas', 'atendimento_ia',
+})
+
+# Endpoints liberados pra administrador E recepção — recepção também precisa
+# acompanhar leads e o resumo financeiro no dia a dia (ver
+# tem_acesso_dashboard() em permissions.py). Contas a Pagar/Receber
+# continuam só pra administrador, em _ADMIN_ONLY_ENDPOINTS.
+_ADMIN_OU_RECEPCAO_ENDPOINTS = frozenset({
+    'dashboard', 'dashboard_faturamento',
+    'leads', 'lead_new', 'lead_detail', 'lead_convert', 'lead_delete',
+    'lead_marcar_pessoal', 'lead_marcar_spam', 'lead_foto_serve',
+    'financeiro',
 })
 
 
@@ -80,6 +87,10 @@ def _check_perfil_acesso():
     if view in _ADMIN_ONLY_ENDPOINTS:
         from .permissions import is_administrador
         if not is_administrador():
+            abort(403)
+    elif view in _ADMIN_OU_RECEPCAO_ENDPOINTS:
+        from .permissions import tem_acesso_dashboard
+        if not tem_acesso_dashboard():
             abort(403)
     elif view in _CATALOGO_ENDPOINTS:
         from .permissions import tem_acesso_catalogo
@@ -157,14 +168,15 @@ def _inject_empresa():
 
     from flask_login import current_user
     from .permissions import (agenda_scope, comissoes_scope, financeiro_scope, is_administrador,
-                               tem_acesso_catalogo, bloqueios_pode_gerenciar)
+                               tem_acesso_catalogo, bloqueios_pode_gerenciar, tem_acesso_dashboard)
     if current_user.is_authenticated:
         perm = {'agenda': agenda_scope(), 'comissoes': comissoes_scope(),
                 'financeiro': financeiro_scope(), 'admin': is_administrador(),
-                'catalogo': tem_acesso_catalogo(), 'bloqueios': bloqueios_pode_gerenciar()}
+                'catalogo': tem_acesso_catalogo(), 'bloqueios': bloqueios_pode_gerenciar(),
+                'dashboard': tem_acesso_dashboard()}
     else:
         perm = {'agenda': 'own_ro', 'comissoes': 'none', 'financeiro': 'none', 'admin': False,
-                'catalogo': False, 'bloqueios': False}
+                'catalogo': False, 'bloqueios': False, 'dashboard': False}
 
     return {'empresa': empresa, 'setup_pendente': setup_pendente, 'theme_css': theme_css,
             'profissionais_limite_atingido': profissionais_limite_atingido, 'perm': perm}
