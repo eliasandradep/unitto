@@ -47,6 +47,7 @@
       </select>
     </div>
     {% endif %}
+    <input type="hidden" name="per_page" value="{{ per_page }}" />
     <div style="display:flex;gap:.5rem">
       <button type="submit" class="btn-primary">Buscar</button>
       <a href="{{ url_for('admin.contas_receber') }}" class="btn-secondary">Limpar</a>
@@ -61,8 +62,60 @@
   </button>
 </div>
 
+{% set pg_args = {'status': status_f, 'dt_ini': dt_ini, 'dt_fim': dt_fim, 'unidade': unidade_f, 'per_page': per_page} %}
+{% macro paginacao_nav() %}
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+  <p style="font-size:.78rem;color:var(--text-muted);margin:0">
+    {% if pagination.total %}
+    Exibindo {{ (pagination.page - 1) * per_page + 1 }}–{{ (pagination.page - 1) * per_page + contas|length }}
+    de {{ pagination.total }} conta(s)
+    {% else %}0 conta(s){% endif %}
+  </p>
+  <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+    <form method="GET" style="display:flex;align-items:center;gap:.35rem">
+      <input type="hidden" name="status" value="{{ status_f }}" />
+      <input type="hidden" name="dt_ini" value="{{ dt_ini }}" />
+      <input type="hidden" name="dt_fim" value="{{ dt_fim }}" />
+      {% if unidades_list|length > 1 %}<input type="hidden" name="unidade" value="{{ unidade_f }}" />{% endif %}
+      <label style="font-size:.78rem;color:var(--text-muted)">Por página</label>
+      <select name="per_page" onchange="this.form.submit()">
+        {% for opt in per_page_options %}
+        <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if pagination.pages > 1 %}
+    <nav style="display:flex;align-items:center;gap:.25rem;flex-wrap:wrap">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('admin.contas_receber', page=pagination.prev_num, **pg_args) }}"
+         class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">‹</a>
+      {% endif %}
+      {% for pg in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if pg %}
+          {% if pg == pagination.page %}
+          <span style="padding:.22rem .55rem;font-size:.78rem;font-weight:600;background:var(--gold);color:#fff;border-radius:4px">{{ pg }}</span>
+          {% else %}
+          <a href="{{ url_for('admin.contas_receber', page=pg, **pg_args) }}"
+             class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">{{ pg }}</a>
+          {% endif %}
+        {% else %}
+          <span style="font-size:.78rem;color:var(--text-muted);padding:0 .1rem">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if pagination.has_next %}
+      <a href="{{ url_for('admin.contas_receber', page=pagination.next_num, **pg_args) }}"
+         class="btn-secondary" style="padding:.22rem .55rem;font-size:.78rem">›</a>
+      {% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{{ paginacao_nav() }}
+
 <!-- Listagem -->
-<div class="card" style="padding:0;overflow:hidden">
+<div class="card" style="padding:0;overflow:hidden;margin-top:.6rem">
   {% if contas %}
   <div style="overflow-x:auto">
   <table class="admin-table">
@@ -138,6 +191,8 @@
   <div style="padding:2rem;text-align:center;color:var(--text-muted)">Nenhuma conta encontrada.</div>
   {% endif %}
 </div>
+
+<div style="margin-top:.6rem">{{ paginacao_nav() }}</div>
 
 <!-- Modal: Nova Conta a Receber -->
 <div id="modalNovaConta" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">

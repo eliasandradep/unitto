@@ -3885,6 +3885,23 @@ def financeiro_categorias():
 
 # ── Contas a Pagar ────────────────────────────────────────────────────────────
 
+_CONTAS_PER_PAGE_OPTIONS = [25, 50, 100, 200, 500]
+
+
+def _contas_per_page_e_pagina():
+    try:
+        per_page = int(request.args.get('per_page', 50))
+    except (ValueError, TypeError):
+        per_page = 50
+    if per_page not in _CONTAS_PER_PAGE_OPTIONS:
+        per_page = 50
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+    return per_page, page
+
+
 @admin_bp.route('/financeiro/contas-a-pagar', methods=['GET', 'POST'])
 @login_required
 def contas_pagar():
@@ -3940,15 +3957,19 @@ def contas_pagar():
             q = q.filter(ContaPagar.vencimento <= _date.fromisoformat(dt_fim_s))
         except ValueError:
             pass
-    contas = q.order_by(ContaPagar.vencimento.asc()).all()
-    total_pendente = sum(cp.valor for cp in contas if cp.status == 'pendente')
-    total_pago     = sum(cp.valor for cp in contas if cp.status == 'pago')
+    q = q.order_by(ContaPagar.vencimento.asc())
+    contas_todas   = q.all()
+    total_pendente = sum(cp.valor for cp in contas_todas if cp.status == 'pendente')
+    total_pago     = sum(cp.valor for cp in contas_todas if cp.status == 'pago')
+    per_page, page = _contas_per_page_e_pagina()
+    pagination     = q.paginate(page=page, per_page=per_page, error_out=False)
     categorias_fin = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
     unidades_list  = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
-    return render_template('admin/contas_pagar.html', contas=contas,
+    return render_template('admin/contas_pagar.html', contas=pagination.items, pagination=pagination,
                            status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s, unidade_f=unidade_f,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
                            total_pendente=total_pendente, total_pago=total_pago,
+                           per_page=per_page, per_page_options=_CONTAS_PER_PAGE_OPTIONS,
                            categorias_fin=categorias_fin, unidades_list=unidades_list)
 
 
@@ -4041,16 +4062,20 @@ def contas_receber():
             q = q.filter(ContaReceber.vencimento <= _date.fromisoformat(dt_fim_s))
         except ValueError:
             pass
-    contas = q.order_by(ContaReceber.vencimento.asc()).all()
-    total_pendente  = sum(cr.valor for cr in contas if cr.status == 'pendente')
-    total_recebido  = sum(cr.valor for cr in contas if cr.status == 'recebido')
+    q = q.order_by(ContaReceber.vencimento.asc())
+    contas_todas    = q.all()
+    total_pendente  = sum(cr.valor for cr in contas_todas if cr.status == 'pendente')
+    total_recebido  = sum(cr.valor for cr in contas_todas if cr.status == 'recebido')
+    per_page, page  = _contas_per_page_e_pagina()
+    pagination      = q.paginate(page=page, per_page=per_page, error_out=False)
     clientes_list   = tq(Cliente).order_by(Cliente.nome).all()
     categorias_fin  = tq(CategoriaFinanceira).filter_by(ativo=True).order_by(CategoriaFinanceira.nome).all()
     unidades_list   = tq(Unidade).filter_by(ativo=True).order_by(Unidade.nome).all()
-    return render_template('admin/contas_receber.html', contas=contas,
+    return render_template('admin/contas_receber.html', contas=pagination.items, pagination=pagination,
                            status_f=status_f, dt_ini=dt_ini_s, dt_fim=dt_fim_s, unidade_f=unidade_f,
                            formas=FORMA_PAGAMENTO, hoje=_date.today().isoformat(),
                            total_pendente=total_pendente, total_recebido=total_recebido,
+                           per_page=per_page, per_page_options=_CONTAS_PER_PAGE_OPTIONS,
                            clientes_list=clientes_list, categorias_fin=categorias_fin, unidades_list=unidades_list)
 
 
